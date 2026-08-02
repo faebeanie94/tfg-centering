@@ -7,12 +7,16 @@ import { PerspectiveCorrector } from './components/PerspectiveCorrector';
 import { CropEditor } from './components/CropEditor';
 import { BorderEditor } from './components/BorderEditor';
 import { CompareView } from './components/CompareView';
+import { SavedCardsView } from './components/SavedCardsView';
 import { SettingsPanel } from './components/SettingsPanel';
+import { useSavedCards } from './hooks/useSavedCards';
+import type { SavedCardRecord } from './lib/saved-cards';
 
-type Phase = 'capture' | 'perspective' | 'crop' | 'editor' | 'compare';
+type Phase = 'capture' | 'perspective' | 'crop' | 'editor' | 'compare' | 'library';
 
 export default function App() {
   const { settings, updateSettings } = useAppSettings();
+  const { cards, loading: libraryLoading, save: saveToLibrary, remove: deleteFromLibrary } = useSavedCards();
   const [phase, setPhase] = useState<Phase>('capture');
   const [session, setSession] = useState<GradingSession>(emptySession);
   const [currentSide, setCurrentSide] = useState<CardSide>('front');
@@ -22,6 +26,42 @@ export default function App() {
   const [cardNames, setCardNames] = useState<{ front: string; back: string }>({ front: '', back: '' });
   const [showSettings, setShowSettings] = useState(false);
   const [returnPhaseAfterEdit, setReturnPhaseAfterEdit] = useState<Phase>('editor');
+  const [libraryReturnPhase, setLibraryReturnPhase] = useState<Phase>('capture');
+  const [libraryMessage, setLibraryMessage] = useState<string | null>(null);
+
+  const openLibrary = useCallback((returnTo: Phase = phase) => {
+    setLibraryReturnPhase(returnTo);
+    setPhase('library');
+  }, [phase]);
+
+  const handleSaveToLibrary = useCallback(
+    async (sessionToSave: GradingSession, label?: string) => {
+      if (!sessionHasAny(sessionToSave)) return false;
+      await saveToLibrary(sessionToSave, label);
+      setLibraryMessage('Saved to library');
+      window.setTimeout(() => setLibraryMessage(null), 2500);
+      return true;
+    },
+    [saveToLibrary],
+  );
+
+  const handleOpenSavedCard = useCallback((record: SavedCardRecord) => {
+    setSession(record.session);
+    setCardNames({
+      front: record.session.front?.name ?? '',
+      back: record.session.back?.name ?? '',
+    });
+    if (record.session.front) {
+      setWorkingImage(record.session.front.imageSrc);
+      setEditorRects({ outer: record.session.front.outer, inner: record.session.front.inner });
+      setCurrentSide('front');
+    } else if (record.session.back) {
+      setWorkingImage(record.session.back.imageSrc);
+      setEditorRects({ outer: record.session.back.outer, inner: record.session.back.inner });
+      setCurrentSide('back');
+    }
+    setPhase('editor');
+  }, []);
 
   const handleCapture = useCallback((dataUrl: string) => {
     setRawImage(dataUrl);
@@ -124,12 +164,30 @@ export default function App() {
     setPhase('capture');
   }, []);
 
+  if (phase === 'library') {
+    return (
+      <>
+        <SavedCardsView
+          cards={cards}
+          loading={libraryLoading}
+          onClose={() => setPhase(libraryReturnPhase)}
+          onOpen={handleOpenSavedCard}
+          onDelete={deleteFromLibrary}
+        />
+        <SettingsPanel open={showSettings} settings={settings} onChange={updateSettings} onClose={() => setShowSettings(false)} />
+      </>
+    );
+  }
+
   if (phase === 'compare') {
     return (
       <>
         <CompareView
           session={session}
           onEdit={loadSideIntoEditor}
+          onSaveToLibrary={() => handleSaveToLibrary(session)}
+          onLibrary={() => openLibrary('compare')}
+          libraryMessage={libraryMessage}
           onClose={() => {
             if (session.front) loadSideIntoEditor('front');
             else if (session.back) loadSideIntoEditor('back');
@@ -182,6 +240,9 @@ export default function App() {
           onPerspectiveFix={handlePerspectiveFix}
           onDelete={() => handleDeleteSide(currentSide)}
           onCompare={() => setPhase('compare')}
+          onLibrary={() => openLibrary('editor')}
+          onSaveToLibrary={handleSaveToLibrary}
+          libraryMessage={libraryMessage}
           onSettings={() => setShowSettings(true)}
           onReset={handleReset}
         />
@@ -198,6 +259,8 @@ export default function App() {
         onCapture={handleCapture}
         onSettings={() => setShowSettings(true)}
         onCompare={() => setPhase('compare')}
+        onLibrary={() => openLibrary('capture')}
+        savedCount={cards.length}
         hasSavedSides={sessionHasAny(session)}
       />
       <SettingsPanel open={showSettings} settings={settings} onChange={updateSettings} onClose={() => setShowSettings(false)} />

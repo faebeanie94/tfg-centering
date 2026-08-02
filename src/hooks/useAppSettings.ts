@@ -7,9 +7,22 @@ export interface AppSettings {
   autoCapture: boolean;
   levelIndicators: boolean;
   autoCaptureDelayMs: number;
+  torchEnabled: boolean;
+  macroMode: boolean;
+  /** Phone-to-card distance the scanner guide is calibrated for (cm). */
+  scanDistanceCm: 12 | 20 | 30;
+  /** Bottom of frame blocked by phone stand (0.2 = small, 0.32 = typical, 0.45 = large). */
+  scanObstructionBottom: number;
 }
 
 const STORAGE_KEY = 'tfg-centering-settings';
+
+export const SCAN_OBSTRUCTION_OPTIONS = [
+  { label: 'None', value: 0 },
+  { label: 'Small stand (~20%)', value: 0.2 },
+  { label: 'Phone on box (~32%)', value: 0.32 },
+  { label: 'Large stand (~45%)', value: 0.45 },
+] as const;
 
 export const DEFAULT_SETTINGS: AppSettings = {
   handleColor: '#facc15',
@@ -18,13 +31,21 @@ export const DEFAULT_SETTINGS: AppSettings = {
   autoCapture: true,
   levelIndicators: true,
   autoCaptureDelayMs: 1500,
+  torchEnabled: false,
+  macroMode: false,
+  scanDistanceCm: 20,
+  scanObstructionBottom: 0.32,
 };
 
 function loadSettings(): AppSettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_SETTINGS;
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+    const parsed = { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+    if (![12, 20, 30].includes(parsed.scanDistanceCm)) parsed.scanDistanceCm = 20;
+    if (typeof parsed.scanObstructionBottom !== 'number') parsed.scanObstructionBottom = 0.32;
+    parsed.scanObstructionBottom = Math.max(0, Math.min(0.5, parsed.scanObstructionBottom));
+    return parsed;
   } catch {
     return DEFAULT_SETTINGS;
   }

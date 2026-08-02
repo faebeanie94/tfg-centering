@@ -10,8 +10,10 @@ import type { SideSnapshot, GradingSession } from '../lib/session';
 import { formatGrade, sessionHasAny } from '../lib/session';
 import { getTfgGrade, type CardSide } from '../lib/tfg-standards';
 import type { AppSettings } from '../hooks/useAppSettings';
+import { useFitScale, useAppShellMode } from '../hooks/useFitScale';
 import { StandardsPanel } from './StandardsPanel';
 import { CardMenu } from './CardMenu';
+import { EdgeArrowHandle, edgeHandleStyle } from './EdgeArrowHandle';
 
 interface BorderEditorProps {
   imageSrc: string;
@@ -31,6 +33,9 @@ interface BorderEditorProps {
   onCompare: () => void;
   onSettings: () => void;
   onReset: () => void;
+  onLibrary?: () => void;
+  onSaveToLibrary?: (session: GradingSession) => Promise<boolean>;
+  libraryMessage?: string | null;
 }
 
 type DragTarget =
@@ -45,6 +50,10 @@ interface ImageSize {
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
+}
+
+function formatMm(n: number): string {
+  return `${n.toFixed(2)} mm`;
 }
 
 function formatPct(n: number): string {
@@ -69,16 +78,22 @@ export function BorderEditor({
   onCompare,
   onSettings,
   onReset,
+  onLibrary,
+  onSaveToLibrary,
+  libraryMessage,
 }: BorderEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
   const [imageSize, setImageSize] = useState<ImageSize | null>(null);
-  const [displayScale, setDisplayScale] = useState(1);
+  useAppShellMode('editor-mode', true);
+  const displayScale = useFitScale(viewportRef, imageSize);
   const [outer, setOuter] = useState<Rect | null>(initialOuter ?? null);
   const [inner, setInner] = useState<Rect | null>(initialInner ?? null);
   const [dragTarget, setDragTarget] = useState<DragTarget>(null);
   const [showStandards, setShowStandards] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [savingToLibrary, setSavingToLibrary] = useState(false);
   const dragStartRef = useRef<{ x: number; y: number; rect: Rect } | null>(null);
   const patternId = useMemo(() => `stripe-${side}-${Math.random().toString(36).slice(2)}`, [side, imageSrc]);
 
@@ -95,16 +110,6 @@ export function BorderEditor({
     };
     img.src = imageSrc;
   }, [imageSrc, initialOuter, initialInner]);
-
-  useEffect(() => {
-    function updateScale() {
-      if (!containerRef.current || !imageSize) return;
-      setDisplayScale(containerRef.current.clientWidth / imageSize.width);
-    }
-    updateScale();
-    window.addEventListener('resize', updateScale);
-    return () => window.removeEventListener('resize', updateScale);
-  }, [imageSize]);
 
   const result = useMemo(() => {
     if (!outer || !inner) return null;
@@ -237,50 +242,26 @@ export function BorderEditor({
   const otherSide: CardSide = side === 'front' ? 'back' : 'front';
   const otherSaved = session[otherSide] !== null;
 
-  function renderInnerHandles(rect: Rect) {
-    const edges: Array<{ edge: 'left' | 'right' | 'top' | 'bottom'; style: React.CSSProperties; arrow: string }> = [
-      { edge: 'left', style: { left: rect.x * displayScale - 16, top: (rect.y + rect.height * 0.35) * displayScale - 16 }, arrow: '←' },
-      { edge: 'left', style: { left: rect.x * displayScale - 16, top: (rect.y + rect.height * 0.65) * displayScale - 16 }, arrow: '←' },
-      { edge: 'right', style: { left: (rect.x + rect.width) * displayScale - 16, top: (rect.y + rect.height * 0.35) * displayScale - 16 }, arrow: '→' },
-      { edge: 'right', style: { left: (rect.x + rect.width) * displayScale - 16, top: (rect.y + rect.height * 0.65) * displayScale - 16 }, arrow: '→' },
-      { edge: 'top', style: { left: (rect.x + rect.width * 0.35) * displayScale - 16, top: rect.y * displayScale - 16 }, arrow: '↑' },
-      { edge: 'top', style: { left: (rect.x + rect.width * 0.65) * displayScale - 16, top: rect.y * displayScale - 16 }, arrow: '↑' },
-      { edge: 'bottom', style: { left: (rect.x + rect.width * 0.35) * displayScale - 16, top: (rect.y + rect.height) * displayScale - 16 }, arrow: '↓' },
-      { edge: 'bottom', style: { left: (rect.x + rect.width * 0.65) * displayScale - 16, top: (rect.y + rect.height) * displayScale - 16 }, arrow: '↓' },
-    ];
+  function renderEdgeHandles(rect: Rect, rectType: 'outer' | 'inner', color: string) {
+    const edges: Array<'left' | 'right' | 'top' | 'bottom'> = ['left', 'right', 'top', 'bottom'];
 
-    return edges.map(({ edge, style, arrow }, i) => (
+    return edges.map((edge) => (
       <div
-        key={`inner-${edge}-${i}`}
-        className="handle handle-inner"
-        style={{ ...style, backgroundColor: settings.handleColor, borderColor: '#fff' }}
-        onPointerDown={(e) => handlePointerDown({ rect: 'inner', edge }, e)}
+        key={`${rectType}-${edge}`}
+        className="edge-handle-wrap"
+        style={edgeHandleStyle(edge, rect, displayScale, rectType)}
       >
-        {arrow}
+        <EdgeArrowHandle
+          edge={edge}
+          color={color}
+          onPointerDown={(e) => handlePointerDown({ rect: rectType, edge }, e)}
+        />
       </div>
     ));
   }
 
-  function renderOuterHandles(rect: Rect) {
-    const corners: Array<{ corner: 'tl' | 'tr' | 'bl' | 'br'; style: React.CSSProperties }> = [
-      { corner: 'tl', style: { left: rect.x * displayScale - 10, top: rect.y * displayScale - 10 } },
-      { corner: 'tr', style: { left: (rect.x + rect.width) * displayScale - 10, top: rect.y * displayScale - 10 } },
-      { corner: 'bl', style: { left: rect.x * displayScale - 10, top: (rect.y + rect.height) * displayScale - 10 } },
-      { corner: 'br', style: { left: (rect.x + rect.width) * displayScale - 10, top: (rect.y + rect.height) * displayScale - 10 } },
-    ];
-
-    return corners.map(({ corner, style }) => (
-      <div
-        key={`outer-${corner}`}
-        className="handle handle-outer"
-        style={{ ...style, backgroundColor: settings.outerEdgeColor }}
-        onPointerDown={(e) => handlePointerDown({ rect: 'outer', corner }, e)}
-      />
-    ));
-  }
-
   return (
-    <div className="editor">
+    <div className="editor editor-shell">
       <div className="editor-toolbar">
         <button type="button" className="btn btn-secondary btn-small" onClick={onReset}>
           ← New
@@ -304,10 +285,17 @@ export function BorderEditor({
         <button type="button" className="btn btn-secondary btn-small" onClick={() => setShowMenu(true)}>
           ⋯
         </button>
+        {onLibrary && (
+          <button type="button" className="btn btn-secondary btn-small" onClick={onLibrary}>
+            Library
+          </button>
+        )}
         <button type="button" className="btn btn-secondary btn-small" onClick={onSettings}>
           ⚙
         </button>
       </div>
+
+      {libraryMessage && <div className="library-toast">{libraryMessage}</div>}
 
       <div className="grade-banner">
         <div className="grade-banner-brand">
@@ -317,7 +305,6 @@ export function BorderEditor({
             {cardName && <span className="grade-banner-name"> · {cardName}</span>}
           </span>
         </div>
-        <div className="grade-banner-score">{formatGrade(tfgGrade.grade)}</div>
         <div className="grade-banner-metrics">
           <div className="metric">
             <span className="metric-label">L | R</span>
@@ -332,12 +319,14 @@ export function BorderEditor({
             </span>
           </div>
         </div>
+        <div className="grade-banner-score">{formatGrade(tfgGrade.grade)}</div>
       </div>
 
+      <div ref={viewportRef} className="editor-viewport">
       <div
         ref={containerRef}
         className="editor-canvas"
-        style={{ height: displayHeight }}
+        style={{ width: imageSize.width * displayScale, height: displayHeight }}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
@@ -365,22 +354,23 @@ export function BorderEditor({
         </svg>
 
         <div className="handles-layer">
-          {renderOuterHandles(outer)}
-          {renderInnerHandles(inner)}
+          {renderEdgeHandles(outer, 'outer', settings.handleColor)}
+          {renderEdgeHandles(inner, 'inner', settings.handleColor)}
         </div>
 
         <div className="border-label" style={{ left: (outer.x + (inner.x - outer.x) / 2) * displayScale, top: (outer.y + outer.height / 2) * displayScale }}>
-          {result.bordersMm.left.toFixed(1)} mm
+          {formatMm(result.bordersMm.left)}
         </div>
         <div className="border-label" style={{ left: (inner.x + inner.width + (outer.x + outer.width - inner.x - inner.width) / 2) * displayScale, top: (outer.y + outer.height / 2) * displayScale }}>
-          {result.bordersMm.right.toFixed(1)} mm
+          {formatMm(result.bordersMm.right)}
         </div>
         <div className="border-label" style={{ left: (outer.x + outer.width / 2) * displayScale, top: (outer.y + (inner.y - outer.y) / 2) * displayScale }}>
-          {result.bordersMm.top.toFixed(1)} mm
+          {formatMm(result.bordersMm.top)}
         </div>
         <div className="border-label" style={{ left: (outer.x + outer.width / 2) * displayScale, top: (inner.y + inner.height + (outer.y + outer.height - inner.y - inner.height) / 2) * displayScale }}>
-          {result.bordersMm.bottom.toFixed(1)} mm
+          {formatMm(result.bordersMm.bottom)}
         </div>
+      </div>
       </div>
 
       <div className="editor-actions">
@@ -401,41 +391,6 @@ export function BorderEditor({
         )}
       </div>
 
-      <div className="results">
-        <div className="result-cards">
-          <div className="result-card">
-            <div className="result-label">Left / Right</div>
-            <div className="result-ratio">
-              {formatPct(result.leftRight.left)} / {formatPct(result.leftRight.right)}
-            </div>
-            <div className="result-detail">
-              {result.bordersMm.left.toFixed(1)} mm · {result.bordersMm.right.toFixed(1)} mm
-            </div>
-            <div className="result-qualify">Qualify: {tfgGrade.lrQualify.toFixed(3)}</div>
-          </div>
-          <div className="result-card">
-            <div className="result-label">Top / Bottom</div>
-            <div className="result-ratio">
-              {formatPct(result.topBottom.top)} / {formatPct(result.topBottom.bottom)}
-            </div>
-            <div className="result-detail">
-              {result.bordersMm.top.toFixed(1)} mm · {result.bordersMm.bottom.toFixed(1)} mm
-            </div>
-            <div className="result-qualify">Qualify: {tfgGrade.tbQualify.toFixed(3)}</div>
-          </div>
-        </div>
-
-        <div className="result-summary">
-          <div><strong>TFG Centering Grade:</strong> {tfgGrade.label}</div>
-          <div>
-            Worst axis: {tfgGrade.worstAxis === 'left-right' ? 'Left/Right' : 'Top/Bottom'} (qualify {tfgGrade.worstQualify.toFixed(3)})
-          </div>
-          {tfgGrade.ocEligible && (
-            <div className="oc-note">May qualify for OC alt grade (centering ≤5, other criteria ≥5)</div>
-          )}
-        </div>
-      </div>
-
       <StandardsPanel open={showStandards} onClose={() => setShowStandards(false)} />
       <CardMenu
         open={showMenu}
@@ -448,6 +403,24 @@ export function BorderEditor({
         onFlipSide={() => handleSideSwitch(side === 'front' ? 'back' : 'front')}
         onResetLines={resetLines}
         onDelete={onDelete}
+        onSaveToLibrary={
+          onSaveToLibrary
+            ? async () => {
+                setSavingToLibrary(true);
+                try {
+                  const snap = buildSnapshot();
+                  const merged: GradingSession = {
+                    ...session,
+                    [side]: snap ?? session[side],
+                  };
+                  return await onSaveToLibrary(merged);
+                } finally {
+                  setSavingToLibrary(false);
+                }
+              }
+            : undefined
+        }
+        savingToLibrary={savingToLibrary}
         onClose={() => setShowMenu(false)}
       />
     </div>
