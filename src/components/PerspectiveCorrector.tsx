@@ -9,6 +9,7 @@ import { useFitScale, useAppShellMode } from '../hooks/useFitScale';
 
 interface PerspectiveCorrectorProps {
   imageSrc: string;
+  invertColors?: boolean;
   onComplete: (correctedSrc: string) => void;
   onSkip: () => void;
   onCancel: () => void;
@@ -37,7 +38,13 @@ function cornerAtPoint(corners: QuadCorners, x: number, y: number, hitRadius: nu
   return null;
 }
 
-export function PerspectiveCorrector({ imageSrc, onComplete, onSkip, onCancel }: PerspectiveCorrectorProps) {
+export function PerspectiveCorrector({
+  imageSrc,
+  invertColors = false,
+  onComplete,
+  onSkip,
+  onCancel,
+}: PerspectiveCorrectorProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
@@ -269,6 +276,7 @@ export function PerspectiveCorrector({ imageSrc, onComplete, onSkip, onCancel }:
             src={imageSrc}
             alt="Card to correct"
             draggable={false}
+            className={invertColors ? 'editor-image-inverted' : undefined}
             style={{ width: '100%', height: '100%' }}
           />
 

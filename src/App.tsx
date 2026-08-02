@@ -203,6 +203,7 @@ export default function App() {
     return (
       <PerspectiveCorrector
         imageSrc={rawImage}
+        invertColors={settings.invertColors}
         onComplete={handlePerspectiveComplete}
         onSkip={handlePerspectiveSkip}
         onCancel={() => setPhase(workingImage ? 'editor' : 'capture')}
@@ -214,6 +215,7 @@ export default function App() {
     return (
       <CropEditor
         imageSrc={workingImage}
+        invertColors={settings.invertColors}
         onComplete={handleCropComplete}
         onCancel={() => setPhase('editor')}
       />
@@ -244,6 +246,7 @@ export default function App() {
           onSaveToLibrary={handleSaveToLibrary}
           libraryMessage={libraryMessage}
           onSettings={() => setShowSettings(true)}
+          onSettingsChange={updateSettings}
           onReset={handleReset}
         />
         <SettingsPanel open={showSettings} settings={settings} onChange={updateSettings} onClose={() => setShowSettings(false)} />

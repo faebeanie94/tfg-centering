@@ -13,6 +13,8 @@ export interface AppSettings {
   scanDistanceCm: 12 | 20 | 30;
   /** Bottom of frame blocked by phone stand (0.2 = small, 0.32 = typical, 0.45 = large). */
   scanObstructionBottom: number;
+  /** Display-only negative view while aligning borders. */
+  invertColors: boolean;
 }
 
 const STORAGE_KEY = 'tfg-centering-settings';
@@ -35,6 +37,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   macroMode: false,
   scanDistanceCm: 20,
   scanObstructionBottom: 0.32,
+  invertColors: false,
 };
 
 function loadSettings(): AppSettings {
