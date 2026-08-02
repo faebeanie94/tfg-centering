@@ -39,22 +39,87 @@ export function getCameraCapabilities(track: MediaStreamTrack): CameraCapabiliti
   };
 }
 
-export function buildVideoConstraints(macroMode: boolean): MediaTrackConstraints {
-  const constraints: MediaTrackConstraints = {
-    facingMode: 'environment',
+const BASE_TIERS: MediaTrackConstraints[] = [
+  {
+    facingMode: { ideal: 'environment' },
     width: { ideal: 4032, min: 1920 },
     height: { ideal: 3024, min: 1080 },
     focusMode: { ideal: 'continuous' },
-  } as MediaTrackConstraints;
+  } as unknown as MediaTrackConstraints,
+  {
+    facingMode: { ideal: 'environment' },
+    width: { ideal: 1920 },
+    height: { ideal: 1080 },
+  },
+  { facingMode: { ideal: 'environment' } },
+];
 
-  if (macroMode) {
-    return {
-      ...constraints,
-      zoom: { ideal: 1.05 },
-    } as MediaTrackConstraints;
+/** Open the rear camera with progressive fallbacks so iOS Safari always gets a stream. */
+export async function openCameraStream(): Promise<MediaStream> {
+  let lastError: unknown;
+  for (const video of BASE_TIERS) {
+    try {
+      return await navigator.mediaDevices.getUserMedia({ video });
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError ?? new Error('Camera unavailable');
+}
+
+/** @deprecated Use openCameraStream — kept for callers that pass macro flag (ignored at open). */
+export function buildVideoConstraints(
+  _macroMode?: boolean,
+  _tier?: 'max' | 'high',
+): MediaTrackConstraints {
+  return BASE_TIERS[0];
+}
+
+/** After the stream is open, gently request the highest resolution the device reports. */
+export async function applyMaxCaptureResolution(
+  track: MediaStreamTrack,
+): Promise<{ width: number; height: number } | null> {
+  const caps = track.getCapabilities?.();
+  if (!caps?.width || !caps?.height) return null;
+
+  const widthMax = typeof caps.width === 'object' ? caps.width.max : undefined;
+  const heightMax = typeof caps.height === 'object' ? caps.height.max : undefined;
+  if (!widthMax || !heightMax) return null;
+
+  const settings = track.getSettings();
+  if (settings.width === widthMax && settings.height === heightMax) {
+    return { width: widthMax, height: heightMax };
   }
 
-  return constraints;
+  const attempts: MediaTrackConstraints[] = [
+    { width: { ideal: widthMax }, height: { ideal: heightMax } },
+    { advanced: [{ width: widthMax, height: heightMax }] as ExtendedConstraintSet[] },
+  ];
+
+  for (const attempt of attempts) {
+    try {
+      await track.applyConstraints(attempt);
+      const next = track.getSettings();
+      if (next.width && next.height) {
+        return { width: next.width, height: next.height };
+      }
+    } catch {
+      // keep current resolution
+    }
+  }
+
+  return settings.width && settings.height
+    ? { width: settings.width, height: settings.height }
+    : null;
+}
+
+/** Target optical zoom when macro mode is on (~1.5×). */
+export const MACRO_ZOOM_FACTOR = 1.5;
+
+function macroZoomTarget(caps: ExtendedCapabilities): number | undefined {
+  if (!caps.zoom) return undefined;
+  const { min, max } = caps.zoom;
+  return Math.max(min, Math.min(max, MACRO_ZOOM_FACTOR));
 }
 
 function sleep(ms: number): Promise<void> {
@@ -138,9 +203,8 @@ export async function setMacroMode(track: MediaStreamTrack, enabled: boolean): P
     const patch: ExtendedConstraintSet = { focusMode: 'continuous' };
 
     if (caps.zoom) {
-      patch.zoom = enabled
-        ? Math.min(caps.zoom.max, Math.max(caps.zoom.min, caps.zoom.min + (caps.zoom.max - caps.zoom.min) * 0.08))
-        : caps.zoom.min;
+      const target = macroZoomTarget(caps);
+      patch.zoom = enabled ? target ?? caps.zoom.min : caps.zoom.min;
     }
 
     if (enabled && caps.focusDistance) {
@@ -153,7 +217,7 @@ export async function setMacroMode(track: MediaStreamTrack, enabled: boolean): P
   } catch {
     try {
       if (caps.zoom) {
-        const zoom = enabled ? Math.min(caps.zoom.max, caps.zoom.min + 0.15) : caps.zoom.min;
+        const zoom = enabled ? macroZoomTarget(caps) ?? Math.min(caps.zoom.max, MACRO_ZOOM_FACTOR) : caps.zoom.min;
         await track.applyConstraints({ zoom } as ExtendedConstraintSet);
         return true;
       }

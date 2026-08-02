@@ -608,6 +608,28 @@ body.editor-mode #root {
   overflow: hidden;
   background: #000;
   border-radius: var(--radius);
+  position: relative;
+  touch-action: none;
+}
+
+.editor-zoom-layer {
+  flex-shrink: 0;
+  touch-action: none;
+}
+
+.editor-zoom-badge {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  padding: 4px 8px;
+  border-radius: 6px;
+  pointer-events: none;
+  z-index: 20;
 }
 
 /* Editor */
@@ -744,6 +766,10 @@ body.editor-mode #root {
   width: 100%;
   height: auto;
   pointer-events: none;
+}
+
+.editor-canvas img.editor-image-inverted {
+  filter: invert(1);
 }
 
 .editor-overlay {
@@ -1106,8 +1132,7 @@ body.editor-mode #root {
 }
 
 .perspective-guide-line {
-  stroke: rgba(239, 68, 68, 0.55);
-  stroke-width: 1.5;
+  stroke: rgba(239, 68, 68, 0.7);
   stroke-dasharray: 6 6;
   pointer-events: none;
 }
@@ -1685,6 +1710,33 @@ body.editor-mode #root {
   height: 1px;
   background: var(--surface-2);
   margin: 8px 0;
+}
+
+.action-sheet-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 4px;
+  border-bottom: 1px solid var(--surface-2);
+  cursor: pointer;
+}
+
+.action-sheet-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.action-sheet-toggle input {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  accent-color: var(--accent, #22c55e);
 }
 
 .name-edit {

@@ -7,6 +7,8 @@ interface CardMenuProps {
   side: CardSide;
   imageSrc: string;
   cardName: string;
+  invertColors: boolean;
+  onInvertColorsChange: (invert: boolean) => void;
   onNameChange: (name: string) => void;
   onCrop: () => void;
   onPerspectiveFix: () => void;
@@ -23,6 +25,8 @@ export function CardMenu({
   side,
   imageSrc,
   cardName,
+  invertColors,
+  onInvertColorsChange,
   onNameChange,
   onCrop,
   onPerspectiveFix,
@@ -136,6 +140,18 @@ export function CardMenu({
               <span className="action-icon">⊞</span>
               Perspective fix
             </button>
+
+            <label className="action-sheet-toggle">
+              <span className="action-sheet-toggle-label">
+                <span className="action-icon">◑</span>
+                Invert colours
+              </span>
+              <input
+                type="checkbox"
+                checked={invertColors}
+                onChange={(e) => onInvertColorsChange(e.target.checked)}
+              />
+            </label>
 
             <button
               type="button"

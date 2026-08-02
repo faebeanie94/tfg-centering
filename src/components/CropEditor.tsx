@@ -4,6 +4,7 @@ import { cropImage, defaultCropRect } from '../lib/crop-image';
 
 interface CropEditorProps {
   imageSrc: string;
+  invertColors?: boolean;
   onComplete: (croppedSrc: string) => void;
   onCancel: () => void;
 }
@@ -17,7 +18,7 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
-export function CropEditor({ imageSrc, onComplete, onCancel }: CropEditorProps) {
+export function CropEditor({ imageSrc, invertColors = false, onComplete, onCancel }: CropEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
   const [displayScale, setDisplayScale] = useState(1);
@@ -167,7 +168,13 @@ export function CropEditor({ imageSrc, onComplete, onCancel }: CropEditorProps) 
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
       >
-        <img src={imageSrc} alt="Crop preview" draggable={false} style={{ width: '100%' }} />
+        <img
+          src={imageSrc}
+          alt="Crop preview"
+          draggable={false}
+          className={invertColors ? 'editor-image-inverted' : undefined}
+          style={{ width: '100%' }}
+        />
 
         <svg className="editor-overlay" viewBox={`0 0 ${imageSize.width} ${imageSize.height}`} preserveAspectRatio="none">
           <defs>

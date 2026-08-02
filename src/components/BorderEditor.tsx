@@ -11,6 +11,7 @@ import { formatGrade, sessionHasAny } from '../lib/session';
 import { getTfgGrade, type CardSide } from '../lib/tfg-standards';
 import type { AppSettings } from '../hooks/useAppSettings';
 import { useFitScale, useAppShellMode } from '../hooks/useFitScale';
+import { usePinchZoom } from '../hooks/usePinchZoom';
 import { StandardsPanel } from './StandardsPanel';
 import { CardMenu } from './CardMenu';
 import { EdgeArrowHandle, edgeHandleStyle } from './EdgeArrowHandle';
@@ -32,6 +33,7 @@ interface BorderEditorProps {
   onDelete: () => void;
   onCompare: () => void;
   onSettings: () => void;
+  onSettingsChange: (patch: Partial<AppSettings>) => void;
   onReset: () => void;
   onLibrary?: () => void;
   onSaveToLibrary?: (session: GradingSession) => Promise<boolean>;
@@ -77,6 +79,7 @@ export function BorderEditor({
   onDelete,
   onCompare,
   onSettings,
+  onSettingsChange,
   onReset,
   onLibrary,
   onSaveToLibrary,
@@ -87,6 +90,7 @@ export function BorderEditor({
   const [imageSize, setImageSize] = useState<ImageSize | null>(null);
   useAppShellMode('editor-mode', true);
   const displayScale = useFitScale(viewportRef, imageSize);
+  const { zoom, reset: resetZoom, layerStyle, viewportHandlers } = usePinchZoom(viewportRef, 15);
   const [outer, setOuter] = useState<Rect | null>(initialOuter ?? null);
   const [inner, setInner] = useState<Rect | null>(initialInner ?? null);
   const [dragTarget, setDragTarget] = useState<DragTarget>(null);
@@ -96,6 +100,10 @@ export function BorderEditor({
   const [savingToLibrary, setSavingToLibrary] = useState(false);
   const dragStartRef = useRef<{ x: number; y: number; rect: Rect } | null>(null);
   const patternId = useMemo(() => `stripe-${side}-${Math.random().toString(36).slice(2)}`, [side, imageSrc]);
+
+  useEffect(() => {
+    resetZoom();
+  }, [imageSrc, resetZoom]);
 
   useEffect(() => {
     const img = new Image();
@@ -175,8 +183,10 @@ export function BorderEditor({
       if (!dragTarget || !dragStartRef.current || !imageSize) return;
 
       const start = dragStartRef.current;
-      const dx = (e.clientX - start.x) / displayScale;
-      const dy = (e.clientY - start.y) / displayScale;
+      const rect = containerRef.current?.getBoundingClientRect();
+      const imageScale = rect && imageSize ? rect.width / imageSize.width : displayScale;
+      const dx = (e.clientX - start.x) / imageScale;
+      const dy = (e.clientY - start.y) / imageScale;
       const r = start.rect;
       let next: Rect = { ...r };
 
@@ -322,7 +332,8 @@ export function BorderEditor({
         <div className="grade-banner-score">{formatGrade(tfgGrade.grade)}</div>
       </div>
 
-      <div ref={viewportRef} className="editor-viewport">
+      <div ref={viewportRef} className="editor-viewport" {...viewportHandlers}>
+      <div className="editor-zoom-layer" style={layerStyle}>
       <div
         ref={containerRef}
         className="editor-canvas"
@@ -331,7 +342,13 @@ export function BorderEditor({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
       >
-        <img src={imageSrc} alt="Trading card" draggable={false} style={{ width: '100%' }} />
+        <img
+          src={imageSrc}
+          alt="Trading card"
+          draggable={false}
+          className={settings.invertColors ? 'editor-image-inverted' : undefined}
+          style={{ width: '100%' }}
+        />
 
         <svg
           className="editor-overlay"
@@ -372,6 +389,10 @@ export function BorderEditor({
         </div>
       </div>
       </div>
+      {zoom > 1 && (
+        <div className="editor-zoom-badge">{zoom.toFixed(1)}×</div>
+      )}
+      </div>
 
       <div className="editor-actions">
         <button type="button" className="btn btn-secondary" onClick={() => setShowStandards(true)}>
@@ -397,6 +418,8 @@ export function BorderEditor({
         side={side}
         imageSrc={imageSrc}
         cardName={cardName}
+        invertColors={settings.invertColors}
+        onInvertColorsChange={(invertColors) => onSettingsChange({ invertColors })}
         onNameChange={onNameChange}
         onCrop={onCrop}
         onPerspectiveFix={onPerspectiveFix}

@@ -86,6 +86,15 @@ export function SettingsPanel({ open, settings, onChange, onClose }: SettingsPan
             value={settings.outerEdgeColor}
             onChange={(v) => onChange({ outerEdgeColor: v })}
           />
+          <label className="toggle-row">
+            <span>Invert image colours</span>
+            <input
+              type="checkbox"
+              checked={settings.invertColors}
+              onChange={(e) => onChange({ invertColors: e.target.checked })}
+            />
+          </label>
+          <p className="settings-hint">Display only — helps see borders on dark or light cards. Exports stay normal.</p>
         </section>
 
         <section className="settings-section">

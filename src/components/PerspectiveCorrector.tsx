@@ -9,6 +9,7 @@ import { useFitScale, useAppShellMode } from '../hooks/useFitScale';
 
 interface PerspectiveCorrectorProps {
   imageSrc: string;
+  invertColors?: boolean;
   onComplete: (correctedSrc: string) => void;
   onSkip: () => void;
   onCancel: () => void;
@@ -21,9 +22,13 @@ const CORNERS: Array<{ key: CornerKey; label: string; arrow: string }> = [
   { key: 'br', label: 'BR', arrow: '↘' },
 ];
 
-const CROSSHAIR_ARM = 48;
 const LOUPE_SIZE = 96;
-const LOUPE_ZOOM = 4;
+const LOUPE_ZOOM = 2;
+
+/** Convert desired on-screen pixels to SVG/image coordinate units. */
+function screenPx(px: number, displayScale: number) {
+  return px / Math.max(displayScale, 0.02);
+}
 
 function cornerAtPoint(corners: QuadCorners, x: number, y: number, hitRadius: number): CornerKey | null {
   for (const { key } of CORNERS) {
@@ -33,7 +38,13 @@ function cornerAtPoint(corners: QuadCorners, x: number, y: number, hitRadius: nu
   return null;
 }
 
-export function PerspectiveCorrector({ imageSrc, onComplete, onSkip, onCancel }: PerspectiveCorrectorProps) {
+export function PerspectiveCorrector({
+  imageSrc,
+  invertColors = false,
+  onComplete,
+  onSkip,
+  onCancel,
+}: PerspectiveCorrectorProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
@@ -114,7 +125,7 @@ export function PerspectiveCorrector({ imageSrc, onComplete, onSkip, onCancel }:
 
       const center = LOUPE_SIZE / 2;
       ctx.strokeStyle = '#ef4444';
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = 2.5;
       ctx.beginPath();
       ctx.moveTo(center, 0);
       ctx.lineTo(center, LOUPE_SIZE);
@@ -123,9 +134,9 @@ export function PerspectiveCorrector({ imageSrc, onComplete, onSkip, onCancel }:
       ctx.stroke();
 
       ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 1;
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(center, center, 14, 0, Math.PI * 2);
+      ctx.arc(center, center, 18, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
 
@@ -170,7 +181,7 @@ export function PerspectiveCorrector({ imageSrc, onComplete, onSkip, onCancel }:
       const rect = containerRef.current.getBoundingClientRect();
       const imageX = (e.clientX - rect.left) / displayScale;
       const imageY = (e.clientY - rect.top) / displayScale;
-      const hitRadius = 36 / displayScale;
+      const hitRadius = screenPx(26, displayScale);
       const hit = cornerAtPoint(corners, imageX, imageY, hitRadius);
 
       beginDrag(e.clientX, e.clientY, hit ?? selectedCorner);
@@ -227,6 +238,16 @@ export function PerspectiveCorrector({ imageSrc, onComplete, onSkip, onCancel }:
 
   const displayHeight = imageSize.height * displayScale;
   const displayWidth = imageSize.width * displayScale;
+  const crosshairArm = screenPx(16, displayScale);
+  const crosshairStroke = screenPx(1.75, displayScale);
+  const crosshairStrokeActive = screenPx(2.25, displayScale);
+  const guideStroke = screenPx(1.25, displayScale);
+  const hitRadius = screenPx(26, displayScale);
+  const hubRadius = screenPx(5, displayScale);
+  const hubStroke = screenPx(1.25, displayScale);
+  const hubStrokeActive = screenPx(1.75, displayScale);
+  const centerDot = screenPx(2, displayScale);
+  const outlineExtra = screenPx(0.75, displayScale);
   const points = [corners.tl, corners.tr, corners.br, corners.bl, corners.tl];
   const linePoints = points.map((p) => `${p.x},${p.y}`).join(' ');
   const active = corners[selectedCorner];
@@ -255,6 +276,7 @@ export function PerspectiveCorrector({ imageSrc, onComplete, onSkip, onCancel }:
             src={imageSrc}
             alt="Card to correct"
             draggable={false}
+            className={invertColors ? 'editor-image-inverted' : undefined}
             style={{ width: '100%', height: '100%' }}
           />
 
@@ -271,21 +293,73 @@ export function PerspectiveCorrector({ imageSrc, onComplete, onSkip, onCancel }:
               strokeDasharray="8 4"
             />
 
-            <line x1={active.x} y1={0} x2={active.x} y2={imageSize.height} className="perspective-guide-line" />
-            <line x1={0} y1={active.y} x2={imageSize.width} y2={active.y} className="perspective-guide-line" />
+            <line
+              x1={active.x}
+              y1={0}
+              x2={active.x}
+              y2={imageSize.height}
+              className="perspective-guide-line"
+              strokeWidth={guideStroke}
+            />
+            <line
+              x1={0}
+              y1={active.y}
+              x2={imageSize.width}
+              y2={active.y}
+              className="perspective-guide-line"
+              strokeWidth={guideStroke}
+            />
 
             {CORNERS.map(({ key }) => {
               const p = corners[key];
               const isActive = key === selectedCorner;
               const color = isActive ? '#ef4444' : '#ffffff';
+              const stroke = isActive ? crosshairStrokeActive : crosshairStroke;
+              const outline = outlineExtra;
               return (
                 <g key={key} className={`perspective-crosshair ${isActive ? 'active' : ''}`}>
-                  <line x1={p.x - CROSSHAIR_ARM} y1={p.y} x2={p.x + CROSSHAIR_ARM} y2={p.y} stroke={color} strokeWidth={isActive ? 2.5 : 2} />
-                  <line x1={p.x} y1={p.y - CROSSHAIR_ARM} x2={p.x} y2={p.y + CROSSHAIR_ARM} stroke={color} strokeWidth={isActive ? 2.5 : 2} />
+                  <line
+                    x1={p.x - crosshairArm}
+                    y1={p.y}
+                    x2={p.x + crosshairArm}
+                    y2={p.y}
+                    stroke="#000"
+                    strokeWidth={stroke + outline * 2}
+                    strokeOpacity={0.45}
+                    strokeLinecap="round"
+                  />
+                  <line
+                    x1={p.x}
+                    y1={p.y - crosshairArm}
+                    x2={p.x}
+                    y2={p.y + crosshairArm}
+                    stroke="#000"
+                    strokeWidth={stroke + outline * 2}
+                    strokeOpacity={0.45}
+                    strokeLinecap="round"
+                  />
+                  <line
+                    x1={p.x - crosshairArm}
+                    y1={p.y}
+                    x2={p.x + crosshairArm}
+                    y2={p.y}
+                    stroke={color}
+                    strokeWidth={stroke}
+                    strokeLinecap="round"
+                  />
+                  <line
+                    x1={p.x}
+                    y1={p.y - crosshairArm}
+                    x2={p.x}
+                    y2={p.y + crosshairArm}
+                    stroke={color}
+                    strokeWidth={stroke}
+                    strokeLinecap="round"
+                  />
                   <circle
                     cx={p.x}
                     cy={p.y}
-                    r={28}
+                    r={hitRadius}
                     fill="transparent"
                     className="perspective-crosshair-hit"
                     onPointerDown={(e) => {
@@ -295,8 +369,16 @@ export function PerspectiveCorrector({ imageSrc, onComplete, onSkip, onCancel }:
                       containerRef.current?.setPointerCapture(e.pointerId);
                     }}
                   />
-                  <circle cx={p.x} cy={p.y} r={16} fill="rgba(0,0,0,0.25)" stroke={color} strokeWidth={isActive ? 2.5 : 2} pointerEvents="none" />
-                  <circle cx={p.x} cy={p.y} r={3} fill={color} pointerEvents="none" />
+                  <circle
+                    cx={p.x}
+                    cy={p.y}
+                    r={hubRadius}
+                    fill="rgba(0,0,0,0.28)"
+                    stroke={color}
+                    strokeWidth={isActive ? hubStrokeActive : hubStroke}
+                    pointerEvents="none"
+                  />
+                  <circle cx={p.x} cy={p.y} r={centerDot} fill={color} pointerEvents="none" />
                 </g>
               );
             })}
