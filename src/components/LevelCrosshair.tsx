@@ -1,10 +1,16 @@
 interface LevelCrosshairProps {
-  level: { isLevel: boolean; gamma: number | null; beta: number | null; supported: boolean };
+  level: {
+    isLevel: boolean;
+    tiltFromFlat: number | null;
+    roll: number | null;
+    supported: boolean;
+    permissionGranted: boolean;
+  };
   progress?: number;
 }
 
 export function LevelCrosshair({ level, progress = 0 }: LevelCrosshairProps) {
-  const { isLevel, gamma, beta, supported } = level;
+  const { isLevel, tiltFromFlat, roll, supported, permissionGranted } = level;
   const color = isLevel ? '#22c55e' : '#ef4444';
 
   return (
@@ -35,13 +41,23 @@ export function LevelCrosshair({ level, progress = 0 }: LevelCrosshairProps) {
       </svg>
 
       <div className={`level-status ${isLevel ? 'level-ok' : 'level-bad'}`}>
-        {isLevel ? (progress > 0 ? 'Hold steady…' : 'Level — ready to capture') : 'Align device parallel to card'}
+        {!permissionGranted
+          ? 'Motion access needed for level — allow in Settings or capture manually'
+          : isLevel
+            ? progress > 0
+              ? 'Hold steady…'
+              : 'Level — ready to capture'
+            : 'Hold phone parallel to card'}
       </div>
 
-      {supported && gamma !== null && beta !== null && (
+      {supported && permissionGranted && tiltFromFlat !== null && roll !== null && (
         <div className="level-debug">
-          Tilt L/R: {gamma.toFixed(1)}° · Forward: {Math.abs(Math.abs(beta) - 90).toFixed(1)}° off
+          Flat: {tiltFromFlat.toFixed(1)}° · Roll: {roll.toFixed(1)}°
         </div>
+      )}
+
+      {supported && !permissionGranted && (
+        <div className="level-debug">Allow motion access when prompted</div>
       )}
 
       {!supported && (

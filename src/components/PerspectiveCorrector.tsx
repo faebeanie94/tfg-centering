@@ -13,12 +13,34 @@ interface PerspectiveCorrectorProps {
   onCancel: () => void;
 }
 
+const CORNERS: Array<{ key: CornerKey; label: string; arrow: string }> = [
+  { key: 'tl', label: 'TL', arrow: '↖' },
+  { key: 'tr', label: 'TR', arrow: '↗' },
+  { key: 'bl', label: 'BL', arrow: '↙' },
+  { key: 'br', label: 'BR', arrow: '↘' },
+];
+
+const CROSSHAIR_ARM = 48;
+const LOUPE_SIZE = 140;
+const LOUPE_ZOOM = 3;
+
+function cornerAtPoint(corners: QuadCorners, x: number, y: number, hitRadius: number): CornerKey | null {
+  for (const { key } of CORNERS) {
+    const p = corners[key];
+    if (Math.hypot(p.x - x, p.y - y) <= hitRadius) return key;
+  }
+  return null;
+}
+
 export function PerspectiveCorrector({ imageSrc, onComplete, onSkip, onCancel }: PerspectiveCorrectorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
+  const loupeCanvasRef = useRef<HTMLCanvasElement>(null);
   const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
   const [displayScale, setDisplayScale] = useState(1);
   const [corners, setCorners] = useState<QuadCorners | null>(null);
-  const [dragging, setDragging] = useState<CornerKey | null>(null);
+  const [selectedCorner, setSelectedCorner] = useState<CornerKey>('tl');
+  const [dragging, setDragging] = useState(false);
   const [processing, setProcessing] = useState(false);
   const dragStartRef = useRef<{ x: number; y: number; corners: QuadCorners } | null>(null);
 
@@ -42,15 +64,106 @@ export function PerspectiveCorrector({ imageSrc, onComplete, onSkip, onCancel }:
     return () => window.removeEventListener('resize', updateScale);
   }, [imageSize]);
 
-  const handlePointerDown = useCallback(
-    (key: CornerKey, e: React.PointerEvent) => {
-      e.preventDefault();
-      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  const drawLoupe = useCallback(
+    (corner: CornerKey) => {
+      const canvas = loupeCanvasRef.current;
+      const img = imageRef.current;
+      if (!canvas || !img || !corners || !imageSize) return;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = LOUPE_SIZE * dpr;
+      canvas.height = LOUPE_SIZE * dpr;
+      canvas.style.width = `${LOUPE_SIZE}px`;
+      canvas.style.height = `${LOUPE_SIZE}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      const { x: cx, y: cy } = corners[corner];
+      const srcSize = LOUPE_SIZE / LOUPE_ZOOM;
+
+      ctx.clearRect(0, 0, LOUPE_SIZE, LOUPE_SIZE);
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(LOUPE_SIZE / 2, LOUPE_SIZE / 2, LOUPE_SIZE / 2 - 2, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.drawImage(
+        img,
+        cx - srcSize / 2,
+        cy - srcSize / 2,
+        srcSize,
+        srcSize,
+        0,
+        0,
+        LOUPE_SIZE,
+        LOUPE_SIZE,
+      );
+
+      const center = LOUPE_SIZE / 2;
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(center, 0);
+      ctx.lineTo(center, LOUPE_SIZE);
+      ctx.moveTo(0, center);
+      ctx.lineTo(LOUPE_SIZE, center);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(center, center, 10, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(LOUPE_SIZE / 2, LOUPE_SIZE / 2, LOUPE_SIZE / 2 - 1.5, 0, Math.PI * 2);
+      ctx.stroke();
+    },
+    [corners, imageSize],
+  );
+
+  useEffect(() => {
+    if (dragging && corners) drawLoupe(selectedCorner);
+  }, [dragging, corners, selectedCorner, drawLoupe]);
+
+  const beginDrag = useCallback(
+    (clientX: number, clientY: number, corner: CornerKey) => {
       if (!corners) return;
-      dragStartRef.current = { x: e.clientX, y: e.clientY, corners: { ...corners, [key]: { ...corners[key] } } };
-      setDragging(key);
+      setSelectedCorner(corner);
+      dragStartRef.current = {
+        x: clientX,
+        y: clientY,
+        corners: {
+          tl: { ...corners.tl },
+          tr: { ...corners.tr },
+          br: { ...corners.br },
+          bl: { ...corners.bl },
+        },
+      };
+      setDragging(true);
     },
     [corners],
+  );
+
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      if (!corners || !imageSize || !containerRef.current) return;
+      e.preventDefault();
+      containerRef.current.setPointerCapture(e.pointerId);
+
+      const rect = containerRef.current.getBoundingClientRect();
+      const imageX = (e.clientX - rect.left) / displayScale;
+      const imageY = (e.clientY - rect.top) / displayScale;
+      const hitRadius = 36 / displayScale;
+      const hit = cornerAtPoint(corners, imageX, imageY, hitRadius);
+
+      beginDrag(e.clientX, e.clientY, hit ?? selectedCorner);
+    },
+    [corners, imageSize, displayScale, selectedCorner, beginDrag],
   );
 
   const handlePointerMove = useCallback(
@@ -58,12 +171,12 @@ export function PerspectiveCorrector({ imageSrc, onComplete, onSkip, onCancel }:
       if (!dragging || !dragStartRef.current || !imageSize) return;
       const dx = (e.clientX - dragStartRef.current.x) / displayScale;
       const dy = (e.clientY - dragStartRef.current.y) / displayScale;
-      const start = dragStartRef.current.corners[dragging];
+      const start = dragStartRef.current.corners[selectedCorner];
       setCorners((prev) =>
         prev
           ? {
               ...prev,
-              [dragging]: {
+              [selectedCorner]: {
                 x: Math.max(0, Math.min(imageSize.width, start.x + dx)),
                 y: Math.max(0, Math.min(imageSize.height, start.y + dy)),
               },
@@ -71,12 +184,16 @@ export function PerspectiveCorrector({ imageSrc, onComplete, onSkip, onCancel }:
           : prev,
       );
     },
-    [dragging, displayScale, imageSize],
+    [dragging, displayScale, imageSize, selectedCorner],
   );
 
   const handlePointerUp = useCallback(() => {
     dragStartRef.current = null;
-    setDragging(null);
+    setDragging(false);
+  }, []);
+
+  const selectCorner = useCallback((key: CornerKey) => {
+    setSelectedCorner(key);
   }, []);
 
   async function applyCorrection() {
@@ -97,15 +214,13 @@ export function PerspectiveCorrector({ imageSrc, onComplete, onSkip, onCancel }:
   }
 
   const displayHeight = imageSize.height * displayScale;
-  const cornerList: Array<{ key: CornerKey; label: string }> = [
-    { key: 'tl', label: 'TL' },
-    { key: 'tr', label: 'TR' },
-    { key: 'br', label: 'BR' },
-    { key: 'bl', label: 'BL' },
-  ];
-
   const points = [corners.tl, corners.tr, corners.br, corners.bl, corners.tl];
   const linePoints = points.map((p) => `${p.x},${p.y}`).join(' ');
+  const active = corners[selectedCorner];
+
+  const canvasWidth = imageSize.width * displayScale;
+  const loupeLeft = Math.max(8, Math.min(active.x * displayScale - LOUPE_SIZE / 2, canvasWidth - LOUPE_SIZE - 8));
+  const loupeTop = Math.max(8, active.y * displayScale - LOUPE_SIZE - 20);
 
   return (
     <div className="perspective">
@@ -117,42 +232,129 @@ export function PerspectiveCorrector({ imageSrc, onComplete, onSkip, onCancel }:
       </div>
 
       <p className="perspective-hint">
-        Drag the four corners to the card edges. This flattens skewed photos before measuring borders.
+        Place the centre of each cross on a card corner. Drag anywhere to move the selected marker, or pick a corner below.
       </p>
 
       <div
         ref={containerRef}
-        className="editor-canvas"
+        className="editor-canvas perspective-canvas"
         style={{ height: displayHeight }}
+        onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
       >
-        <img src={imageSrc} alt="Card to correct" draggable={false} style={{ width: '100%' }} />
+        <img
+          ref={imageRef}
+          src={imageSrc}
+          alt="Card to correct"
+          draggable={false}
+          style={{ width: '100%' }}
+        />
 
         <svg
-          className="editor-overlay"
+          className="editor-overlay perspective-overlay"
           viewBox={`0 0 ${imageSize.width} ${imageSize.height}`}
           preserveAspectRatio="none"
         >
-          <polygon points={linePoints} fill="rgba(59,130,246,0.15)" stroke="#3b82f6" strokeWidth={3} strokeDasharray="8 4" />
+          <polygon
+            points={linePoints}
+            fill="rgba(59,130,246,0.12)"
+            stroke="#3b82f6"
+            strokeWidth={2}
+            strokeDasharray="8 4"
+          />
+
+          <line
+            x1={active.x}
+            y1={0}
+            x2={active.x}
+            y2={imageSize.height}
+            className="perspective-guide-line"
+          />
+          <line
+            x1={0}
+            y1={active.y}
+            x2={imageSize.width}
+            y2={active.y}
+            className="perspective-guide-line"
+          />
+
+          {CORNERS.map(({ key }) => {
+            const p = corners[key];
+            const isActive = key === selectedCorner;
+            const color = isActive ? '#ef4444' : '#ffffff';
+            return (
+              <g key={key} className={`perspective-crosshair ${isActive ? 'active' : ''}`}>
+                <line
+                  x1={p.x - CROSSHAIR_ARM}
+                  y1={p.y}
+                  x2={p.x + CROSSHAIR_ARM}
+                  y2={p.y}
+                  stroke={color}
+                  strokeWidth={isActive ? 2.5 : 2}
+                />
+                <line
+                  x1={p.x}
+                  y1={p.y - CROSSHAIR_ARM}
+                  x2={p.x}
+                  y2={p.y + CROSSHAIR_ARM}
+                  stroke={color}
+                  strokeWidth={isActive ? 2.5 : 2}
+                />
+                <circle
+                  cx={p.x}
+                  cy={p.y}
+                  r={28}
+                  fill="transparent"
+                  className="perspective-crosshair-hit"
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    selectCorner(key);
+                    beginDrag(e.clientX, e.clientY, key);
+                    containerRef.current?.setPointerCapture(e.pointerId);
+                  }}
+                />
+                <circle
+                  cx={p.x}
+                  cy={p.y}
+                  r={16}
+                  fill="rgba(0,0,0,0.25)"
+                  stroke={color}
+                  strokeWidth={isActive ? 2.5 : 2}
+                  pointerEvents="none"
+                />
+                <circle cx={p.x} cy={p.y} r={3} fill={color} pointerEvents="none" />
+              </g>
+            );
+          })}
         </svg>
 
-        <div className="handles-layer">
-          {cornerList.map(({ key, label }) => (
-            <div
-              key={key}
-              className="handle handle-perspective"
-              style={{
-                left: corners[key].x * displayScale - 18,
-                top: corners[key].y * displayScale - 18,
-              }}
-              onPointerDown={(e) => handlePointerDown(key, e)}
-            >
-              {label}
-            </div>
-          ))}
-        </div>
+        {dragging && (
+          <div
+            className="perspective-loupe"
+            style={{ left: loupeLeft, top: loupeTop, width: LOUPE_SIZE, height: LOUPE_SIZE }}
+          >
+            <canvas ref={loupeCanvasRef} />
+          </div>
+        )}
+
+        {dragging && (
+          <div className="perspective-drag-hint">Drag anywhere</div>
+        )}
+      </div>
+
+      <div className="perspective-corner-tabs">
+        {CORNERS.map(({ key, label, arrow }) => (
+          <button
+            key={key}
+            type="button"
+            className={`perspective-corner-tab ${selectedCorner === key ? 'active' : ''}`}
+            onClick={() => selectCorner(key)}
+          >
+            {label} {arrow}
+          </button>
+        ))}
       </div>
 
       <div className="perspective-actions">

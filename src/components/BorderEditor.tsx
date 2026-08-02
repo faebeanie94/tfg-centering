@@ -47,6 +47,10 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
+function formatMm(n: number): string {
+  return `${n.toFixed(2)} mm`;
+}
+
 function formatPct(n: number): string {
   return `${n.toFixed(1)}%`;
 }
@@ -370,16 +374,16 @@ export function BorderEditor({
         </div>
 
         <div className="border-label" style={{ left: (outer.x + (inner.x - outer.x) / 2) * displayScale, top: (outer.y + outer.height / 2) * displayScale }}>
-          {result.bordersMm.left.toFixed(1)} mm
+          {formatMm(result.bordersMm.left)}
         </div>
         <div className="border-label" style={{ left: (inner.x + inner.width + (outer.x + outer.width - inner.x - inner.width) / 2) * displayScale, top: (outer.y + outer.height / 2) * displayScale }}>
-          {result.bordersMm.right.toFixed(1)} mm
+          {formatMm(result.bordersMm.right)}
         </div>
         <div className="border-label" style={{ left: (outer.x + outer.width / 2) * displayScale, top: (outer.y + (inner.y - outer.y) / 2) * displayScale }}>
-          {result.bordersMm.top.toFixed(1)} mm
+          {formatMm(result.bordersMm.top)}
         </div>
         <div className="border-label" style={{ left: (outer.x + outer.width / 2) * displayScale, top: (inner.y + inner.height + (outer.y + outer.height - inner.y - inner.height) / 2) * displayScale }}>
-          {result.bordersMm.bottom.toFixed(1)} mm
+          {formatMm(result.bordersMm.bottom)}
         </div>
       </div>
 
@@ -409,7 +413,7 @@ export function BorderEditor({
               {formatPct(result.leftRight.left)} / {formatPct(result.leftRight.right)}
             </div>
             <div className="result-detail">
-              {result.bordersMm.left.toFixed(1)} mm · {result.bordersMm.right.toFixed(1)} mm
+              {formatMm(result.bordersMm.left)} · {formatMm(result.bordersMm.right)}
             </div>
             <div className="result-qualify">Qualify: {tfgGrade.lrQualify.toFixed(3)}</div>
           </div>
@@ -419,7 +423,7 @@ export function BorderEditor({
               {formatPct(result.topBottom.top)} / {formatPct(result.topBottom.bottom)}
             </div>
             <div className="result-detail">
-              {result.bordersMm.top.toFixed(1)} mm · {result.bordersMm.bottom.toFixed(1)} mm
+              {formatMm(result.bordersMm.top)} · {formatMm(result.bordersMm.bottom)}
             </div>
             <div className="result-qualify">Qualify: {tfgGrade.tbQualify.toFixed(3)}</div>
           </div>

@@ -1,9 +1,19 @@
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import { useDeviceLevel } from '../hooks/useDeviceLevel';
+import { useCardEdgeDetector } from '../hooks/useCardEdgeDetector';
 import { useAutoCapture } from '../hooks/useAutoCapture';
 import type { AppSettings } from '../hooks/useAppSettings';
 import type { CardSide } from '../lib/tfg-standards';
-import { LevelCrosshair } from './LevelCrosshair';
+import {
+  buildVideoConstraints,
+  getCameraCapabilities,
+  setMacroMode,
+  setTorch,
+  type CameraCapabilities,
+} from '../lib/camera-controls';
+import { requestMotionPermission } from '../lib/motion-permission';
+import { getLevelHint } from '../lib/level-hint';
+import { ScannerOverlay } from './ScannerOverlay';
 
 interface ImageCaptureProps {
   side: CardSide;
@@ -28,7 +38,19 @@ export function ImageCapture({
   const [cameraActive, setCameraActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const level = useDeviceLevel(cameraActive && settings.levelIndicators);
+  const [motionGranted, setMotionGranted] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
+  const [macroOn, setMacroOn] = useState(false);
+  const [cameraCaps, setCameraCaps] = useState<CameraCapabilities>({ torch: false, macro: false });
+
+  const showLevel = settings.levelIndicators;
+  const level = useDeviceLevel(cameraActive && showLevel, motionGranted);
+  const { cardBox, detected } = useCardEdgeDetector(cameraActive, videoRef);
+
+  useEffect(() => {
+    document.body.classList.toggle('scanner-mode', cameraActive);
+    return () => document.body.classList.remove('scanner-mode');
+  }, [cameraActive]);
 
   const takePhoto = useCallback(() => {
     const video = videoRef.current;
@@ -43,26 +65,70 @@ export function ImageCapture({
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     setCameraActive(false);
+    setTorchOn(false);
+    setMacroOn(false);
   }, [onCapture]);
 
   const { progress, isCountingDown } = useAutoCapture({
-    enabled: cameraActive && settings.autoCapture && settings.levelIndicators,
+    enabled: cameraActive && settings.autoCapture && showLevel && motionGranted,
     isLevel: level.isLevel,
     delayMs: settings.autoCaptureDelayMs,
     onCapture: takePhoto,
   });
 
+  useEffect(() => {
+    const video = videoRef.current;
+    const stream = streamRef.current;
+    if (!cameraActive || !video || !stream) return;
+
+    video.srcObject = stream;
+    void video.play().catch(() => {
+      setError('Could not start camera preview. Please upload a photo instead.');
+      stream.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+      setCameraActive(false);
+    });
+  }, [cameraActive]);
+
+  async function applyCameraOptions(track: MediaStreamTrack, torch: boolean, macro: boolean) {
+    const caps = getCameraCapabilities(track);
+    setCameraCaps(caps);
+
+    if (torch && caps.torch) {
+      const ok = await setTorch(track, true);
+      setTorchOn(ok);
+    } else {
+      setTorchOn(false);
+    }
+
+    if (macro) {
+      const ok = await setMacroMode(track, true);
+      setMacroOn(ok);
+    } else {
+      setMacroOn(false);
+    }
+  }
+
   async function startCamera() {
     setError(null);
+    setTorchOn(false);
+    setMacroOn(false);
+
+    let granted = true;
+    if (showLevel) {
+      granted = await requestMotionPermission();
+      setMotionGranted(granted);
+    } else {
+      setMotionGranted(false);
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+        video: buildVideoConstraints(settings.macroMode),
       });
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
+      const track = stream.getVideoTracks()[0];
+      await applyCameraOptions(track, settings.torchEnabled, settings.macroMode);
       setCameraActive(true);
     } catch {
       setError('Camera access denied or unavailable. Please upload a photo instead.');
@@ -72,7 +138,26 @@ export function ImageCapture({
   function stopCamera() {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
     setCameraActive(false);
+    setTorchOn(false);
+    setMacroOn(false);
+  }
+
+  async function toggleTorch() {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track || !cameraCaps.torch) return;
+    const next = !torchOn;
+    const ok = await setTorch(track, next);
+    if (ok) setTorchOn(next);
+  }
+
+  async function toggleMacro() {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track || !cameraCaps.macro) return;
+    const next = !macroOn;
+    const ok = await setMacroMode(track, next);
+    if (ok) setMacroOn(next);
   }
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -87,12 +172,93 @@ export function ImageCapture({
   }
 
   const canManualCapture =
-    !settings.levelIndicators ||
+    !showLevel ||
     !level.supported ||
+    !motionGranted ||
     level.isLevel;
 
+  const statusHint = !showLevel
+    ? 'Fill the frame with your card and tap capture'
+    : isCountingDown
+      ? `Auto-capturing in ${((1 - progress) * settings.autoCaptureDelayMs / 1000).toFixed(1)}s…`
+      : getLevelHint(level);
+
+  if (cameraActive) {
+    return (
+      <div className="scanner">
+        <header className="scanner-header">
+          <button type="button" className="scanner-icon-btn" onClick={stopCamera} aria-label="Close">
+            ×
+          </button>
+          <h1 className="scanner-title">Scanner</h1>
+          <div className="scanner-header-actions">
+            {hasSavedSides && onCompare && (
+              <button type="button" className="scanner-icon-btn" onClick={onCompare} aria-label="Compare">
+                ⇄
+              </button>
+            )}
+            <button type="button" className="scanner-icon-btn" onClick={onSettings} aria-label="Settings">
+              ⚙
+            </button>
+          </div>
+        </header>
+
+        <div className="scanner-viewport">
+          <div className="scanner-media">
+            <video ref={videoRef} playsInline muted className="scanner-video" />
+            <ScannerOverlay
+              level={level}
+              cardBox={cardBox}
+              detected={detected}
+              showLevel={showLevel}
+              progress={isCountingDown ? progress : 0}
+            />
+          </div>
+          <canvas ref={canvasRef} hidden />
+        </div>
+
+        <div className="scanner-status">
+          <p className="scanner-status-title">{side === 'front' ? 'Front' : 'Back'} · TFG</p>
+          <p className="scanner-status-hint">{statusHint}</p>
+        </div>
+
+        <div className="scanner-controls">
+          <button
+            type="button"
+            className={`scanner-aux-btn ${torchOn ? 'active' : ''}`}
+            onClick={toggleTorch}
+            disabled={!cameraCaps.torch}
+            aria-pressed={torchOn}
+          >
+            <span className="scanner-aux-icon">🔦</span>
+            <span>LED</span>
+          </button>
+
+          <button
+            type="button"
+            className={`scanner-shutter ${canManualCapture ? '' : 'disabled'}`}
+            onClick={takePhoto}
+            disabled={!canManualCapture}
+            aria-label="Capture"
+          />
+
+          <button
+            type="button"
+            className={`scanner-aux-btn ${macroOn ? 'active' : ''}`}
+            onClick={toggleMacro}
+            disabled={!cameraCaps.macro}
+            aria-pressed={macroOn}
+          >
+            <span className="scanner-aux-icon">✿</span>
+            <span>Macro</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="capture">
+    <div className="capture capture-idle">
       <div className="capture-top-bar">
         <span className="capture-side-badge">{side === 'front' ? 'Front' : 'Back'} side</span>
         <div className="capture-top-actions">
@@ -107,77 +273,33 @@ export function ImageCapture({
         </div>
       </div>
 
-      <div className="capture-hero">
+      <div className="capture-hero capture-hero-compact">
         <div className="capture-logo">TFG</div>
         <h1>Tree Frog Grading</h1>
-        <p>Capture the {side} of your card. Hold level for auto-capture, or tap manually.</p>
+        <p>Capture the {side} of your card</p>
       </div>
 
       {error && <div className="error-banner">{error}</div>}
 
-      {cameraActive ? (
-        <div className="camera-view">
-          <div className="camera-frame">
-            <video ref={videoRef} playsInline muted className="camera-video" />
-            {settings.levelIndicators && <LevelCrosshair level={level} progress={isCountingDown ? progress : 0} />}
-          </div>
-          <canvas ref={canvasRef} hidden />
-
-          {settings.autoCapture && settings.levelIndicators && (
-            <div className="auto-capture-hint">
-              {isCountingDown
-                ? `Auto-capturing in ${((1 - progress) * settings.autoCaptureDelayMs / 1000).toFixed(1)}s…`
-                : level.isLevel
-                  ? 'Hold steady…'
-                  : 'Align device parallel to card'}
-            </div>
-          )}
-
-          <div className="camera-actions">
-            <button type="button" className="btn btn-secondary" onClick={stopCamera}>
-              Cancel
-            </button>
-            <button
-              type="button"
-              className={`btn btn-primary btn-large ${canManualCapture ? '' : 'btn-disabled'}`}
-              onClick={takePhoto}
-              disabled={!canManualCapture}
-            >
-              {canManualCapture ? 'Capture' : 'Hold level to capture'}
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="capture-actions">
-          <button type="button" className="btn btn-primary btn-large" onClick={startCamera}>
-            Take Photo
-          </button>
-          <button
-            type="button"
-            className="btn btn-secondary btn-large"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            Upload Image
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            hidden
-            onChange={handleFile}
-          />
-        </div>
-      )}
-
-      <div className="capture-tips">
-        <h3>Scanner tips</h3>
-        <ul>
-          <li>Hold your device parallel to the card — crosshairs turn green when level</li>
-          <li>Auto-capture fires after 1.5s of steady alignment</li>
-          <li>Use a solid, high-contrast background</li>
-          <li>Remove sleeves to avoid reflection and edge detection issues</li>
-        </ul>
+      <div className="capture-actions">
+        <button type="button" className="btn btn-primary btn-large" onClick={startCamera}>
+          Take Photo
+        </button>
+        <button
+          type="button"
+          className="btn btn-secondary btn-large"
+          onClick={() => fileInputRef.current?.click()}
+        >
+          Upload Image
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          hidden
+          onChange={handleFile}
+        />
       </div>
     </div>
   );

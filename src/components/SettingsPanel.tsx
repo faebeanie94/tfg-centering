@@ -105,6 +105,23 @@ export function SettingsPanel({ open, settings, onChange, onClose }: SettingsPan
               onChange={(e) => onChange({ autoCapture: e.target.checked })}
             />
           </label>
+          <label className="toggle-row">
+            <span>Torch (flashlight)</span>
+            <input
+              type="checkbox"
+              checked={settings.torchEnabled}
+              onChange={(e) => onChange({ torchEnabled: e.target.checked })}
+            />
+          </label>
+          <label className="toggle-row">
+            <span>Macro / close focus</span>
+            <input
+              type="checkbox"
+              checked={settings.macroMode}
+              onChange={(e) => onChange({ macroMode: e.target.checked })}
+            />
+          </label>
+          <p className="settings-hint">Torch and macro depend on your device. Toggle them during capture too.</p>
         </section>
 
         <div className="settings-actions">

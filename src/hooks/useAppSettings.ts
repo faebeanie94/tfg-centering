@@ -7,6 +7,8 @@ export interface AppSettings {
   autoCapture: boolean;
   levelIndicators: boolean;
   autoCaptureDelayMs: number;
+  torchEnabled: boolean;
+  macroMode: boolean;
 }
 
 const STORAGE_KEY = 'tfg-centering-settings';
@@ -18,6 +20,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   autoCapture: true,
   levelIndicators: true,
   autoCaptureDelayMs: 1500,
+  torchEnabled: false,
+  macroMode: false,
 };
 
 function loadSettings(): AppSettings {
