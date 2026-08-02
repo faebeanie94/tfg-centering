@@ -63,7 +63,7 @@ export function computeCentering(
 }
 
 export function defaultOuterRect(imgWidth: number, imgHeight: number): Rect {
-  const margin = Math.min(imgWidth, imgHeight) * 0.05;
+  const margin = Math.min(imgWidth, imgHeight) * 0.015;
   return {
     x: margin,
     y: margin,

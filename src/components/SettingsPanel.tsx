@@ -1,5 +1,6 @@
 import type { AppSettings } from '../hooks/useAppSettings';
-import { DEFAULT_SETTINGS } from '../hooks/useAppSettings';
+import { DEFAULT_SETTINGS, SCAN_OBSTRUCTION_OPTIONS } from '../hooks/useAppSettings';
+import { SCAN_DISTANCE_OPTIONS } from '../lib/card-edge-detect';
 
 interface SettingsPanelProps {
   open: boolean;
@@ -89,6 +90,40 @@ export function SettingsPanel({ open, settings, onChange, onClose }: SettingsPan
 
         <section className="settings-section">
           <h3>Scanner</h3>
+          <label className="settings-field">
+            <span className="settings-field-label">Scan distance</span>
+            <select
+              className="settings-select"
+              value={settings.scanDistanceCm}
+              onChange={(e) => onChange({ scanDistanceCm: Number(e.target.value) as AppSettings['scanDistanceCm'] })}
+            >
+              {SCAN_DISTANCE_OPTIONS.map((cm) => (
+                <option key={cm} value={cm}>
+                  {cm} cm{cm === 20 ? ' (default)' : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="settings-hint">
+            Sets the guide frame size for your working height. Use 20 cm when the phone is about 20 cm above the card.
+          </p>
+          <label className="settings-field">
+            <span className="settings-field-label">Phone stand / box at bottom</span>
+            <select
+              className="settings-select"
+              value={settings.scanObstructionBottom}
+              onChange={(e) => onChange({ scanObstructionBottom: Number(e.target.value) })}
+            >
+              {SCAN_OBSTRUCTION_OPTIONS.map(({ label, value }) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="settings-hint">
+            Keeps the guide above your phone stand. The guide also follows your card once detected.
+          </p>
           <label className="toggle-row">
             <span>Level indicators</span>
             <input

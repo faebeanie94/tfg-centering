@@ -6,13 +6,19 @@ import type { AppSettings } from '../hooks/useAppSettings';
 import type { CardSide } from '../lib/tfg-standards';
 import {
   buildVideoConstraints,
+  cardCenterFromBox,
+  focusOnCard,
   getCameraCapabilities,
   setMacroMode,
   setTorch,
   type CameraCapabilities,
 } from '../lib/camera-controls';
 import { requestMotionPermission } from '../lib/motion-permission';
-import { getLevelHint } from '../lib/level-hint';
+import {
+  queryCameraPermission,
+  saveStoredPermissions,
+} from '../lib/permissions';
+import { getScannerHint } from '../lib/level-hint';
 import { ScannerOverlay } from './ScannerOverlay';
 
 interface ImageCaptureProps {
@@ -41,37 +47,94 @@ export function ImageCapture({
   const [motionGranted, setMotionGranted] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
   const [macroOn, setMacroOn] = useState(false);
-  const [cameraCaps, setCameraCaps] = useState<CameraCapabilities>({ torch: false, macro: false });
+  const [cameraCaps, setCameraCaps] = useState<CameraCapabilities>({ torch: false, macro: false, focus: false });
+  const [focusReady, setFocusReady] = useState(true);
+  const [capturing, setCapturing] = useState(false);
+  const scanReadyRef = useRef(false);
 
   const showLevel = settings.levelIndicators;
   const level = useDeviceLevel(cameraActive && showLevel, motionGranted);
-  const { cardBox, detected } = useCardEdgeDetector(cameraActive, videoRef);
+  const { guideBox, detectedBox, alignment } = useCardEdgeDetector(cameraActive, videoRef, {
+    scanDistanceCm: settings.scanDistanceCm,
+    obstructionBottom: settings.scanObstructionBottom,
+  });
+
+  useEffect(() => {
+    void queryCameraPermission();
+  }, []);
 
   useEffect(() => {
     document.body.classList.toggle('scanner-mode', cameraActive);
     return () => document.body.classList.remove('scanner-mode');
   }, [cameraActive]);
 
-  const takePhoto = useCallback(() => {
+  const takePhoto = useCallback(async () => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    if (!video || !canvas) return;
+    if (!video || !canvas || capturing) return;
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d')!;
-    ctx.drawImage(video, 0, 0);
-    onCapture(canvas.toDataURL('image/jpeg', 0.92));
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
-    setCameraActive(false);
-    setTorchOn(false);
-    setMacroOn(false);
-  }, [onCapture]);
+    setCapturing(true);
+    try {
+      const track = streamRef.current?.getVideoTracks()[0];
+      const focusPoint = detectedBox
+        ? cardCenterFromBox(detectedBox)
+        : cardCenterFromBox(guideBox);
+      if (track) await focusOnCard(track, focusPoint);
+
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(video, 0, 0);
+      onCapture(canvas.toDataURL('image/jpeg', 0.95));
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+      setCameraActive(false);
+      setTorchOn(false);
+      setMacroOn(false);
+    } finally {
+      setCapturing(false);
+    }
+  }, [onCapture, capturing, detectedBox, guideBox]);
+
+  const scanReady =
+    !showLevel ||
+    !level.supported ||
+    !motionGranted ||
+    (level.isLevel && alignment.fitsGuide);
+
+  const captureReady = scanReady && focusReady && !capturing;
+
+  useEffect(() => {
+    if (!cameraActive || !scanReady) {
+      scanReadyRef.current = scanReady;
+      if (!scanReady) setFocusReady(true);
+      return;
+    }
+
+    const justReady = scanReady && !scanReadyRef.current;
+    scanReadyRef.current = scanReady;
+    if (!justReady) return;
+
+    let cancelled = false;
+    setFocusReady(false);
+
+    void (async () => {
+      const track = streamRef.current?.getVideoTracks()[0];
+      const focusPoint = detectedBox
+        ? cardCenterFromBox(detectedBox)
+        : cardCenterFromBox(guideBox);
+      if (track) await focusOnCard(track, focusPoint);
+      if (!cancelled) setFocusReady(true);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [cameraActive, scanReady, detectedBox, guideBox]);
 
   const { progress, isCountingDown } = useAutoCapture({
     enabled: cameraActive && settings.autoCapture && showLevel && motionGranted,
-    isLevel: level.isLevel,
+    isLevel: captureReady,
     delayMs: settings.autoCaptureDelayMs,
     onCapture: takePhoto,
   });
@@ -109,14 +172,31 @@ export function ImageCapture({
     }
   }
 
+  async function enableMotion() {
+    const granted = await requestMotionPermission();
+    setMotionGranted(granted);
+    if (!granted) {
+      setError('Motion access was not granted. Tap Enable Motion to try again, or disable levelling in Settings.');
+    } else {
+      setError(null);
+    }
+  }
+
   async function startCamera() {
     setError(null);
     setTorchOn(false);
     setMacroOn(false);
 
-    let granted = true;
+    const cameraState = await queryCameraPermission();
+    if (cameraState === 'denied') {
+      setError(
+        'Camera access is blocked for this site. Open your browser settings → TFG Grader → allow Camera, then try again.',
+      );
+      return;
+    }
+
     if (showLevel) {
-      granted = await requestMotionPermission();
+      const granted = await requestMotionPermission();
       setMotionGranted(granted);
     } else {
       setMotionGranted(false);
@@ -126,12 +206,19 @@ export function ImageCapture({
       const stream = await navigator.mediaDevices.getUserMedia({
         video: buildVideoConstraints(settings.macroMode),
       });
+      saveStoredPermissions({ camera: 'granted' });
       streamRef.current = stream;
       const track = stream.getVideoTracks()[0];
       await applyCameraOptions(track, settings.torchEnabled, settings.macroMode);
       setCameraActive(true);
-    } catch {
-      setError('Camera access denied or unavailable. Please upload a photo instead.');
+    } catch (err) {
+      const denied = err instanceof DOMException && err.name === 'NotAllowedError';
+      if (denied) saveStoredPermissions({ camera: 'denied' });
+      setError(
+        denied
+          ? 'Camera access denied. Tap Take Photo again to allow, or enable Camera for this site in your browser settings.'
+          : 'Camera unavailable. Please upload a photo instead.',
+      );
     }
   }
 
@@ -171,17 +258,15 @@ export function ImageCapture({
     reader.readAsDataURL(file);
   }
 
-  const canManualCapture =
-    !showLevel ||
-    !level.supported ||
-    !motionGranted ||
-    level.isLevel;
+  const canManualCapture = captureReady;
 
-  const statusHint = !showLevel
-    ? 'Fill the frame with your card and tap capture'
-    : isCountingDown
-      ? `Auto-capturing in ${((1 - progress) * settings.autoCaptureDelayMs / 1000).toFixed(1)}s…`
-      : getLevelHint(level);
+  const statusHint = capturing
+    ? 'Focusing…'
+    : scanReady && !focusReady
+      ? 'Focusing on card…'
+      : isCountingDown
+        ? `Auto-capturing in ${((1 - progress) * settings.autoCaptureDelayMs / 1000).toFixed(1)}s…`
+        : getScannerHint(level, alignment, showLevel);
 
   if (cameraActive) {
     return (
@@ -208,8 +293,9 @@ export function ImageCapture({
             <video ref={videoRef} playsInline muted className="scanner-video" />
             <ScannerOverlay
               level={level}
-              cardBox={cardBox}
-              detected={detected}
+              guideBox={guideBox}
+              detectedBox={detectedBox}
+              alignment={alignment}
               showLevel={showLevel}
               progress={isCountingDown ? progress : 0}
             />
@@ -220,6 +306,11 @@ export function ImageCapture({
         <div className="scanner-status">
           <p className="scanner-status-title">{side === 'front' ? 'Front' : 'Back'} · TFG</p>
           <p className="scanner-status-hint">{statusHint}</p>
+          {showLevel && !motionGranted && (
+            <button type="button" className="btn btn-primary scanner-motion-btn" onClick={enableMotion}>
+              Enable Motion
+            </button>
+          )}
         </div>
 
         <div className="scanner-controls">

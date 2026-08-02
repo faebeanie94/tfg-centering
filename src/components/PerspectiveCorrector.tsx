@@ -5,6 +5,7 @@ import {
   defaultCorners,
   perspectiveCorrect,
 } from '../lib/perspective';
+import { useFitScale, useAppShellMode } from '../hooks/useFitScale';
 
 interface PerspectiveCorrectorProps {
   imageSrc: string;
@@ -21,8 +22,8 @@ const CORNERS: Array<{ key: CornerKey; label: string; arrow: string }> = [
 ];
 
 const CROSSHAIR_ARM = 48;
-const LOUPE_SIZE = 140;
-const LOUPE_ZOOM = 3;
+const LOUPE_SIZE = 96;
+const LOUPE_ZOOM = 10;
 
 function cornerAtPoint(corners: QuadCorners, x: number, y: number, hitRadius: number): CornerKey | null {
   for (const { key } of CORNERS) {
@@ -33,42 +34,52 @@ function cornerAtPoint(corners: QuadCorners, x: number, y: number, hitRadius: nu
 }
 
 export function PerspectiveCorrector({ imageSrc, onComplete, onSkip, onCancel }: PerspectiveCorrectorProps) {
+  const viewportRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const loupeCanvasRef = useRef<HTMLCanvasElement>(null);
+  const bitmapRef = useRef<ImageBitmap | null>(null);
   const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
-  const [displayScale, setDisplayScale] = useState(1);
   const [corners, setCorners] = useState<QuadCorners | null>(null);
   const [selectedCorner, setSelectedCorner] = useState<CornerKey>('tl');
   const [dragging, setDragging] = useState(false);
   const [processing, setProcessing] = useState(false);
   const dragStartRef = useRef<{ x: number; y: number; corners: QuadCorners } | null>(null);
 
+  useAppShellMode('editor-mode', true);
+  const displayScale = useFitScale(viewportRef, imageSize);
+
   useEffect(() => {
+    let cancelled = false;
     const img = new Image();
-    img.onload = () => {
+    img.onload = async () => {
+      if (cancelled) return;
       const size = { width: img.naturalWidth, height: img.naturalHeight };
       setImageSize(size);
       setCorners(defaultCorners(size.width, size.height));
+      bitmapRef.current?.close();
+      try {
+        bitmapRef.current = await createImageBitmap(img);
+      } catch {
+        bitmapRef.current = null;
+      }
     };
     img.src = imageSrc;
+    return () => {
+      cancelled = true;
+      bitmapRef.current?.close();
+      bitmapRef.current = null;
+    };
   }, [imageSrc]);
-
-  useEffect(() => {
-    function updateScale() {
-      if (!containerRef.current || !imageSize) return;
-      setDisplayScale(containerRef.current.clientWidth / imageSize.width);
-    }
-    updateScale();
-    window.addEventListener('resize', updateScale);
-    return () => window.removeEventListener('resize', updateScale);
-  }, [imageSize]);
 
   const drawLoupe = useCallback(
     (corner: CornerKey) => {
       const canvas = loupeCanvasRef.current;
+      const bitmap = bitmapRef.current;
       const img = imageRef.current;
-      if (!canvas || !img || !corners || !imageSize) return;
+      if (!canvas || !corners || !imageSize) return;
+      const source = bitmap ?? img;
+      if (!source) return;
 
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
@@ -79,6 +90,7 @@ export function PerspectiveCorrector({ imageSrc, onComplete, onSkip, onCancel }:
       canvas.style.width = `${LOUPE_SIZE}px`;
       canvas.style.height = `${LOUPE_SIZE}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.imageSmoothingEnabled = false;
 
       const { x: cx, y: cy } = corners[corner];
       const srcSize = LOUPE_SIZE / LOUPE_ZOOM;
@@ -89,7 +101,7 @@ export function PerspectiveCorrector({ imageSrc, onComplete, onSkip, onCancel }:
       ctx.arc(LOUPE_SIZE / 2, LOUPE_SIZE / 2, LOUPE_SIZE / 2 - 2, 0, Math.PI * 2);
       ctx.clip();
       ctx.drawImage(
-        img,
+        source,
         cx - srcSize / 2,
         cy - srcSize / 2,
         srcSize,
@@ -214,16 +226,13 @@ export function PerspectiveCorrector({ imageSrc, onComplete, onSkip, onCancel }:
   }
 
   const displayHeight = imageSize.height * displayScale;
+  const displayWidth = imageSize.width * displayScale;
   const points = [corners.tl, corners.tr, corners.br, corners.bl, corners.tl];
   const linePoints = points.map((p) => `${p.x},${p.y}`).join(' ');
   const active = corners[selectedCorner];
 
-  const canvasWidth = imageSize.width * displayScale;
-  const loupeLeft = Math.max(8, Math.min(active.x * displayScale - LOUPE_SIZE / 2, canvasWidth - LOUPE_SIZE - 8));
-  const loupeTop = Math.max(8, active.y * displayScale - LOUPE_SIZE - 20);
-
   return (
-    <div className="perspective">
+    <div className="perspective editor-shell">
       <div className="perspective-header">
         <button type="button" className="btn btn-secondary btn-small" onClick={onCancel}>
           ← Cancel
@@ -231,116 +240,78 @@ export function PerspectiveCorrector({ imageSrc, onComplete, onSkip, onCancel }:
         <h2>Perspective Fix</h2>
       </div>
 
-      <p className="perspective-hint">
-        Place the centre of each cross on a card corner. Drag anywhere to move the selected marker, or pick a corner below.
-      </p>
-
-      <div
-        ref={containerRef}
-        className="editor-canvas perspective-canvas"
-        style={{ height: displayHeight }}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-      >
-        <img
-          ref={imageRef}
-          src={imageSrc}
-          alt="Card to correct"
-          draggable={false}
-          style={{ width: '100%' }}
-        />
-
-        <svg
-          className="editor-overlay perspective-overlay"
-          viewBox={`0 0 ${imageSize.width} ${imageSize.height}`}
-          preserveAspectRatio="none"
+      <div ref={viewportRef} className="editor-viewport perspective-viewport">
+        <div
+          ref={containerRef}
+          className="editor-canvas perspective-canvas"
+          style={{ width: displayWidth, height: displayHeight }}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
         >
-          <polygon
-            points={linePoints}
-            fill="rgba(59,130,246,0.12)"
-            stroke="#3b82f6"
-            strokeWidth={2}
-            strokeDasharray="8 4"
+          <img
+            ref={imageRef}
+            src={imageSrc}
+            alt="Card to correct"
+            draggable={false}
+            style={{ width: '100%', height: '100%' }}
           />
 
-          <line
-            x1={active.x}
-            y1={0}
-            x2={active.x}
-            y2={imageSize.height}
-            className="perspective-guide-line"
-          />
-          <line
-            x1={0}
-            y1={active.y}
-            x2={imageSize.width}
-            y2={active.y}
-            className="perspective-guide-line"
-          />
-
-          {CORNERS.map(({ key }) => {
-            const p = corners[key];
-            const isActive = key === selectedCorner;
-            const color = isActive ? '#ef4444' : '#ffffff';
-            return (
-              <g key={key} className={`perspective-crosshair ${isActive ? 'active' : ''}`}>
-                <line
-                  x1={p.x - CROSSHAIR_ARM}
-                  y1={p.y}
-                  x2={p.x + CROSSHAIR_ARM}
-                  y2={p.y}
-                  stroke={color}
-                  strokeWidth={isActive ? 2.5 : 2}
-                />
-                <line
-                  x1={p.x}
-                  y1={p.y - CROSSHAIR_ARM}
-                  x2={p.x}
-                  y2={p.y + CROSSHAIR_ARM}
-                  stroke={color}
-                  strokeWidth={isActive ? 2.5 : 2}
-                />
-                <circle
-                  cx={p.x}
-                  cy={p.y}
-                  r={28}
-                  fill="transparent"
-                  className="perspective-crosshair-hit"
-                  onPointerDown={(e) => {
-                    e.stopPropagation();
-                    selectCorner(key);
-                    beginDrag(e.clientX, e.clientY, key);
-                    containerRef.current?.setPointerCapture(e.pointerId);
-                  }}
-                />
-                <circle
-                  cx={p.x}
-                  cy={p.y}
-                  r={16}
-                  fill="rgba(0,0,0,0.25)"
-                  stroke={color}
-                  strokeWidth={isActive ? 2.5 : 2}
-                  pointerEvents="none"
-                />
-                <circle cx={p.x} cy={p.y} r={3} fill={color} pointerEvents="none" />
-              </g>
-            );
-          })}
-        </svg>
-
-        {dragging && (
-          <div
-            className="perspective-loupe"
-            style={{ left: loupeLeft, top: loupeTop, width: LOUPE_SIZE, height: LOUPE_SIZE }}
+          <svg
+            className="editor-overlay perspective-overlay"
+            viewBox={`0 0 ${imageSize.width} ${imageSize.height}`}
+            preserveAspectRatio="none"
           >
-            <canvas ref={loupeCanvasRef} />
-          </div>
-        )}
+            <polygon
+              points={linePoints}
+              fill="rgba(59,130,246,0.12)"
+              stroke="#3b82f6"
+              strokeWidth={2}
+              strokeDasharray="8 4"
+            />
+
+            <line x1={active.x} y1={0} x2={active.x} y2={imageSize.height} className="perspective-guide-line" />
+            <line x1={0} y1={active.y} x2={imageSize.width} y2={active.y} className="perspective-guide-line" />
+
+            {CORNERS.map(({ key }) => {
+              const p = corners[key];
+              const isActive = key === selectedCorner;
+              const color = isActive ? '#ef4444' : '#ffffff';
+              return (
+                <g key={key} className={`perspective-crosshair ${isActive ? 'active' : ''}`}>
+                  <line x1={p.x - CROSSHAIR_ARM} y1={p.y} x2={p.x + CROSSHAIR_ARM} y2={p.y} stroke={color} strokeWidth={isActive ? 2.5 : 2} />
+                  <line x1={p.x} y1={p.y - CROSSHAIR_ARM} x2={p.x} y2={p.y + CROSSHAIR_ARM} stroke={color} strokeWidth={isActive ? 2.5 : 2} />
+                  <circle
+                    cx={p.x}
+                    cy={p.y}
+                    r={28}
+                    fill="transparent"
+                    className="perspective-crosshair-hit"
+                    onPointerDown={(e) => {
+                      e.stopPropagation();
+                      selectCorner(key);
+                      beginDrag(e.clientX, e.clientY, key);
+                      containerRef.current?.setPointerCapture(e.pointerId);
+                    }}
+                  />
+                  <circle cx={p.x} cy={p.y} r={16} fill="rgba(0,0,0,0.25)" stroke={color} strokeWidth={isActive ? 2.5 : 2} pointerEvents="none" />
+                  <circle cx={p.x} cy={p.y} r={3} fill={color} pointerEvents="none" />
+                </g>
+              );
+            })}
+          </svg>
+        </div>
 
         {dragging && (
-          <div className="perspective-drag-hint">Drag anywhere</div>
+          <div className="perspective-loupe-dock" aria-label="Magnified corner view">
+            <span className="perspective-loupe-label">
+              {CORNERS.find((c) => c.key === selectedCorner)?.label} corner
+            </span>
+            <div className="perspective-loupe" style={{ width: LOUPE_SIZE, height: LOUPE_SIZE }}>
+              <canvas ref={loupeCanvasRef} />
+            </div>
+          </div>
         )}
       </div>
 

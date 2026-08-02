@@ -13,6 +13,8 @@ export interface QuadCorners {
 }
 
 const CARD_ASPECT = 63.5 / 88.9;
+/** Margin around the card in the corrected image (each side). */
+const OUTPUT_PADDING_RATIO = 0.08;
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -21,6 +23,32 @@ function loadImage(src: string): Promise<HTMLImageElement> {
     img.onerror = reject;
     img.src = src;
   });
+}
+
+function dist(a: Point, b: Point): number {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function quadHeight(corners: QuadCorners): number {
+  return (dist(corners.tl, corners.bl) + dist(corners.tr, corners.br)) / 2;
+}
+
+function computeOutputSize(corners: QuadCorners): {
+  width: number;
+  height: number;
+  padX: number;
+  padY: number;
+} {
+  const cardHeight = Math.max(Math.round(quadHeight(corners)), 400);
+  const cardWidth = Math.round(cardHeight * CARD_ASPECT);
+  const padX = Math.round(cardWidth * OUTPUT_PADDING_RATIO);
+  const padY = Math.round(cardHeight * OUTPUT_PADDING_RATIO);
+  return {
+    width: cardWidth + padX * 2,
+    height: cardHeight + padY * 2,
+    padX,
+    padY,
+  };
 }
 
 /** Solve 3×3 homography mapping dst → src (8 dof, h22 = 1). */
@@ -122,21 +150,16 @@ export function defaultCorners(imgWidth: number, imgHeight: number): QuadCorners
   };
 }
 
-export async function perspectiveCorrect(
-  imageSrc: string,
-  corners: QuadCorners,
-  maxHeight = 1200,
-): Promise<string> {
+export async function perspectiveCorrect(imageSrc: string, corners: QuadCorners): Promise<string> {
   const img = await loadImage(imageSrc);
-  const outHeight = maxHeight;
-  const outWidth = Math.round(outHeight * CARD_ASPECT);
+  const { width: outWidth, height: outHeight, padX, padY } = computeOutputSize(corners);
 
   const src = [corners.tl, corners.tr, corners.br, corners.bl];
   const dst: Point[] = [
-    { x: 0, y: 0 },
-    { x: outWidth, y: 0 },
-    { x: outWidth, y: outHeight },
-    { x: 0, y: outHeight },
+    { x: padX, y: padY },
+    { x: outWidth - padX, y: padY },
+    { x: outWidth - padX, y: outHeight - padY },
+    { x: padX, y: outHeight - padY },
   ];
 
   const h = solveHomography(dst, src);
@@ -173,7 +196,7 @@ export async function perspectiveCorrect(
   }
 
   outCtx.putImageData(outData, 0, 0);
-  return outCanvas.toDataURL('image/jpeg', 0.92);
+  return outCanvas.toDataURL('image/jpeg', 0.95);
 }
 
 export function hexToRgba(hex: string, alpha: number): string {

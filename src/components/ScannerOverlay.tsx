@@ -1,60 +1,129 @@
+import type { CardAlignmentState } from '../lib/card-alignment';
 import type { DetectedCard } from '../lib/card-edge-detect';
 import type { LevelState } from '../hooks/useDeviceLevel';
 
 interface ScannerOverlayProps {
   level: LevelState;
-  cardBox: DetectedCard;
-  detected: boolean;
+  guideBox: DetectedCard;
+  detectedBox: DetectedCard | null;
+  alignment: CardAlignmentState;
   showLevel: boolean;
   progress?: number;
 }
 
-export function ScannerOverlay({ level, cardBox, detected, showLevel, progress = 0 }: ScannerOverlayProps) {
-  const isLevel = showLevel && level.isLevel;
-  const color = !showLevel ? '#ffffff' : isLevel ? '#22c55e' : '#f97316';
-  const { left, top, width, height } = cardBox;
-  const cx = (left + width / 2) * 100;
-  const cy = (top + height / 2) * 100;
+function boxToSvg(box: DetectedCard) {
+  return {
+    x: box.left * 100,
+    y: box.top * 100,
+    w: box.width * 100,
+    h: box.height * 100,
+  };
+}
+
+export function ScannerOverlay({
+  level,
+  guideBox,
+  detectedBox,
+  alignment,
+  showLevel,
+  progress = 0,
+}: ScannerOverlayProps) {
+  const phoneLevel = showLevel && level.isLevel;
+  const cardReady = alignment.fitsGuide;
+  const ready = !showLevel || (phoneLevel && cardReady);
+
+  const guide = boxToSvg(guideBox);
+  const detected = detectedBox ? boxToSvg(detectedBox) : null;
+
+  const guideColor = '#ffffff';
+  const detectedColor = !showLevel
+    ? '#ffffff'
+    : !detectedBox
+      ? '#94a3b8'
+      : cardReady
+        ? '#22c55e'
+        : '#f97316';
+
+  const cx = guide.x + guide.w / 2;
+  const cy = guide.y + guide.h / 2;
 
   return (
     <div className="scanner-overlay">
       <svg className="scanner-overlay-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
         <rect
-          x={left * 100}
-          y={top * 100}
-          width={width * 100}
-          height={height * 100}
+          x={guide.x}
+          y={guide.y}
+          width={guide.w}
+          height={guide.h}
           fill="none"
-          stroke={color}
-          strokeWidth={0.5}
-          className={`scanner-edge-box ${showLevel ? (isLevel ? 'level-ok' : 'level-bad') : 'guide-only'} ${detected ? 'detected' : 'guide'}`}
+          stroke={guideColor}
+          strokeWidth={0.45}
+          strokeDasharray="1.2 0.8"
+          className="scanner-guide-box"
         />
 
-        {showLevel && !isLevel && (
-          <g className="scanner-crosshair" stroke={color} strokeWidth={0.3} opacity={0.85}>
-            <line x1={cx} y1={top * 100} x2={cx} y2={(top + height) * 100} />
-            <line x1={left * 100} y1={cy} x2={(left + width) * 100} y2={cy} />
+        {detected && (
+          <rect
+            x={detected.x}
+            y={detected.y}
+            width={detected.w}
+            height={detected.h}
+            fill="none"
+            stroke={detectedColor}
+            strokeWidth={0.55}
+            className={`scanner-detected-box ${ready ? 'ready' : 'adjust'}`}
+          />
+        )}
+
+        {showLevel && phoneLevel && detectedBox && !cardReady && (
+          <g className="scanner-alignment-hint" stroke="#f97316" strokeWidth={0.35} opacity={0.9}>
+            {Math.abs(alignment.offsetX) > 0.03 && (
+              <text
+                x={cx}
+                y={cy}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fill="#f97316"
+                fontSize="3.5"
+                fontWeight="700"
+              >
+                {alignment.offsetX > 0 ? '←' : '→'}
+              </text>
+            )}
+            {Math.abs(alignment.offsetY) > 0.03 && Math.abs(alignment.offsetX) <= 0.03 && (
+              <text
+                x={cx}
+                y={cy}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fill="#f97316"
+                fontSize="3.5"
+                fontWeight="700"
+              >
+                {alignment.offsetY > 0 ? '↑' : '↓'}
+              </text>
+            )}
           </g>
         )}
 
-        {progress > 0 && (
+        {progress > 0 && detected && (
           <circle
-            cx={cx}
-            cy={cy}
-            r={Math.min(width, height) * 50}
+            cx={detected.x + detected.w / 2}
+            cy={detected.y + detected.h / 2}
+            r={Math.min(detected.w, detected.h) * 50}
             fill="none"
             stroke="#22c55e"
             strokeWidth={0.5}
             strokeDasharray={`${progress * 160} 160`}
-            transform={`rotate(-90 ${cx} ${cy})`}
+            transform={`rotate(-90 ${detected.x + detected.w / 2} ${detected.y + detected.h / 2})`}
             opacity={0.8}
           />
         )}
       </svg>
 
-      {showLevel && isLevel && (
+      {showLevel && ready && (
         <div className="scanner-level-badge level-ok">
-          <span className="scanner-level-icon">✓</span> Level
+          <span className="scanner-level-icon">✓</span> Ready
         </div>
       )}
     </div>
