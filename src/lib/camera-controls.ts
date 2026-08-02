@@ -113,12 +113,13 @@ export async function applyMaxCaptureResolution(
     : null;
 }
 
+/** Target optical zoom when macro mode is on (~1.5×). */
+export const MACRO_ZOOM_FACTOR = 1.5;
+
 function macroZoomTarget(caps: ExtendedCapabilities): number | undefined {
   if (!caps.zoom) return undefined;
   const { min, max } = caps.zoom;
-  const span = max - min;
-  if (span <= 0) return min;
-  return Math.min(max, min + span * 0.38);
+  return Math.max(min, Math.min(max, MACRO_ZOOM_FACTOR));
 }
 
 function sleep(ms: number): Promise<void> {
@@ -216,8 +217,7 @@ export async function setMacroMode(track: MediaStreamTrack, enabled: boolean): P
   } catch {
     try {
       if (caps.zoom) {
-        const target = macroZoomTarget(caps);
-        const zoom = enabled ? target ?? caps.zoom.min + 0.35 : caps.zoom.min;
+        const zoom = enabled ? macroZoomTarget(caps) ?? Math.min(caps.zoom.max, MACRO_ZOOM_FACTOR) : caps.zoom.min;
         await track.applyConstraints({ zoom } as ExtendedConstraintSet);
         return true;
       }
