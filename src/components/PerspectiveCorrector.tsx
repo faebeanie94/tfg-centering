@@ -23,7 +23,7 @@ const CORNERS: Array<{ key: CornerKey; label: string; arrow: string }> = [
 
 const CROSSHAIR_ARM = 48;
 const LOUPE_SIZE = 96;
-const LOUPE_ZOOM = 10;
+const LOUPE_ZOOM = 4;
 
 function cornerAtPoint(corners: QuadCorners, x: number, y: number, hitRadius: number): CornerKey | null {
   for (const { key } of CORNERS) {
@@ -125,7 +125,7 @@ export function PerspectiveCorrector({ imageSrc, onComplete, onSkip, onCancel }:
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.arc(center, center, 10, 0, Math.PI * 2);
+      ctx.arc(center, center, 14, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
 

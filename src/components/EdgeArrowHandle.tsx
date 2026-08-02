@@ -72,20 +72,36 @@ export function edgeHandleStyle(
   edge: Edge,
   rect: RectLike,
   scale: number,
+  slot: 'outer' | 'inner' = 'outer',
 ): React.CSSProperties {
-  const cx = (rect.x + rect.width / 2) * scale;
-  const cy = (rect.y + rect.height / 2) * scale;
   const hw = edge === 'left' || edge === 'right' ? 36 : 28;
   const hh = edge === 'top' || edge === 'bottom' ? 36 : 28;
+  /** Stagger outer/inner handles along the edge so they stay visible. */
+  const outerAlong = 0.3;
+  const innerAlong = 0.7;
 
   switch (edge) {
-    case 'left':
-      return { left: rect.x * scale - hw / 2, top: cy - hh / 2 };
-    case 'right':
-      return { left: (rect.x + rect.width) * scale - hw / 2, top: cy - hh / 2 };
-    case 'top':
-      return { left: cx - hw / 2, top: rect.y * scale - hh / 2 };
-    case 'bottom':
-      return { left: cx - hw / 2, top: (rect.y + rect.height) * scale - hh / 2 };
+    case 'left': {
+      const along = slot === 'outer' ? outerAlong : innerAlong;
+      return { left: rect.x * scale - hw / 2, top: (rect.y + rect.height * along) * scale - hh / 2 };
+    }
+    case 'right': {
+      const along = slot === 'outer' ? innerAlong : outerAlong;
+      return {
+        left: (rect.x + rect.width) * scale - hw / 2,
+        top: (rect.y + rect.height * along) * scale - hh / 2,
+      };
+    }
+    case 'top': {
+      const along = slot === 'outer' ? outerAlong : innerAlong;
+      return { left: (rect.x + rect.width * along) * scale - hw / 2, top: rect.y * scale - hh / 2 };
+    }
+    case 'bottom': {
+      const along = slot === 'outer' ? innerAlong : outerAlong;
+      return {
+        left: (rect.x + rect.width * along) * scale - hw / 2,
+        top: (rect.y + rect.height) * scale - hh / 2,
+      };
+    }
   }
 }

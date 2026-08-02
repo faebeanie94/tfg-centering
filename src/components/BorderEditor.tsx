@@ -249,7 +249,7 @@ export function BorderEditor({
       <div
         key={`${rectType}-${edge}`}
         className="edge-handle-wrap"
-        style={edgeHandleStyle(edge, rect, displayScale)}
+        style={edgeHandleStyle(edge, rect, displayScale, rectType)}
       >
         <EdgeArrowHandle
           edge={edge}
