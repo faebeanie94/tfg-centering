@@ -39,22 +39,77 @@ export function getCameraCapabilities(track: MediaStreamTrack): CameraCapabiliti
   };
 }
 
-export function buildVideoConstraints(macroMode: boolean): MediaTrackConstraints {
-  const constraints: MediaTrackConstraints = {
-    facingMode: 'environment',
-    width: { ideal: 4032, min: 1920 },
-    height: { ideal: 3024, min: 1080 },
+export function buildVideoConstraints(
+  macroMode: boolean,
+  tier: 'max' | 'high' = 'max',
+): MediaTrackConstraints {
+  const resolution =
+    tier === 'max'
+      ? {
+          width: { ideal: 8064, max: 8064, min: 1920 },
+          height: { ideal: 6048, max: 6048, min: 1080 },
+        }
+      : {
+          width: { ideal: 4032, min: 1920 },
+          height: { ideal: 3024, min: 1080 },
+        };
+
+  const constraints = {
+    facingMode: { ideal: 'environment' },
+    ...resolution,
+    aspectRatio: { ideal: 4 / 3 },
     focusMode: { ideal: 'continuous' },
-  } as MediaTrackConstraints;
+    resizeMode: { ideal: 'none' },
+  } as unknown as MediaTrackConstraints;
 
   if (macroMode) {
     return {
       ...constraints,
-      zoom: { ideal: 1.05 },
+      zoom: { ideal: 1.25, min: 1 },
     } as MediaTrackConstraints;
   }
 
   return constraints;
+}
+
+/** Push the video track to the device maximum (e.g. 48MP iPhone main camera). */
+export async function applyMaxCaptureResolution(
+  track: MediaStreamTrack,
+): Promise<{ width: number; height: number } | null> {
+  const caps = track.getCapabilities?.();
+  if (!caps?.width || !caps?.height) return null;
+
+  const widthMax = typeof caps.width === 'object' ? caps.width.max : undefined;
+  const heightMax = typeof caps.height === 'object' ? caps.height.max : undefined;
+  if (!widthMax || !heightMax) return null;
+
+  const attempts: MediaTrackConstraints[] = [
+    { width: { ideal: widthMax, max: widthMax }, height: { ideal: heightMax, max: heightMax } },
+    { width: { ideal: widthMax }, height: { ideal: heightMax } },
+    { advanced: [{ width: widthMax, height: heightMax }] as ExtendedConstraintSet[] },
+  ];
+
+  for (const attempt of attempts) {
+    try {
+      await track.applyConstraints(attempt);
+      const settings = track.getSettings();
+      if (settings.width && settings.height) {
+        return { width: settings.width, height: settings.height };
+      }
+    } catch {
+      // try next strategy
+    }
+  }
+
+  return null;
+}
+
+function macroZoomTarget(caps: ExtendedCapabilities): number | undefined {
+  if (!caps.zoom) return undefined;
+  const { min, max } = caps.zoom;
+  const span = max - min;
+  if (span <= 0) return min;
+  return Math.min(max, min + span * 0.38);
 }
 
 function sleep(ms: number): Promise<void> {
@@ -138,9 +193,8 @@ export async function setMacroMode(track: MediaStreamTrack, enabled: boolean): P
     const patch: ExtendedConstraintSet = { focusMode: 'continuous' };
 
     if (caps.zoom) {
-      patch.zoom = enabled
-        ? Math.min(caps.zoom.max, Math.max(caps.zoom.min, caps.zoom.min + (caps.zoom.max - caps.zoom.min) * 0.08))
-        : caps.zoom.min;
+      const target = macroZoomTarget(caps);
+      patch.zoom = enabled ? target ?? caps.zoom.min : caps.zoom.min;
     }
 
     if (enabled && caps.focusDistance) {
@@ -153,7 +207,8 @@ export async function setMacroMode(track: MediaStreamTrack, enabled: boolean): P
   } catch {
     try {
       if (caps.zoom) {
-        const zoom = enabled ? Math.min(caps.zoom.max, caps.zoom.min + 0.15) : caps.zoom.min;
+        const target = macroZoomTarget(caps);
+        const zoom = enabled ? target ?? caps.zoom.min + 0.35 : caps.zoom.min;
         await track.applyConstraints({ zoom } as ExtendedConstraintSet);
         return true;
       }

@@ -174,7 +174,7 @@ export function PerspectiveCorrector({ imageSrc, onComplete, onSkip, onCancel }:
       const rect = containerRef.current.getBoundingClientRect();
       const imageX = (e.clientX - rect.left) / displayScale;
       const imageY = (e.clientY - rect.top) / displayScale;
-      const hitRadius = screenPx(32, displayScale);
+      const hitRadius = screenPx(26, displayScale);
       const hit = cornerAtPoint(corners, imageX, imageY, hitRadius);
 
       beginDrag(e.clientX, e.clientY, hit ?? selectedCorner);
@@ -231,16 +231,16 @@ export function PerspectiveCorrector({ imageSrc, onComplete, onSkip, onCancel }:
 
   const displayHeight = imageSize.height * displayScale;
   const displayWidth = imageSize.width * displayScale;
-  const crosshairArm = screenPx(28, displayScale);
-  const crosshairStroke = screenPx(2.5, displayScale);
-  const crosshairStrokeActive = screenPx(3.5, displayScale);
-  const guideStroke = screenPx(1.75, displayScale);
-  const hitRadius = screenPx(32, displayScale);
-  const hubRadius = screenPx(10, displayScale);
-  const hubStroke = screenPx(2, displayScale);
-  const hubStrokeActive = screenPx(2.5, displayScale);
-  const centerDot = screenPx(2.5, displayScale);
-  const outlineExtra = screenPx(1, displayScale);
+  const crosshairArm = screenPx(16, displayScale);
+  const crosshairStroke = screenPx(1.75, displayScale);
+  const crosshairStrokeActive = screenPx(2.25, displayScale);
+  const guideStroke = screenPx(1.25, displayScale);
+  const hitRadius = screenPx(26, displayScale);
+  const hubRadius = screenPx(5, displayScale);
+  const hubStroke = screenPx(1.25, displayScale);
+  const hubStrokeActive = screenPx(1.75, displayScale);
+  const centerDot = screenPx(2, displayScale);
+  const outlineExtra = screenPx(0.75, displayScale);
   const points = [corners.tl, corners.tr, corners.br, corners.bl, corners.tl];
   const linePoints = points.map((p) => `${p.x},${p.y}`).join(' ');
   const active = corners[selectedCorner];

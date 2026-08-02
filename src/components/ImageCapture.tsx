@@ -6,6 +6,7 @@ import type { AppSettings } from '../hooks/useAppSettings';
 import type { CardSide } from '../lib/tfg-standards';
 import {
   buildVideoConstraints,
+  applyMaxCaptureResolution,
   cardCenterFromBox,
   focusOnCard,
   getCameraCapabilities,
@@ -213,12 +214,20 @@ export function ImageCapture({
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: buildVideoConstraints(settings.macroMode),
-      });
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: buildVideoConstraints(settings.macroMode, 'max'),
+        });
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: buildVideoConstraints(settings.macroMode, 'high'),
+        });
+      }
       saveStoredPermissions({ camera: 'granted' });
       streamRef.current = stream;
       const track = stream.getVideoTracks()[0];
+      await applyMaxCaptureResolution(track);
       await applyCameraOptions(track, settings.torchEnabled, settings.macroMode);
       setCameraActive(true);
     } catch (err) {
