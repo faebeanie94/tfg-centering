@@ -1,6 +1,5 @@
 import type { DetectedCard } from '../lib/card-edge-detect';
 import type { LevelState } from '../hooks/useDeviceLevel';
-import { getLevelHint } from '../lib/level-hint';
 
 interface ScannerOverlayProps {
   level: LevelState;
@@ -16,7 +15,6 @@ export function ScannerOverlay({ level, cardBox, detected, showLevel, progress =
   const { left, top, width, height } = cardBox;
   const cx = (left + width / 2) * 100;
   const cy = (top + height / 2) * 100;
-  const hint = showLevel ? getLevelHint(level) : null;
 
   return (
     <div className="scanner-overlay">
@@ -54,17 +52,9 @@ export function ScannerOverlay({ level, cardBox, detected, showLevel, progress =
         )}
       </svg>
 
-      {showLevel && (
-        <div className={`scanner-level-badge ${isLevel ? 'level-ok' : 'level-bad'}`}>
-          {isLevel ? (
-            <>
-              <span className="scanner-level-icon">✓</span> Level
-            </>
-          ) : !level.permissionGranted ? (
-            'Allow motion'
-          ) : (
-            hint ?? 'Level'
-          )}
+      {showLevel && isLevel && (
+        <div className="scanner-level-badge level-ok">
+          <span className="scanner-level-icon">✓</span> Level
         </div>
       )}
     </div>
