@@ -5,7 +5,7 @@ import { useAutoCapture } from '../hooks/useAutoCapture';
 import type { AppSettings } from '../hooks/useAppSettings';
 import type { CardSide } from '../lib/tfg-standards';
 import {
-  buildVideoConstraints,
+  openCameraStream,
   applyMaxCaptureResolution,
   cardCenterFromBox,
   focusOnCard,
@@ -214,20 +214,15 @@ export function ImageCapture({
     }
 
     try {
-      let stream: MediaStream;
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: buildVideoConstraints(settings.macroMode, 'max'),
-        });
-      } catch {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: buildVideoConstraints(settings.macroMode, 'high'),
-        });
-      }
+      const stream = await openCameraStream();
       saveStoredPermissions({ camera: 'granted' });
       streamRef.current = stream;
       const track = stream.getVideoTracks()[0];
-      await applyMaxCaptureResolution(track);
+      try {
+        await applyMaxCaptureResolution(track);
+      } catch {
+        // keep default stream resolution
+      }
       await applyCameraOptions(track, settings.torchEnabled, settings.macroMode);
       setCameraActive(true);
     } catch (err) {

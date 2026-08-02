@@ -39,40 +39,43 @@ export function getCameraCapabilities(track: MediaStreamTrack): CameraCapabiliti
   };
 }
 
-export function buildVideoConstraints(
-  macroMode: boolean,
-  tier: 'max' | 'high' = 'max',
-): MediaTrackConstraints {
-  const resolution =
-    tier === 'max'
-      ? {
-          width: { ideal: 8064, max: 8064, min: 1920 },
-          height: { ideal: 6048, max: 6048, min: 1080 },
-        }
-      : {
-          width: { ideal: 4032, min: 1920 },
-          height: { ideal: 3024, min: 1080 },
-        };
-
-  const constraints = {
+const BASE_TIERS: MediaTrackConstraints[] = [
+  {
     facingMode: { ideal: 'environment' },
-    ...resolution,
-    aspectRatio: { ideal: 4 / 3 },
+    width: { ideal: 4032, min: 1920 },
+    height: { ideal: 3024, min: 1080 },
     focusMode: { ideal: 'continuous' },
-    resizeMode: { ideal: 'none' },
-  } as unknown as MediaTrackConstraints;
+  } as unknown as MediaTrackConstraints,
+  {
+    facingMode: { ideal: 'environment' },
+    width: { ideal: 1920 },
+    height: { ideal: 1080 },
+  },
+  { facingMode: { ideal: 'environment' } },
+];
 
-  if (macroMode) {
-    return {
-      ...constraints,
-      zoom: { ideal: 1.25, min: 1 },
-    } as MediaTrackConstraints;
+/** Open the rear camera with progressive fallbacks so iOS Safari always gets a stream. */
+export async function openCameraStream(): Promise<MediaStream> {
+  let lastError: unknown;
+  for (const video of BASE_TIERS) {
+    try {
+      return await navigator.mediaDevices.getUserMedia({ video });
+    } catch (err) {
+      lastError = err;
+    }
   }
-
-  return constraints;
+  throw lastError ?? new Error('Camera unavailable');
 }
 
-/** Push the video track to the device maximum (e.g. 48MP iPhone main camera). */
+/** @deprecated Use openCameraStream — kept for callers that pass macro flag (ignored at open). */
+export function buildVideoConstraints(
+  _macroMode?: boolean,
+  _tier?: 'max' | 'high',
+): MediaTrackConstraints {
+  return BASE_TIERS[0];
+}
+
+/** After the stream is open, gently request the highest resolution the device reports. */
 export async function applyMaxCaptureResolution(
   track: MediaStreamTrack,
 ): Promise<{ width: number; height: number } | null> {
@@ -83,8 +86,12 @@ export async function applyMaxCaptureResolution(
   const heightMax = typeof caps.height === 'object' ? caps.height.max : undefined;
   if (!widthMax || !heightMax) return null;
 
+  const settings = track.getSettings();
+  if (settings.width === widthMax && settings.height === heightMax) {
+    return { width: widthMax, height: heightMax };
+  }
+
   const attempts: MediaTrackConstraints[] = [
-    { width: { ideal: widthMax, max: widthMax }, height: { ideal: heightMax, max: heightMax } },
     { width: { ideal: widthMax }, height: { ideal: heightMax } },
     { advanced: [{ width: widthMax, height: heightMax }] as ExtendedConstraintSet[] },
   ];
@@ -92,16 +99,18 @@ export async function applyMaxCaptureResolution(
   for (const attempt of attempts) {
     try {
       await track.applyConstraints(attempt);
-      const settings = track.getSettings();
-      if (settings.width && settings.height) {
-        return { width: settings.width, height: settings.height };
+      const next = track.getSettings();
+      if (next.width && next.height) {
+        return { width: next.width, height: next.height };
       }
     } catch {
-      // try next strategy
+      // keep current resolution
     }
   }
 
-  return null;
+  return settings.width && settings.height
+    ? { width: settings.width, height: settings.height }
+    : null;
 }
 
 function macroZoomTarget(caps: ExtendedCapabilities): number | undefined {
