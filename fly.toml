@@ -1,5 +1,10 @@
-app = 'centering-tfg'
-primary_region = 'lhr'
+# fly.toml app configuration file generated for tfg-centering on 2026-08-02T18:54:24Z
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'tfg-centering'
+primary_region = 'ams'
 
 [build]
 
@@ -14,3 +19,4 @@ primary_region = 'lhr'
   memory = '256mb'
   cpu_kind = 'shared'
   cpus = 1
+  memory_mb = 256
