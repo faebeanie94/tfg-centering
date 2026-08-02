@@ -1410,6 +1410,164 @@ body.editor-mode #root {
   color: var(--text-muted);
 }
 
+.compare-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.library {
+  min-height: 100dvh;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.library-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.library-header h2 {
+  flex: 1;
+  font-size: 1.1rem;
+}
+
+.library-feedback,
+.library-toast {
+  padding: 10px 14px;
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.library-toast {
+  margin: 0 12px;
+}
+
+.library-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--text-muted);
+  gap: 8px;
+  padding: 24px;
+}
+
+.library-empty-hint {
+  font-size: 0.85rem;
+  max-width: 280px;
+}
+
+.library-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+}
+
+.library-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 10px;
+}
+
+.library-item-main {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  border: none;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  padding: 0;
+}
+
+.library-item-main:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.library-thumb {
+  width: 56px;
+  height: 78px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: #000;
+  flex-shrink: 0;
+}
+
+.library-thumb-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+}
+
+.library-item-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.library-item-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.library-item-meta {
+  display: flex;
+  gap: 10px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.library-grade {
+  color: #4ade80;
+  font-weight: 700;
+}
+
+.library-item-date {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.library-item-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding-left: 68px;
+}
+
+.library-delete-confirm {
+  display: flex;
+  gap: 6px;
+}
+
+.library-delete-btn {
+  color: #f87171;
+}
+
 .compare-header {
   display: flex;
   align-items: center;

@@ -21,6 +21,14 @@ export interface CameraCapabilities {
 }
 
 export const FOCUS_SETTLE_MS = 550;
+export const FOCUS_MAX_MS = 1200;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([
+    promise,
+    sleep(ms).then(() => fallback),
+  ]);
+}
 
 export function getCameraCapabilities(track: MediaStreamTrack): CameraCapabilities {
   const caps = track.getCapabilities?.() as ExtendedCapabilities | undefined;
@@ -55,6 +63,13 @@ function sleep(ms: number): Promise<void> {
 
 /** Trigger autofocus at a normalized point (0–1) on the card before capture. */
 export async function focusOnCard(
+  track: MediaStreamTrack,
+  point: { x: number; y: number },
+): Promise<boolean> {
+  return withTimeout(focusOnCardInner(track, point), FOCUS_MAX_MS, false);
+}
+
+async function focusOnCardInner(
   track: MediaStreamTrack,
   point: { x: number; y: number },
 ): Promise<boolean> {

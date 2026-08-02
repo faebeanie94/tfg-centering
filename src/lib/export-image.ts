@@ -1,4 +1,5 @@
 import type { CardSide } from './tfg-standards';
+import type { GradingSession } from './session';
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -115,4 +116,33 @@ export async function saveAllCleanImages(
     await saveCleanImage(imageSrc, side, name);
     await new Promise((r) => setTimeout(r, 300));
   }
+}
+
+export function sessionExportImages(session: GradingSession): Array<{ side: CardSide; imageSrc: string; name?: string }> {
+  const items: Array<{ side: CardSide; imageSrc: string; name?: string }> = [];
+  if (session.front) {
+    items.push({ side: 'front', imageSrc: session.front.imageSrc, name: session.front.name });
+  }
+  if (session.back) {
+    items.push({ side: 'back', imageSrc: session.back.imageSrc, name: session.back.name });
+  }
+  return items;
+}
+
+export async function exportSessionImages(session: GradingSession): Promise<void> {
+  const images = sessionExportImages(session);
+  if (images.length === 0) return;
+  await saveAllCleanImages(images);
+}
+
+export async function exportAllSessions(sessions: GradingSession[]): Promise<number> {
+  let count = 0;
+  for (const session of sessions) {
+    const images = sessionExportImages(session);
+    if (images.length === 0) continue;
+    await saveAllCleanImages(images);
+    count += images.length;
+    await new Promise((r) => setTimeout(r, 400));
+  }
+  return count;
 }

@@ -13,6 +13,10 @@ function lum(data: Uint8ClampedArray, px: number): number {
   return 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
 function sampleRay(
   data: Uint8ClampedArray,
   w: number,
@@ -120,58 +124,142 @@ function rayEdgeCoord(
   thresh: number,
 ): number | null {
   const dist = sampleRay(data, w, h, x0, y0, dx, dy, ref, thresh);
-  if (dist < 6) return null;
+  if (dist < 4) return null;
   if (dx !== 0) return x0 + dx * dist;
   return y0 + dy * dist;
 }
 
-export function detectCardFrame(video: HTMLVideoElement, canvas: HTMLCanvasElement): CardFrameDetection | null {
-  if (video.videoWidth === 0 || video.videoHeight === 0) return null;
+/** Walk outward from a point on the card until pixels match the dark background. */
+function rayEdgeToBackground(
+  data: Uint8ClampedArray,
+  w: number,
+  h: number,
+  x0: number,
+  y0: number,
+  dx: number,
+  dy: number,
+  bgCutoff: number,
+  minDist = 8,
+): number | null {
+  const startL = lum(data, y0 * w + x0);
+  if (startL < bgCutoff) return null;
 
-  const w = 240;
-  const h = Math.round(w * (video.videoHeight / video.videoWidth));
-  canvas.width = w;
-  canvas.height = h;
+  const steps = Math.max(w, h);
+  for (let s = minDist; s < steps - 2; s++) {
+    const x = Math.round(x0 + dx * s);
+    const y = Math.round(y0 + dy * s);
+    if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) break;
 
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  if (!ctx) return null;
+    const l = lum(data, y * w + x);
+    if (l >= bgCutoff) continue;
 
-  ctx.drawImage(video, 0, 0, w, h);
-  const { data } = ctx.getImageData(0, 0, w, h);
+    const x2 = Math.round(x0 + dx * (s + 1));
+    const y2 = Math.round(y0 + dy * (s + 1));
+    if (x2 < 1 || y2 < 1 || x2 >= w - 1 || y2 >= h - 1) break;
+    if (lum(data, y2 * w + x2) < bgCutoff) {
+      const edgeStep = Math.max(minDist, s - 1);
+      if (dx !== 0) return x0 + dx * edgeStep;
+      return y0 + dy * edgeStep;
+    }
+  }
+  return null;
+}
 
-  const cx = Math.floor(w / 2);
-  const cy = Math.floor(h / 2);
-  const ref = lum(data, cy * w + cx);
-  const thresh = 28;
+function estimateBackgroundLum(
+  data: Uint8ClampedArray,
+  w: number,
+  h: number,
+  cx: number,
+  cy: number,
+  span: number,
+): number {
+  const samples: number[] = [];
+  const offsets: Array<[number, number]> = [
+    [-span * 1.1, 0],
+    [span * 1.1, 0],
+    [0, span * 1.1],
+    [-span * 0.9, span * 0.9],
+    [span * 0.9, span * 0.9],
+  ];
 
-  const yFracs = [0.32, 0.5, 0.68];
-  const xFracs = [0.32, 0.5, 0.68];
+  for (const [ox, oy] of offsets) {
+    const x = clamp(Math.round(cx + ox * w), 1, w - 2);
+    const y = clamp(Math.round(cy + oy * h), 1, h - 2);
+    samples.push(lum(data, y * w + x));
+  }
+
+  samples.sort((a, b) => a - b);
+  return samples[Math.floor(samples.length / 2)] ?? 24;
+}
+
+function sampleRef(data: Uint8ClampedArray, w: number, x: number, y: number): number {
+  const x0 = clamp(Math.round(x), 1, w - 2);
+  const y0 = clamp(Math.round(y), 1, Math.floor(data.length / (4 * w)) - 2);
+  let sum = 0;
+  let n = 0;
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      sum += lum(data, (y0 + dy) * w + (x0 + dx));
+      n++;
+    }
+  }
+  return sum / n;
+}
+
+export interface DetectSearchRegion {
+  /** Normalised centre (0–1) where the card is expected. */
+  cx: number;
+  cy: number;
+  /** Expected card size (normalised) for scoring stable detections. */
+  expectedWidth?: number;
+  expectedHeight?: number;
+}
+
+function collectBackgroundEdges(
+  data: Uint8ClampedArray,
+  w: number,
+  h: number,
+  px: number,
+  py: number,
+  bgCutoff: number,
+) {
+  const yFracs = [0.3, 0.42, 0.5, 0.58, 0.7];
+  const xFracs = [0.3, 0.42, 0.5, 0.58, 0.7];
 
   const leftXs: number[] = [];
   const rightXs: number[] = [];
   const topYs: number[] = [];
   const bottomYs: number[] = [];
 
-  // Cast rays outward from near the centre — finds the card, not the table edge.
   for (const yf of yFracs) {
-    const y = Math.round(h * yf);
-    const lx = rayEdgeCoord(data, w, h, cx, y, -1, 0, ref, thresh);
-    const rx = rayEdgeCoord(data, w, h, cx, y, 1, 0, ref, thresh);
+    const y = clamp(Math.round(py + (yf - 0.5) * h * 0.38), 2, h - 3);
+    const lx = rayEdgeToBackground(data, w, h, px, y, -1, 0, bgCutoff);
+    const rx = rayEdgeToBackground(data, w, h, px, y, 1, 0, bgCutoff);
     if (lx != null) leftXs.push(lx);
     if (rx != null) rightXs.push(rx);
   }
 
   for (const xf of xFracs) {
-    const x = Math.round(w * xf);
-    const ty = rayEdgeCoord(data, w, h, x, cy, 0, -1, ref, thresh);
-    const by = rayEdgeCoord(data, w, h, x, cy, 0, 1, ref, thresh);
+    const x = clamp(Math.round(px + (xf - 0.5) * w * 0.38), 2, w - 3);
+    const ty = rayEdgeToBackground(data, w, h, x, py, 0, -1, bgCutoff);
+    const by = rayEdgeToBackground(data, w, h, x, py, 0, 1, bgCutoff);
     if (ty != null) topYs.push(ty);
     if (by != null) bottomYs.push(by);
   }
 
+  return { leftXs, rightXs, topYs, bottomYs };
+}
+
+function boxFromOuterEdges(
+  leftXs: number[],
+  rightXs: number[],
+  topYs: number[],
+  bottomYs: number[],
+  w: number,
+  h: number,
+): CardFrameDetection | null {
   if (leftXs.length < 2 || rightXs.length < 2 || topYs.length < 2 || bottomYs.length < 2) {
-    const fallback = detectCardBox(video, canvas);
-    return fallback ? { box: fallback, rotationDeg: 0 } : null;
+    return null;
   }
 
   const left = Math.min(...leftXs) / w;
@@ -186,12 +274,182 @@ export function detectCardFrame(video: HTMLVideoElement, canvas: HTMLCanvasEleme
     height: bottom - top,
   };
 
-  if (raw.width < 0.12 || raw.height < 0.12) return null;
+  if (raw.width < 0.08 || raw.height < 0.08) return null;
 
-  const box = enforceCardRect(raw);
-  const rotationDeg = estimateRotationDeg(leftXs, rightXs, topYs, bottomYs, w, h);
+  const aspect = raw.width / raw.height;
+  if (aspect < CARD_ASPECT * 0.75 || aspect > CARD_ASPECT * 1.35) return null;
 
-  return { box, rotationDeg };
+  return {
+    box: enforceCardRect(raw),
+    rotationDeg: estimateRotationDeg(leftXs, rightXs, topYs, bottomYs, w, h),
+  };
+}
+
+function scoreCardBox(
+  box: DetectedCard,
+  expected?: { width: number; height: number },
+): number {
+  const aspectErr = Math.abs(box.width / box.height - CARD_ASPECT);
+  if (aspectErr > 0.06) return -1;
+
+  if (!expected) return 1 - aspectErr;
+
+  const sizeRatio = (box.width / expected.width + box.height / expected.height) / 2;
+  if (sizeRatio < 0.4 || sizeRatio > 1.6) return -1;
+
+  const sizeScore = 1 - Math.min(1, Math.abs(1 - sizeRatio));
+  const aspectScore = 1 - aspectErr / 0.06;
+  return sizeScore * 0.65 + aspectScore * 0.35;
+}
+
+function detectFromBackground(
+  data: Uint8ClampedArray,
+  w: number,
+  h: number,
+  px: number,
+  py: number,
+  bgCutoff: number,
+): CardFrameDetection | null {
+  const edges = collectBackgroundEdges(data, w, h, px, py, bgCutoff);
+  return boxFromOuterEdges(edges.leftXs, edges.rightXs, edges.topYs, edges.bottomYs, w, h);
+}
+
+function collectRefEdges(
+  data: Uint8ClampedArray,
+  w: number,
+  h: number,
+  px: number,
+  py: number,
+  thresh: number,
+) {
+  const ref = sampleRef(data, w, px, py);
+  const yFracs = [0.3, 0.42, 0.5, 0.58, 0.7];
+  const xFracs = [0.3, 0.42, 0.5, 0.58, 0.7];
+
+  const leftXs: number[] = [];
+  const rightXs: number[] = [];
+  const topYs: number[] = [];
+  const bottomYs: number[] = [];
+
+  for (const yf of yFracs) {
+    const y = clamp(Math.round(py + (yf - 0.5) * h * 0.38), 2, h - 3);
+    const lx = rayEdgeCoord(data, w, h, px, y, -1, 0, ref, thresh);
+    const rx = rayEdgeCoord(data, w, h, px, y, 1, 0, ref, thresh);
+    if (lx != null) leftXs.push(lx);
+    if (rx != null) rightXs.push(rx);
+  }
+
+  for (const xf of xFracs) {
+    const x = clamp(Math.round(px + (xf - 0.5) * w * 0.38), 2, w - 3);
+    const ty = rayEdgeCoord(data, w, h, x, py, 0, -1, ref, thresh);
+    const by = rayEdgeCoord(data, w, h, x, py, 0, 1, ref, thresh);
+    if (ty != null) topYs.push(ty);
+    if (by != null) bottomYs.push(by);
+  }
+
+  return { leftXs, rightXs, topYs, bottomYs };
+}
+
+function boxFromRefEdges(
+  leftXs: number[],
+  rightXs: number[],
+  topYs: number[],
+  bottomYs: number[],
+  w: number,
+  h: number,
+): CardFrameDetection | null {
+  if (leftXs.length < 2 || rightXs.length < 2 || topYs.length < 2 || bottomYs.length < 2) {
+    return null;
+  }
+
+  const left = Math.min(...leftXs) / w;
+  const right = Math.max(...rightXs) / w;
+  const top = Math.min(...topYs) / h;
+  const bottom = Math.max(...bottomYs) / h;
+
+  const raw: DetectedCard = {
+    left,
+    top,
+    width: right - left,
+    height: bottom - top,
+  };
+
+  if (raw.width < 0.08 || raw.height < 0.08) return null;
+
+  const aspect = raw.width / raw.height;
+  if (aspect < CARD_ASPECT * 0.75 || aspect > CARD_ASPECT * 1.35) return null;
+
+  return {
+    box: enforceCardRect(raw),
+    rotationDeg: estimateRotationDeg(leftXs, rightXs, topYs, bottomYs, w, h),
+  };
+}
+
+function detectFromPointRefOnly(
+  data: Uint8ClampedArray,
+  w: number,
+  h: number,
+  px: number,
+  py: number,
+  thresh: number,
+): CardFrameDetection | null {
+  const edges = collectRefEdges(data, w, h, px, py, thresh);
+  return boxFromRefEdges(edges.leftXs, edges.rightXs, edges.topYs, edges.bottomYs, w, h);
+}
+
+export function detectCardFrame(
+  video: HTMLVideoElement,
+  canvas: HTMLCanvasElement,
+  search?: DetectSearchRegion,
+): CardFrameDetection | null {
+  if (video.videoWidth === 0 || video.videoHeight === 0) return null;
+
+  const w = 240;
+  const h = Math.round(w * (video.videoHeight / video.videoWidth));
+  canvas.width = w;
+  canvas.height = h;
+
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return null;
+
+  ctx.drawImage(video, 0, 0, w, h);
+  const { data } = ctx.getImageData(0, 0, w, h);
+
+  const cx = search?.cx ?? 0.5;
+  const cy = search?.cy ?? 0.36;
+  const expected =
+    search?.expectedWidth != null && search?.expectedHeight != null
+      ? { width: search.expectedWidth, height: search.expectedHeight }
+      : undefined;
+
+  const px = Math.floor(cx * w);
+  const py = Math.floor(cy * h);
+  const span = (search?.expectedHeight ?? 0.4) / 2;
+  const bgLum = estimateBackgroundLum(data, w, h, cx, cy, span);
+
+  let best: CardFrameDetection | null = null;
+  let bestScore = -1;
+
+  const consider = (found: CardFrameDetection | null) => {
+    if (!found) return;
+    const score = scoreCardBox(found.box, expected);
+    if (score > bestScore) {
+      bestScore = score;
+      best = found;
+    }
+  };
+
+  for (const margin of [28, 32, 38, 45]) {
+    consider(detectFromBackground(data, w, h, px, py, bgLum + margin));
+  }
+
+  if (bestScore < 0.35) {
+    for (const thresh of [22, 28, 36, 44]) {
+      consider(detectFromPointRefOnly(data, w, h, px, py, thresh));
+    }
+  }
+
+  return best;
 }
 
 export function detectCardBox(video: HTMLVideoElement, canvas: HTMLCanvasElement): DetectedCard | null {
@@ -256,10 +514,6 @@ export function guideTemplateForDistance(distanceCm: ScanDistanceCm = 20): { wid
   return { width: height * CARD_ASPECT, height };
 }
 
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
-}
-
 /** Vertical centre for the guide when no card is detected yet. */
 export function defaultGuideAnchorY(templateHeight: number, obstructionBottom: number): number {
   const maxBottom = 1 - obstructionBottom;
@@ -296,7 +550,20 @@ export function defaultGuideBox(): DetectedCard {
   return guideBoxForDistance(20);
 }
 
-export function smoothBox(prev: DetectedCard | null, next: DetectedCard, alpha = 0.35): DetectedCard {
+export function shouldAcceptDetection(prev: DetectedCard | null, next: DetectedCard): boolean {
+  if (!prev) return true;
+
+  const prevCx = prev.left + prev.width / 2;
+  const prevCy = prev.top + prev.height / 2;
+  const nextCx = next.left + next.width / 2;
+  const nextCy = next.top + next.height / 2;
+  const centerJump = Math.hypot(nextCx - prevCx, nextCy - prevCy);
+  const sizeJump = Math.abs(next.width - prev.width) / prev.width;
+
+  return centerJump <= 0.06 && sizeJump <= 0.2;
+}
+
+export function smoothBox(prev: DetectedCard | null, next: DetectedCard, alpha = 0.2): DetectedCard {
   const blended = !prev
     ? next
     : {

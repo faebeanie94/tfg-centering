@@ -36,13 +36,11 @@ export function ScannerOverlay({
   const detected = detectedBox ? boxToSvg(detectedBox) : null;
 
   const guideColor = '#ffffff';
-  const detectedColor = !showLevel
-    ? '#ffffff'
-    : !detectedBox
-      ? '#94a3b8'
-      : cardReady
-        ? '#22c55e'
-        : '#f97316';
+  const detectedColor = !detectedBox
+    ? '#94a3b8'
+    : showLevel && cardReady
+      ? '#22c55e'
+      : '#f97316';
 
   const cx = guide.x + guide.w / 2;
   const cy = guide.y + guide.h / 2;
@@ -50,6 +48,29 @@ export function ScannerOverlay({
   return (
     <div className="scanner-overlay">
       <svg className="scanner-overlay-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+        {detected && (
+          <>
+            <rect
+              x={detected.x}
+              y={detected.y}
+              width={detected.w}
+              height={detected.h}
+              fill="rgba(249, 115, 22, 0.18)"
+              stroke="none"
+            />
+            <rect
+              x={detected.x}
+              y={detected.y}
+              width={detected.w}
+              height={detected.h}
+              fill="none"
+              stroke={detectedColor}
+              strokeWidth={1.2}
+              className={`scanner-detected-box ${ready ? 'ready' : 'adjust'}`}
+            />
+          </>
+        )}
+
         <rect
           x={guide.x}
           y={guide.y}
@@ -61,19 +82,6 @@ export function ScannerOverlay({
           strokeDasharray="1.2 0.8"
           className="scanner-guide-box"
         />
-
-        {detected && (
-          <rect
-            x={detected.x}
-            y={detected.y}
-            width={detected.w}
-            height={detected.h}
-            fill="none"
-            stroke={detectedColor}
-            strokeWidth={0.55}
-            className={`scanner-detected-box ${ready ? 'ready' : 'adjust'}`}
-          />
-        )}
 
         {showLevel && phoneLevel && detectedBox && !cardReady && (
           <g className="scanner-alignment-hint" stroke="#f97316" strokeWidth={0.35} opacity={0.9}>

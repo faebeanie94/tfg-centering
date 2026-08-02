@@ -8,6 +8,9 @@ interface CompareViewProps {
   session: GradingSession;
   onEdit: (side: CardSide) => void;
   onClose: () => void;
+  onSaveToLibrary?: () => Promise<boolean>;
+  onLibrary?: () => void;
+  libraryMessage?: string | null;
 }
 
 function SideCard({
@@ -52,8 +55,16 @@ function SideCard({
   );
 }
 
-export function CompareView({ session, onEdit, onClose }: CompareViewProps) {
+export function CompareView({
+  session,
+  onEdit,
+  onClose,
+  onSaveToLibrary,
+  onLibrary,
+  libraryMessage,
+}: CompareViewProps) {
   const [showExport, setShowExport] = useState(false);
+  const [saving, setSaving] = useState(false);
   const limit = limitingGrade(session);
 
   const exportImages = useMemo(() => {
@@ -70,12 +81,34 @@ export function CompareView({ session, onEdit, onClose }: CompareViewProps) {
           ← Back
         </button>
         <h2>Front & Back Compare</h2>
-        {exportImages.length > 0 && (
-          <button type="button" className="btn btn-secondary btn-small" onClick={() => setShowExport(true)}>
-            Export
-          </button>
-        )}
+        <div className="compare-header-actions">
+          {onLibrary && (
+            <button type="button" className="btn btn-secondary btn-small" onClick={onLibrary}>
+              Library
+            </button>
+          )}
+          {onSaveToLibrary && exportImages.length > 0 && (
+            <button
+              type="button"
+              className="btn btn-secondary btn-small"
+              disabled={saving}
+              onClick={() => {
+                setSaving(true);
+                void onSaveToLibrary().finally(() => setSaving(false));
+              }}
+            >
+              {saving ? 'Saving…' : 'Save to library'}
+            </button>
+          )}
+          {exportImages.length > 0 && (
+            <button type="button" className="btn btn-secondary btn-small" onClick={() => setShowExport(true)}>
+              Export
+            </button>
+          )}
+        </div>
       </div>
+
+      {libraryMessage && <div className="library-toast">{libraryMessage}</div>}
 
       <div className="compare-grid">
         <SideCard label="Front" snapshot={session.front} onEdit={() => onEdit('front')} />

@@ -13,6 +13,8 @@ interface CardMenuProps {
   onFlipSide: () => void;
   onResetLines: () => void;
   onDelete: () => void;
+  onSaveToLibrary?: () => Promise<boolean>;
+  savingToLibrary?: boolean;
   onClose: () => void;
 }
 
@@ -27,6 +29,8 @@ export function CardMenu({
   onFlipSide,
   onResetLines,
   onDelete,
+  onSaveToLibrary,
+  savingToLibrary = false,
   onClose,
 }: CardMenuProps) {
   const [busy, setBusy] = useState(false);
@@ -185,6 +189,22 @@ export function CardMenu({
             )}
 
             <div className="action-sheet-divider" />
+
+            {onSaveToLibrary && (
+              <button
+                type="button"
+                className="action-sheet-item"
+                disabled={busy || savingToLibrary}
+                onClick={() =>
+                  runExport(async () => {
+                    await onSaveToLibrary();
+                  }, 'Saved to library')
+                }
+              >
+                <span className="action-icon">📁</span>
+                {savingToLibrary ? 'Saving to library…' : 'Save to library'}
+              </button>
+            )}
 
             <button
               type="button"

@@ -27,6 +27,8 @@ interface ImageCaptureProps {
   onCapture: (dataUrl: string) => void;
   onSettings: () => void;
   onCompare?: () => void;
+  onLibrary?: () => void;
+  savedCount?: number;
   hasSavedSides?: boolean;
 }
 
@@ -36,6 +38,8 @@ export function ImageCapture({
   onCapture,
   onSettings,
   onCompare,
+  onLibrary,
+  savedCount = 0,
   hasSavedSides,
 }: ImageCaptureProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -58,6 +62,10 @@ export function ImageCapture({
     scanDistanceCm: settings.scanDistanceCm,
     obstructionBottom: settings.scanObstructionBottom,
   });
+  const detectedBoxRef = useRef(detectedBox);
+  const guideBoxRef = useRef(guideBox);
+  detectedBoxRef.current = detectedBox;
+  guideBoxRef.current = guideBox;
 
   useEffect(() => {
     void queryCameraPermission();
@@ -76,9 +84,8 @@ export function ImageCapture({
     setCapturing(true);
     try {
       const track = streamRef.current?.getVideoTracks()[0];
-      const focusPoint = detectedBox
-        ? cardCenterFromBox(detectedBox)
-        : cardCenterFromBox(guideBox);
+      const box = detectedBoxRef.current ?? guideBoxRef.current;
+      const focusPoint = cardCenterFromBox(box);
       if (track) await focusOnCard(track, focusPoint);
 
       canvas.width = video.videoWidth;
@@ -94,7 +101,7 @@ export function ImageCapture({
     } finally {
       setCapturing(false);
     }
-  }, [onCapture, capturing, detectedBox, guideBox]);
+  }, [onCapture, capturing]);
 
   const scanReady =
     !showLevel ||
@@ -102,7 +109,7 @@ export function ImageCapture({
     !motionGranted ||
     (level.isLevel && alignment.fitsGuide);
 
-  const captureReady = scanReady && focusReady && !capturing;
+  const captureReady = scanReady && !capturing && (focusReady || !showLevel);
 
   useEffect(() => {
     if (!cameraActive || !scanReady) {
@@ -118,19 +125,22 @@ export function ImageCapture({
     let cancelled = false;
     setFocusReady(false);
 
+    const fallbackTimer = window.setTimeout(() => {
+      if (!cancelled) setFocusReady(true);
+    }, 900);
+
     void (async () => {
       const track = streamRef.current?.getVideoTracks()[0];
-      const focusPoint = detectedBox
-        ? cardCenterFromBox(detectedBox)
-        : cardCenterFromBox(guideBox);
-      if (track) await focusOnCard(track, focusPoint);
+      const box = detectedBoxRef.current ?? guideBoxRef.current;
+      if (track) await focusOnCard(track, cardCenterFromBox(box));
       if (!cancelled) setFocusReady(true);
     })();
 
     return () => {
       cancelled = true;
+      window.clearTimeout(fallbackTimer);
     };
-  }, [cameraActive, scanReady, detectedBox, guideBox]);
+  }, [cameraActive, scanReady]);
 
   const { progress, isCountingDown } = useAutoCapture({
     enabled: cameraActive && settings.autoCapture && showLevel && motionGranted,
@@ -258,7 +268,7 @@ export function ImageCapture({
     reader.readAsDataURL(file);
   }
 
-  const canManualCapture = captureReady;
+  const canManualCapture = scanReady && !capturing;
 
   const statusHint = capturing
     ? 'Focusing…'
@@ -277,6 +287,11 @@ export function ImageCapture({
           </button>
           <h1 className="scanner-title">Scanner</h1>
           <div className="scanner-header-actions">
+            {onLibrary && (
+              <button type="button" className="scanner-icon-btn" onClick={onLibrary} aria-label="Saved cards">
+                📁{savedCount > 0 ? ` ${savedCount}` : ''}
+              </button>
+            )}
             {hasSavedSides && onCompare && (
               <button type="button" className="scanner-icon-btn" onClick={onCompare} aria-label="Compare">
                 ⇄
@@ -353,6 +368,11 @@ export function ImageCapture({
       <div className="capture-top-bar">
         <span className="capture-side-badge">{side === 'front' ? 'Front' : 'Back'} side</span>
         <div className="capture-top-actions">
+          {onLibrary && (
+            <button type="button" className="btn btn-secondary btn-small" onClick={onLibrary}>
+              Library{savedCount > 0 ? ` (${savedCount})` : ''}
+            </button>
+          )}
           {hasSavedSides && onCompare && (
             <button type="button" className="btn btn-secondary btn-small" onClick={onCompare}>
               Compare

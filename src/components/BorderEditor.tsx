@@ -33,6 +33,9 @@ interface BorderEditorProps {
   onCompare: () => void;
   onSettings: () => void;
   onReset: () => void;
+  onLibrary?: () => void;
+  onSaveToLibrary?: (session: GradingSession) => Promise<boolean>;
+  libraryMessage?: string | null;
 }
 
 type DragTarget =
@@ -75,6 +78,9 @@ export function BorderEditor({
   onCompare,
   onSettings,
   onReset,
+  onLibrary,
+  onSaveToLibrary,
+  libraryMessage,
 }: BorderEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -87,6 +93,7 @@ export function BorderEditor({
   const [showStandards, setShowStandards] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [savingToLibrary, setSavingToLibrary] = useState(false);
   const dragStartRef = useRef<{ x: number; y: number; rect: Rect } | null>(null);
   const patternId = useMemo(() => `stripe-${side}-${Math.random().toString(36).slice(2)}`, [side, imageSrc]);
 
@@ -278,10 +285,17 @@ export function BorderEditor({
         <button type="button" className="btn btn-secondary btn-small" onClick={() => setShowMenu(true)}>
           ⋯
         </button>
+        {onLibrary && (
+          <button type="button" className="btn btn-secondary btn-small" onClick={onLibrary}>
+            Library
+          </button>
+        )}
         <button type="button" className="btn btn-secondary btn-small" onClick={onSettings}>
           ⚙
         </button>
       </div>
+
+      {libraryMessage && <div className="library-toast">{libraryMessage}</div>}
 
       <div className="grade-banner">
         <div className="grade-banner-brand">
@@ -389,6 +403,24 @@ export function BorderEditor({
         onFlipSide={() => handleSideSwitch(side === 'front' ? 'back' : 'front')}
         onResetLines={resetLines}
         onDelete={onDelete}
+        onSaveToLibrary={
+          onSaveToLibrary
+            ? async () => {
+                setSavingToLibrary(true);
+                try {
+                  const snap = buildSnapshot();
+                  const merged: GradingSession = {
+                    ...session,
+                    [side]: snap ?? session[side],
+                  };
+                  return await onSaveToLibrary(merged);
+                } finally {
+                  setSavingToLibrary(false);
+                }
+              }
+            : undefined
+        }
+        savingToLibrary={savingToLibrary}
         onClose={() => setShowMenu(false)}
       />
     </div>
