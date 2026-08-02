@@ -174,7 +174,7 @@ export function PerspectiveCorrector({ imageSrc, onComplete, onSkip, onCancel }:
       const rect = containerRef.current.getBoundingClientRect();
       const imageX = (e.clientX - rect.left) / displayScale;
       const imageY = (e.clientY - rect.top) / displayScale;
-      const hitRadius = screenPx(36, displayScale);
+      const hitRadius = screenPx(32, displayScale);
       const hit = cornerAtPoint(corners, imageX, imageY, hitRadius);
 
       beginDrag(e.clientX, e.clientY, hit ?? selectedCorner);
@@ -231,14 +231,16 @@ export function PerspectiveCorrector({ imageSrc, onComplete, onSkip, onCancel }:
 
   const displayHeight = imageSize.height * displayScale;
   const displayWidth = imageSize.width * displayScale;
-  const crosshairArm = screenPx(52, displayScale);
-  const crosshairStroke = screenPx(4, displayScale);
-  const crosshairStrokeActive = screenPx(5.5, displayScale);
-  const guideStroke = screenPx(2.5, displayScale);
-  const hubRadius = screenPx(18, displayScale);
-  const hubStroke = screenPx(3, displayScale);
-  const hubStrokeActive = screenPx(4, displayScale);
-  const centerDot = screenPx(4, displayScale);
+  const crosshairArm = screenPx(28, displayScale);
+  const crosshairStroke = screenPx(2.5, displayScale);
+  const crosshairStrokeActive = screenPx(3.5, displayScale);
+  const guideStroke = screenPx(1.75, displayScale);
+  const hitRadius = screenPx(32, displayScale);
+  const hubRadius = screenPx(10, displayScale);
+  const hubStroke = screenPx(2, displayScale);
+  const hubStrokeActive = screenPx(2.5, displayScale);
+  const centerDot = screenPx(2.5, displayScale);
+  const outlineExtra = screenPx(1, displayScale);
   const points = [corners.tl, corners.tr, corners.br, corners.bl, corners.tl];
   const linePoints = points.map((p) => `${p.x},${p.y}`).join(' ');
   const active = corners[selectedCorner];
@@ -305,7 +307,7 @@ export function PerspectiveCorrector({ imageSrc, onComplete, onSkip, onCancel }:
               const isActive = key === selectedCorner;
               const color = isActive ? '#ef4444' : '#ffffff';
               const stroke = isActive ? crosshairStrokeActive : crosshairStroke;
-              const outline = screenPx(1.5, displayScale);
+              const outline = outlineExtra;
               return (
                 <g key={key} className={`perspective-crosshair ${isActive ? 'active' : ''}`}>
                   <line
@@ -315,7 +317,7 @@ export function PerspectiveCorrector({ imageSrc, onComplete, onSkip, onCancel }:
                     y2={p.y}
                     stroke="#000"
                     strokeWidth={stroke + outline * 2}
-                    strokeOpacity={0.55}
+                    strokeOpacity={0.45}
                     strokeLinecap="round"
                   />
                   <line
@@ -325,7 +327,7 @@ export function PerspectiveCorrector({ imageSrc, onComplete, onSkip, onCancel }:
                     y2={p.y + crosshairArm}
                     stroke="#000"
                     strokeWidth={stroke + outline * 2}
-                    strokeOpacity={0.55}
+                    strokeOpacity={0.45}
                     strokeLinecap="round"
                   />
                   <line
@@ -349,7 +351,7 @@ export function PerspectiveCorrector({ imageSrc, onComplete, onSkip, onCancel }:
                   <circle
                     cx={p.x}
                     cy={p.y}
-                    r={hubRadius}
+                    r={hitRadius}
                     fill="transparent"
                     className="perspective-crosshair-hit"
                     onPointerDown={(e) => {
@@ -363,7 +365,7 @@ export function PerspectiveCorrector({ imageSrc, onComplete, onSkip, onCancel }:
                     cx={p.x}
                     cy={p.y}
                     r={hubRadius}
-                    fill="rgba(0,0,0,0.3)"
+                    fill="rgba(0,0,0,0.28)"
                     stroke={color}
                     strokeWidth={isActive ? hubStrokeActive : hubStroke}
                     pointerEvents="none"
