@@ -68,4 +68,8 @@ gh pr create --repo faebeanie94/tfg-centering
 | PR closed | `Fly Preview` | Destroys the preview app |
 | Push to `main` | `Fly Production` | Deploys https://tfg-centering.fly.dev |
 
-Add a repo secret **`FLY_API_TOKEN`** (Fly → Account → Access Tokens) so the Fly workflows can deploy.
+Add a repo secret **`FLY_API_TOKEN`** so the Fly workflows can deploy:
+
+1. Open [Fly personal tokens](https://fly.io/dashboard/personal/tokens)
+2. Create a token with **org read/write** (or full access) — **not** an app-scoped deploy token
+3. GitHub → Settings → Secrets and variables → Actions → `FLY_API_TOKEN`
