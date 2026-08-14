@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   type CornerKey,
   type QuadCorners,
@@ -22,7 +22,7 @@ const CORNERS: Array<{ key: CornerKey; label: string; arrow: string }> = [
   { key: 'br', label: 'BR', arrow: '↘' },
 ];
 
-const LOUPE_SIZE = 96;
+const LOUPE_SIZE = 112;
 const LOUPE_ZOOM = 1.25;
 
 /** Convert desired on-screen pixels to SVG/image coordinate units. */
@@ -149,7 +149,8 @@ export function PerspectiveCorrector({
     [corners, imageSize],
   );
 
-  useEffect(() => {
+  // Draw before paint so the loupe is never an empty circle on first drag frame.
+  useLayoutEffect(() => {
     if (dragging && corners) drawLoupe(selectedCorner);
   }, [dragging, corners, selectedCorner, drawLoupe]);
 
@@ -386,7 +387,12 @@ export function PerspectiveCorrector({
         </div>
 
         {dragging && (
-          <div className="perspective-loupe-dock" aria-label="Magnified corner view">
+          <div
+            className={`perspective-loupe-dock ${
+              selectedCorner === 'tl' || selectedCorner === 'tr' ? 'dock-bottom' : 'dock-top'
+            }`}
+            aria-label="Magnified corner view"
+          >
             <span className="perspective-loupe-label">
               {CORNERS.find((c) => c.key === selectedCorner)?.label} corner
             </span>
