@@ -17,7 +17,7 @@ This project has two remotes historically, but **all day-to-day work uses GitHub
 - Fetch / pull: `git fetch github` / `git pull github <branch>`
 - Push: `git push -u github HEAD` (never `origin` by default)
 - PRs: `gh pr … --repo faebeanie94/tfg-centering`
-- Deploy: Fly app `tfg-centering` from GitHub `main`, or PR preview apps via Actions
+- Deploy: Fly app `tfg-centering` (https://tfg-centering.fly.dev) from GitHub `main` via Actions
 
 ## Branch naming
 
