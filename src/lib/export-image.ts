@@ -239,15 +239,3 @@ export async function exportSessionImages(session: GradingSession): Promise<'sha
   if (images.length === 0) return;
   return saveAllCleanImages(images);
 }
-
-export async function exportAllSessions(sessions: GradingSession[]): Promise<number> {
-  let count = 0;
-  for (const session of sessions) {
-    const images = sessionExportImages(session);
-    if (images.length === 0) continue;
-    await saveAllCleanImages(images);
-    count += images.length;
-    await new Promise((r) => setTimeout(r, 400));
-  }
-  return count;
-}

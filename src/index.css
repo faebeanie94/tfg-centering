@@ -1616,6 +1616,11 @@ body.editor-mode #root {
   margin: 0 12px;
 }
 
+.library-feedback-progress {
+  background: rgba(148, 163, 184, 0.15);
+  color: #cbd5e1;
+}
+
 .library-empty {
   flex: 1;
   display: flex;
@@ -1631,6 +1636,71 @@ body.editor-mode #root {
 .library-empty-hint {
   font-size: 0.85rem;
   max-width: 280px;
+}
+
+.library-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.library-group + .library-group {
+  margin-top: 14px;
+}
+
+.library-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 2px;
+}
+
+.library-group-toggle {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding: 6px 4px;
+  margin: -6px -4px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.library-group-toggle:hover {
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.library-group-chevron {
+  font-size: 0.85rem;
+  line-height: 1;
+  width: 12px;
+  text-align: center;
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+}
+
+.library-group-toggle.is-collapsed .library-group-chevron {
+  transform: rotate(-90deg);
+}
+
+.library-group-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.library-group-count {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
 }
 
 .library-list {
