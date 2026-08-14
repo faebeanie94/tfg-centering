@@ -1,0 +1,24 @@
+---
+description: Use GitHub only for remotes, PRs, pushes, and deploys
+alwaysApply: true
+---
+
+# GitHub-only workflow
+
+This project has two remotes historically, but **all day-to-day work uses GitHub only**.
+
+| Remote | URL | Use? |
+|--------|-----|------|
+| `github` | `https://github.com/faebeanie94/tfg-centering.git` | **Yes — always** |
+| `origin` | GitLab | **No** — ignore unless the user explicitly asks |
+
+## Required commands
+
+- Fetch / pull: `git fetch github` / `git pull github <branch>`
+- Push: `git push -u github HEAD` (never `origin` by default)
+- PRs: `gh pr … --repo faebeanie94/tfg-centering`
+- Deploy: Fly app `tfg-centering` from GitHub `main`, or PR preview apps via Actions
+
+## Branch naming
+
+Prefer `cursor/<short-description>` for feature branches pushed to GitHub.

@@ -42,3 +42,30 @@ Reference files in `/reference` include the TFG Grading Standards PDF and center
 npm run build
 npm run preview
 ```
+
+## GitHub workflow (source of truth)
+
+Day-to-day work uses **GitHub only**:
+
+- Repo: https://github.com/faebeanie94/tfg-centering
+- Remote name in this clone: `github` (`git push -u github HEAD`)
+- Ignore the GitLab `origin` remote unless you explicitly need it
+
+```bash
+git fetch github
+git checkout -b cursor/my-change
+# …work…
+git push -u github HEAD
+gh pr create --repo faebeanie94/tfg-centering
+```
+
+### CI and deploys
+
+| Event | Workflow | Result |
+|-------|----------|--------|
+| Push / PR | `CI` | `npm ci` + `npm run build` |
+| PR open/update | `Fly Preview` | Deploys `tfg-centering-pr-<n>.fly.dev` and comments the URL |
+| PR closed | `Fly Preview` | Destroys the preview app |
+| Push to `main` | `Fly Production` | Deploys https://tfg-centering.fly.dev |
+
+Add a repo secret **`FLY_API_TOKEN`** (Fly → Account → Access Tokens) so the Fly workflows can deploy.
