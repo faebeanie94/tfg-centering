@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { formatMmPair, formatPct } from '../lib/centering';
 import type { GradingSession } from '../lib/session';
 import { formatGrade, limitingGrade } from '../lib/session';
 import type { CardSide } from '../lib/tfg-standards';
@@ -42,8 +43,24 @@ function SideCard({
       <img src={imageSrc} alt={label} className="compare-thumb" />
       <div className="compare-grade">{formatGrade(grade.grade)}</div>
       <div className="compare-metrics">
-        <span>L|R {result.leftRight.left.toFixed(1)}|{result.leftRight.right.toFixed(1)}</span>
-        <span>T|B {result.topBottom.top.toFixed(1)}|{result.topBottom.bottom.toFixed(1)}</span>
+        <div className="compare-metric-row">
+          <span className="compare-metric-label">L | R</span>
+          <span className="compare-metric-value">
+            {formatPct(result.leftRight.left)} | {formatPct(result.leftRight.right)}
+          </span>
+          <span className="compare-metric-mm">
+            {formatMmPair(result.bordersMm.left, result.bordersMm.right)}
+          </span>
+        </div>
+        <div className="compare-metric-row">
+          <span className="compare-metric-label">T | B</span>
+          <span className="compare-metric-value">
+            {formatPct(result.topBottom.top)} | {formatPct(result.topBottom.bottom)}
+          </span>
+          <span className="compare-metric-mm">
+            {formatMmPair(result.bordersMm.top, result.bordersMm.bottom)}
+          </span>
+        </div>
       </div>
       <div className="compare-detail">
         Qualify {grade.worstQualify.toFixed(2)} · {grade.worstAxis === 'left-right' ? 'L/R' : 'T/B'}

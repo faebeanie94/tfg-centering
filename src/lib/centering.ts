@@ -23,6 +23,19 @@ export interface CenteringResult {
   topBottom: { top: number; bottom: number };
 }
 
+export function formatMm(n: number): string {
+  return `${n.toFixed(2)} mm`;
+}
+
+export function formatPct(n: number): string {
+  return `${n.toFixed(1)}%`;
+}
+
+/** Compact border pair for banners/summaries, e.g. "2.15 | 1.76 mm". */
+export function formatMmPair(a: number, b: number): string {
+  return `${a.toFixed(2)} | ${b.toFixed(2)} mm`;
+}
+
 export function computeCentering(
   outer: Rect,
   inner: Rect,
