@@ -11,7 +11,7 @@ interface LevelCrosshairProps {
 
 export function LevelCrosshair({ level, progress = 0 }: LevelCrosshairProps) {
   const { isLevel, tiltFromFlat, roll, supported, permissionGranted } = level;
-  const color = isLevel ? '#22c55e' : '#ef4444';
+  const color = isLevel ? '#78c285' : '#e77d31';
 
   return (
     <div className="level-overlay">
@@ -23,7 +23,7 @@ export function LevelCrosshair({ level, progress = 0 }: LevelCrosshairProps) {
             cy="50"
             r="44"
             fill="none"
-            stroke="#22c55e"
+            stroke="#78c285"
             strokeWidth="4"
             strokeDasharray={`${progress * 276} 276`}
             transform="rotate(-90 50 50)"

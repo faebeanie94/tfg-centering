@@ -12,12 +12,12 @@ interface SettingsPanelProps {
 }
 
 const COLOR_PRESETS = [
-  { label: 'Green', value: '#22c55e' },
+  { label: 'Grade', value: '#78c285' },
+  { label: 'Alpha', value: '#cb3687' },
+  { label: 'Bravo', value: '#49a3e1' },
+  { label: 'Error', value: '#e77d31' },
   { label: 'Yellow', value: '#facc15' },
-  { label: 'Blue', value: '#3b82f6' },
-  { label: 'Orange', value: '#f97316' },
-  { label: 'Pink', value: '#ec4899' },
-  { label: 'Cyan', value: '#06b6d4' },
+  { label: 'Accent', value: '#06b6d4' },
 ];
 
 function ColorField({

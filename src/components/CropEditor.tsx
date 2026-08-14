@@ -184,7 +184,7 @@ export function CropEditor({ imageSrc, invertColors = false, onComplete, onCance
             </mask>
           </defs>
           <rect x="0" y="0" width={imageSize.width} height={imageSize.height} fill="rgba(0,0,0,0.55)" mask="url(#crop-mask)" />
-          <rect x={crop.x} y={crop.y} width={crop.width} height={crop.height} fill="none" stroke="#3b82f6" strokeWidth={3} />
+          <rect x={crop.x} y={crop.y} width={crop.width} height={crop.height} fill="none" stroke="#49a3e1" strokeWidth={3} />
         </svg>
 
         <div className="handles-layer">
