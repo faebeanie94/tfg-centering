@@ -21,4 +21,4 @@ There is one service (the Vite dev server). Standard commands live in `package.j
 - Camera and DeviceOrientation/Motion features do not work in the headless cloud VM. To exercise the grading flow end-to-end, use the **"Upload Image"** button on the home screen (a hidden `<input type="file">`) instead of "Take Photo". Flow: upload image → "Perspective Fix" screen (click **Skip**) → **Border Editor**, which displays border widths (mm), L|R and T|B percentages, and the TFG grade.
 - The Border Editor initializes its green (card edge) and yellow (artwork border) handles at default rectangles; it does not auto-detect the uploaded card's borders, so a freshly uploaded image shows a default (often centered) grade until handles are dragged.
 - Node 20 is used in the production `Dockerfile`; Node 22 also works fine for local dev/build.
-- PR preview apps are named `tfg-centering-pr-<number>` on Fly and require the `FLY_API_TOKEN` GitHub secret.
+- Production deploys to Fly app `tfg-centering` (https://tfg-centering.fly.dev) via GitHub Actions on pushes to `main`, using the `FLY_API_TOKEN` secret.
