@@ -38,14 +38,15 @@ export function SavedCardsView({ cards, loading, onClose, onOpen, onDelete }: Sa
   const [message, setMessage] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  async function runExport(action: () => Promise<void>, success: string) {
+  async function runExport(action: () => Promise<void | 'shared' | 'downloaded'>, success: string) {
     setBusy(true);
     setMessage(null);
     try {
-      await action();
-      setMessage(success);
-    } catch {
-      setMessage('Export failed — try again');
+      const result = await action();
+      if (result === 'shared') setMessage('Share sheet opened — Save Image or Save to Files');
+      else setMessage(success);
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') setMessage('Export failed — try again');
     } finally {
       setBusy(false);
     }

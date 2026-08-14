@@ -52,7 +52,7 @@ export function CardMenu({
     setMessage(null);
     try {
       const result = await action();
-      if (result === 'shared') setMessage('Shared successfully');
+      if (result === 'shared') setMessage('Share sheet opened — Save Image or Save to Files');
       else if (result === 'downloaded') setMessage('Saved to downloads');
       else setMessage(success);
     } catch (err) {
@@ -270,10 +270,14 @@ export function CompareExportMenu({ open, images, onClose }: CompareExportMenuPr
     setBusy(true);
     setMessage(null);
     try {
-      await saveAllCleanImages(images);
-      setMessage(`Saved ${images.length} clean image${images.length === 1 ? '' : 's'}`);
-    } catch {
-      setMessage('Export failed — try again');
+      const result = await saveAllCleanImages(images);
+      if (result === 'shared') {
+        setMessage('Share sheet opened — Save Image or Save to Files');
+      } else {
+        setMessage(`Saved ${images.length} clean image${images.length === 1 ? '' : 's'}`);
+      }
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') setMessage('Export failed — try again');
     } finally {
       setBusy(false);
     }
@@ -289,7 +293,10 @@ export function CompareExportMenu({ open, images, onClose }: CompareExportMenuPr
           </button>
         </div>
 
-        <p className="action-sheet-note">Clean exports without border analysis overlays.</p>
+        <p className="action-sheet-note">
+          Clean exports without border analysis overlays. On iPhone, this opens the share sheet so you
+          can Save Image or Save to Files.
+        </p>
 
         {images.map(({ side, imageSrc, name }) => (
           <button
@@ -299,9 +306,18 @@ export function CompareExportMenu({ open, images, onClose }: CompareExportMenuPr
             disabled={busy}
             onClick={() => {
               setBusy(true);
+              setMessage(null);
               saveCleanImage(imageSrc, side, name)
-                .then(() => setMessage(`Saved ${side} image`))
-                .catch(() => setMessage('Export failed'))
+                .then((result) => {
+                  setMessage(
+                    result === 'shared'
+                      ? 'Share sheet opened — Save Image or Save to Files'
+                      : `Saved ${side} image`,
+                  );
+                })
+                .catch((err) => {
+                  if ((err as Error).name !== 'AbortError') setMessage('Export failed');
+                })
                 .finally(() => setBusy(false));
             }}
           >
