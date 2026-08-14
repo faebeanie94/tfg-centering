@@ -1189,27 +1189,43 @@ body.editor-mode #root {
 }
 
 .perspective-viewport {
-  flex-direction: column;
-  gap: 6px;
   justify-content: center;
 }
 
+/* Overlay inside the viewport so overflow:hidden cannot clip a flex sibling
+   squeezed under a fit-to-viewport card image (common on phones). */
 .perspective-loupe-dock {
-  flex-shrink: 0;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  padding: 6px 10px;
-  background: rgba(0, 0, 0, 0.8);
-  border-radius: var(--radius);
+  gap: 6px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.78);
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  border-radius: 14px;
   pointer-events: none;
+  max-width: calc(100% - 16px);
+}
+
+.perspective-loupe-dock.dock-top {
+  top: 10px;
+  bottom: auto;
+}
+
+.perspective-loupe-dock.dock-bottom {
+  bottom: 10px;
+  top: auto;
 }
 
 .perspective-loupe-label {
   font-size: 0.72rem;
   font-weight: 700;
-  color: var(--text-muted);
+  color: #e2e8f0;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -1217,6 +1233,7 @@ body.editor-mode #root {
 .perspective-loupe-dock .perspective-loupe {
   position: relative;
   border: 2px solid #ef4444;
+  flex-shrink: 0;
 }
 
 .perspective-loupe {
@@ -1225,6 +1242,7 @@ body.editor-mode #root {
   pointer-events: none;
   z-index: 20;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.55);
+  background: #000;
 }
 
 .perspective-drag-hint {
