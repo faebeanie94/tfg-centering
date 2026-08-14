@@ -4,8 +4,6 @@ import {
   computeCentering,
   defaultInnerRect,
   defaultOuterRect,
-  formatMm,
-  formatMmPair,
   formatPct,
 } from '../lib/centering';
 import { hexToRgba } from '../lib/perspective';
@@ -265,6 +263,13 @@ export function BorderEditor({
     ));
   }
 
+  const mmReadings = [
+    { key: 'left', label: 'Left', value: result.bordersMm.left },
+    { key: 'right', label: 'Right', value: result.bordersMm.right },
+    { key: 'top', label: 'Top', value: result.bordersMm.top },
+    { key: 'bottom', label: 'Bottom', value: result.bordersMm.bottom },
+  ] as const;
+
   return (
     <div className="editor editor-shell">
       <div className="editor-toolbar">
@@ -316,21 +321,25 @@ export function BorderEditor({
             <span className="metric-value">
               {formatPct(result.leftRight.left)} | {formatPct(result.leftRight.right)}
             </span>
-            <span className="metric-mm">
-              {formatMmPair(result.bordersMm.left, result.bordersMm.right)}
-            </span>
           </div>
           <div className="metric">
             <span className="metric-label">T | B</span>
             <span className="metric-value">
               {formatPct(result.topBottom.top)} | {formatPct(result.topBottom.bottom)}
             </span>
-            <span className="metric-mm">
-              {formatMmPair(result.bordersMm.top, result.bordersMm.bottom)}
-            </span>
           </div>
         </div>
         <div className="grade-banner-score">{formatGrade(tfgGrade.grade)}</div>
+      </div>
+
+      <div className="mm-readout" aria-label="Border measurements in millimetres">
+        {mmReadings.map((reading) => (
+          <div key={reading.key} className="mm-readout-cell">
+            <span className="mm-readout-label">{reading.label}</span>
+            <span className="mm-readout-value">{reading.value.toFixed(2)}</span>
+            <span className="mm-readout-unit">mm</span>
+          </div>
+        ))}
       </div>
 
       <div ref={viewportRef} className="editor-viewport" {...viewportHandlers}>
@@ -343,50 +352,39 @@ export function BorderEditor({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
       >
-        <img
-          src={imageSrc}
-          alt="Trading card"
-          draggable={false}
-          className={settings.invertColors ? 'editor-image-inverted' : undefined}
-          style={{ width: '100%' }}
-        />
+        <div className="editor-canvas-media">
+          <img
+            src={imageSrc}
+            alt="Trading card"
+            draggable={false}
+            className={settings.invertColors ? 'editor-image-inverted' : undefined}
+            style={{ width: '100%' }}
+          />
 
-        <svg
-          className="editor-overlay"
-          viewBox={`0 0 ${imageSize.width} ${imageSize.height}`}
-          preserveAspectRatio="none"
-        >
-          <defs>
-            <pattern id={patternId} patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
-              <line x1="0" y1="0" x2="0" y2="8" stroke={fillStroke} strokeWidth="4" />
-            </pattern>
-          </defs>
+          <svg
+            className="editor-overlay"
+            viewBox={`0 0 ${imageSize.width} ${imageSize.height}`}
+            preserveAspectRatio="none"
+          >
+            <defs>
+              <pattern id={patternId} patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
+                <line x1="0" y1="0" x2="0" y2="8" stroke={fillStroke} strokeWidth="4" />
+              </pattern>
+            </defs>
 
-          <rect x={outer.x} y={outer.y} width={inner.x - outer.x} height={outer.height} fill={`url(#${patternId})`} />
-          <rect x={inner.x + inner.width} y={outer.y} width={outer.x + outer.width - (inner.x + inner.width)} height={outer.height} fill={`url(#${patternId})`} />
-          <rect x={inner.x} y={outer.y} width={inner.width} height={inner.y - outer.y} fill={`url(#${patternId})`} />
-          <rect x={inner.x} y={inner.y + inner.height} width={inner.width} height={outer.y + outer.height - (inner.y + inner.height)} fill={`url(#${patternId})`} />
+            <rect x={outer.x} y={outer.y} width={inner.x - outer.x} height={outer.height} fill={`url(#${patternId})`} />
+            <rect x={inner.x + inner.width} y={outer.y} width={outer.x + outer.width - (inner.x + inner.width)} height={outer.height} fill={`url(#${patternId})`} />
+            <rect x={inner.x} y={outer.y} width={inner.width} height={inner.y - outer.y} fill={`url(#${patternId})`} />
+            <rect x={inner.x} y={inner.y + inner.height} width={inner.width} height={outer.y + outer.height - (inner.y + inner.height)} fill={`url(#${patternId})`} />
 
-          <rect x={outer.x} y={outer.y} width={outer.width} height={outer.height} fill="none" stroke={settings.outerEdgeColor} strokeWidth={3} />
-          <rect x={inner.x} y={inner.y} width={inner.width} height={inner.height} fill="none" stroke={settings.handleColor} strokeWidth={2} />
-        </svg>
+            <rect x={outer.x} y={outer.y} width={outer.width} height={outer.height} fill="none" stroke={settings.outerEdgeColor} strokeWidth={3} />
+            <rect x={inner.x} y={inner.y} width={inner.width} height={inner.height} fill="none" stroke={settings.handleColor} strokeWidth={2} />
+          </svg>
+        </div>
 
         <div className="handles-layer">
           {renderEdgeHandles(outer, 'outer', settings.handleColor)}
           {renderEdgeHandles(inner, 'inner', settings.handleColor)}
-        </div>
-
-        <div className="border-label" style={{ left: (outer.x + (inner.x - outer.x) / 2) * displayScale, top: (outer.y + outer.height / 2) * displayScale }}>
-          {formatMm(result.bordersMm.left)}
-        </div>
-        <div className="border-label" style={{ left: (inner.x + inner.width + (outer.x + outer.width - inner.x - inner.width) / 2) * displayScale, top: (outer.y + outer.height / 2) * displayScale }}>
-          {formatMm(result.bordersMm.right)}
-        </div>
-        <div className="border-label" style={{ left: (outer.x + outer.width / 2) * displayScale, top: (outer.y + (inner.y - outer.y) / 2) * displayScale }}>
-          {formatMm(result.bordersMm.top)}
-        </div>
-        <div className="border-label" style={{ left: (outer.x + outer.width / 2) * displayScale, top: (inner.y + inner.height + (outer.y + outer.height - inner.y - inner.height) / 2) * displayScale }}>
-          {formatMm(result.bordersMm.bottom)}
         </div>
       </div>
       </div>
