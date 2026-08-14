@@ -23,7 +23,7 @@ const CORNERS: Array<{ key: CornerKey; label: string; arrow: string }> = [
 ];
 
 const LOUPE_SIZE = 96;
-const LOUPE_ZOOM = 2;
+const LOUPE_ZOOM = 1.25;
 
 /** Convert desired on-screen pixels to SVG/image coordinate units. */
 function screenPx(px: number, displayScale: number) {
