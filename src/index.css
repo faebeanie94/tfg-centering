@@ -680,7 +680,7 @@ body.editor-mode #root {
   border-radius: var(--radius);
   padding: 8px 10px;
   flex-shrink: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .grade-banner-brand {
@@ -723,13 +723,15 @@ body.editor-mode #root {
   flex: 1;
   min-width: 0;
   justify-content: flex-end;
+  overflow: visible;
 }
 
 .metric {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 1px;
   min-width: 0;
+  flex-shrink: 0;
 }
 
 .metric-label {
@@ -764,13 +766,22 @@ body.editor-mode #root {
 .editor-canvas {
   position: relative;
   border-radius: var(--radius);
-  overflow: hidden;
+  overflow: visible;
   background: #000;
   touch-action: none;
   user-select: none;
   flex-shrink: 0;
 }
 
+.editor-canvas-media {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  background: #000;
+}
+
+.editor-canvas-media img,
 .editor-canvas img {
   display: block;
   width: 100%;
@@ -778,6 +789,7 @@ body.editor-mode #root {
   pointer-events: none;
 }
 
+.editor-canvas-media img.editor-image-inverted,
 .editor-canvas img.editor-image-inverted {
   filter: invert(1);
 }
@@ -886,19 +898,23 @@ body.editor-mode #root {
 .border-label {
   position: absolute;
   transform: translate(-50%, -50%);
-  background: rgba(0, 0, 0, 0.88);
+  background: rgba(0, 0, 0, 0.92);
   color: #fff;
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
-  padding: 5px 10px;
+  line-height: 1.25;
+  padding: 6px 10px;
   border-radius: 8px;
   pointer-events: none;
   white-space: nowrap;
-  z-index: 5;
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  z-index: 15;
+  border: 1px solid rgba(255, 255, 255, 0.4);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
   letter-spacing: 0.01em;
+  box-sizing: border-box;
+  overflow: visible;
+  max-width: none;
 }
 
 .legend {
