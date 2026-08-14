@@ -4,6 +4,9 @@ import {
   computeCentering,
   defaultInnerRect,
   defaultOuterRect,
+  formatMm,
+  formatMmPair,
+  formatPct,
 } from '../lib/centering';
 import { hexToRgba } from '../lib/perspective';
 import type { SideSnapshot, GradingSession } from '../lib/session';
@@ -52,14 +55,6 @@ interface ImageSize {
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
-}
-
-function formatMm(n: number): string {
-  return `${n.toFixed(2)} mm`;
-}
-
-function formatPct(n: number): string {
-  return `${n.toFixed(1)}%`;
 }
 
 export function BorderEditor({
@@ -321,11 +316,17 @@ export function BorderEditor({
             <span className="metric-value">
               {formatPct(result.leftRight.left)} | {formatPct(result.leftRight.right)}
             </span>
+            <span className="metric-mm">
+              {formatMmPair(result.bordersMm.left, result.bordersMm.right)}
+            </span>
           </div>
           <div className="metric">
             <span className="metric-label">T | B</span>
             <span className="metric-value">
               {formatPct(result.topBottom.top)} | {formatPct(result.topBottom.bottom)}
+            </span>
+            <span className="metric-mm">
+              {formatMmPair(result.bordersMm.top, result.bordersMm.bottom)}
             </span>
           </div>
         </div>
