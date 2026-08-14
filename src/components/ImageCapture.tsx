@@ -263,9 +263,20 @@ export function ImageCapture({
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
+    // Allow selecting the same photo again later
+    e.target.value = '';
     if (!file) return;
 
+    if (!file.type.startsWith('image/') && !/\.(jpe?g|png|gif|webp|heic|heif)$/i.test(file.name)) {
+      setError('Please choose an image from your photo library.');
+      return;
+    }
+
+    setError(null);
     const reader = new FileReader();
+    reader.onerror = () => {
+      setError('Could not read that image. Try another photo or export as JPEG.');
+    };
     reader.onload = () => {
       if (typeof reader.result === 'string') onCapture(reader.result);
     };
@@ -405,13 +416,13 @@ export function ImageCapture({
           className="btn btn-secondary btn-large"
           onClick={() => fileInputRef.current?.click()}
         >
-          Upload Image
+          Choose from Photos
         </button>
+        {/* No capture attribute — that forces the camera on iOS and blocks the photo library. */}
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*"
-          capture="environment"
+          accept="image/*,.heic,.heif"
           hidden
           onChange={handleFile}
         />
