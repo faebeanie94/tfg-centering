@@ -14,8 +14,8 @@ interface RectLike {
 }
 
 function EdgeIcon({ edge }: { edge: Edge }) {
-  const line = '#1e293b';
-  const arrow = '#1e293b';
+  const line = '#212529';
+  const arrow = '#212529';
 
   if (edge === 'left') {
     return (

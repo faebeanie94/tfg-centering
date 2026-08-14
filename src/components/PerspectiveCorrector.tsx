@@ -124,7 +124,7 @@ export function PerspectiveCorrector({
       );
 
       const center = LOUPE_SIZE / 2;
-      ctx.strokeStyle = '#ef4444';
+      ctx.strokeStyle = '#e77d31';
       ctx.lineWidth = 2.5;
       ctx.beginPath();
       ctx.moveTo(center, 0);
@@ -140,7 +140,7 @@ export function PerspectiveCorrector({
       ctx.stroke();
       ctx.restore();
 
-      ctx.strokeStyle = '#ef4444';
+      ctx.strokeStyle = '#e77d31';
       ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.arc(LOUPE_SIZE / 2, LOUPE_SIZE / 2, LOUPE_SIZE / 2 - 1.5, 0, Math.PI * 2);
@@ -289,7 +289,7 @@ export function PerspectiveCorrector({
             <polygon
               points={linePoints}
               fill="rgba(59,130,246,0.12)"
-              stroke="#3b82f6"
+              stroke="#49a3e1"
               strokeWidth={2}
               strokeDasharray="8 4"
             />
@@ -314,7 +314,7 @@ export function PerspectiveCorrector({
             {CORNERS.map(({ key }) => {
               const p = corners[key];
               const isActive = key === selectedCorner;
-              const color = isActive ? '#ef4444' : '#ffffff';
+              const color = isActive ? '#e77d31' : '#ffffff';
               const stroke = isActive ? crosshairStrokeActive : crosshairStroke;
               const outline = outlineExtra;
               return (

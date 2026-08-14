@@ -37,10 +37,10 @@ export function ScannerOverlay({
 
   const guideColor = '#ffffff';
   const detectedColor = !detectedBox
-    ? '#94a3b8'
+    ? '#adb5bd'
     : showLevel && cardReady
-      ? '#22c55e'
-      : '#f97316';
+      ? '#78c285'
+      : '#e77d31';
 
   const cx = guide.x + guide.w / 2;
   const cy = guide.y + guide.h / 2;
@@ -55,7 +55,7 @@ export function ScannerOverlay({
               y={detected.y}
               width={detected.w}
               height={detected.h}
-              fill="rgba(249, 115, 22, 0.18)"
+              fill="rgba(231, 125, 49, 0.18)"
               stroke="none"
             />
             <rect
@@ -84,14 +84,14 @@ export function ScannerOverlay({
         />
 
         {showLevel && phoneLevel && detectedBox && !cardReady && (
-          <g className="scanner-alignment-hint" stroke="#f97316" strokeWidth={0.35} opacity={0.9}>
+          <g className="scanner-alignment-hint" stroke="#e77d31" strokeWidth={0.35} opacity={0.9}>
             {Math.abs(alignment.offsetX) > 0.03 && (
               <text
                 x={cx}
                 y={cy}
                 textAnchor="middle"
                 dominantBaseline="middle"
-                fill="#f97316"
+                fill="#e77d31"
                 fontSize="3.5"
                 fontWeight="700"
               >
@@ -104,7 +104,7 @@ export function ScannerOverlay({
                 y={cy}
                 textAnchor="middle"
                 dominantBaseline="middle"
-                fill="#f97316"
+                fill="#e77d31"
                 fontSize="3.5"
                 fontWeight="700"
               >
@@ -120,7 +120,7 @@ export function ScannerOverlay({
             cy={detected.y + detected.h / 2}
             r={Math.min(detected.w, detected.h) * 50}
             fill="none"
-            stroke="#22c55e"
+            stroke="#78c285"
             strokeWidth={0.5}
             strokeDasharray={`${progress * 160} 160`}
             transform={`rotate(-90 ${detected.x + detected.w / 2} ${detected.y + detected.h / 2})`}

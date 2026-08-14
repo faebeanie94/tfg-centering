@@ -28,8 +28,8 @@ export const SCAN_OBSTRUCTION_OPTIONS = [
 
 export const DEFAULT_SETTINGS: AppSettings = {
   handleColor: '#facc15',
-  borderFillColor: '#22c55e',
-  outerEdgeColor: '#22c55e',
+  borderFillColor: '#78c285',
+  outerEdgeColor: '#78c285',
   autoCapture: true,
   levelIndicators: true,
   autoCaptureDelayMs: 1500,
