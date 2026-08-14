@@ -1340,6 +1340,17 @@ body.editor-mode #root {
   line-height: 1.4;
 }
 
+.settings-build {
+  margin: 0 0 10px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.btn-block {
+  width: 100%;
+}
+
 .settings-field {
   display: flex;
   flex-direction: column;

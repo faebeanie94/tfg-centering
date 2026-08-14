@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import type { AppSettings } from '../hooks/useAppSettings';
 import { DEFAULT_SETTINGS, SCAN_OBSTRUCTION_OPTIONS } from '../hooks/useAppSettings';
 import { SCAN_DISTANCE_OPTIONS } from '../lib/card-edge-detect';
+import { getAppBuildLabel, refreshAppToLatest } from '../lib/app-update';
 
 interface SettingsPanelProps {
   open: boolean;
@@ -57,7 +59,19 @@ function ColorField({
 }
 
 export function SettingsPanel({ open, settings, onChange, onClose }: SettingsPanelProps) {
+  const [refreshing, setRefreshing] = useState(false);
+
   if (!open) return null;
+
+  async function handleRefreshApp() {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      await refreshAppToLatest();
+    } catch {
+      setRefreshing(false);
+    }
+  }
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -166,6 +180,23 @@ export function SettingsPanel({ open, settings, onChange, onClose }: SettingsPan
             />
           </label>
           <p className="settings-hint">Torch and macro depend on your device. Toggle them during capture too.</p>
+        </section>
+
+        <section className="settings-section">
+          <h3>App</h3>
+          <p className="settings-build">Build: {getAppBuildLabel()}</p>
+          <button
+            type="button"
+            className="btn btn-secondary btn-block"
+            disabled={refreshing}
+            onClick={() => void handleRefreshApp()}
+          >
+            {refreshing ? 'Refreshing…' : 'Refresh app'}
+          </button>
+          <p className="settings-hint">
+            Reloads the latest version from the server. Does not clear your saved library, settings, or graded
+            cards.
+          </p>
         </section>
 
         <div className="settings-actions">
