@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { formatMmPair, formatPct } from '../lib/centering';
+import { formatPct } from '../lib/centering';
 import type { GradingSession } from '../lib/session';
 import { formatGrade, limitingGrade } from '../lib/session';
 import type { CardSide } from '../lib/tfg-standards';
@@ -48,18 +48,30 @@ function SideCard({
           <span className="compare-metric-value">
             {formatPct(result.leftRight.left)} | {formatPct(result.leftRight.right)}
           </span>
-          <span className="compare-metric-mm">
-            {formatMmPair(result.bordersMm.left, result.bordersMm.right)}
-          </span>
         </div>
         <div className="compare-metric-row">
           <span className="compare-metric-label">T | B</span>
           <span className="compare-metric-value">
             {formatPct(result.topBottom.top)} | {formatPct(result.topBottom.bottom)}
           </span>
-          <span className="compare-metric-mm">
-            {formatMmPair(result.bordersMm.top, result.bordersMm.bottom)}
-          </span>
+        </div>
+      </div>
+      <div className="compare-mm-grid" aria-label="Border measurements in millimetres">
+        <div className="compare-mm-cell">
+          <span className="compare-mm-label">Left</span>
+          <span className="compare-mm-value">{result.bordersMm.left.toFixed(2)} mm</span>
+        </div>
+        <div className="compare-mm-cell">
+          <span className="compare-mm-label">Right</span>
+          <span className="compare-mm-value">{result.bordersMm.right.toFixed(2)} mm</span>
+        </div>
+        <div className="compare-mm-cell">
+          <span className="compare-mm-label">Top</span>
+          <span className="compare-mm-value">{result.bordersMm.top.toFixed(2)} mm</span>
+        </div>
+        <div className="compare-mm-cell">
+          <span className="compare-mm-label">Bottom</span>
+          <span className="compare-mm-value">{result.bordersMm.bottom.toFixed(2)} mm</span>
         </div>
       </div>
       <div className="compare-detail">

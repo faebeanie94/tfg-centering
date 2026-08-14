@@ -4,8 +4,6 @@ import {
   computeCentering,
   defaultInnerRect,
   defaultOuterRect,
-  formatMm,
-  formatMmPair,
   formatPct,
 } from '../lib/centering';
 import { hexToRgba } from '../lib/perspective';
@@ -242,54 +240,10 @@ export function BorderEditor({
     return <div className="loading">Loading image…</div>;
   }
 
-  const outerRect = outer;
-  const innerRect = inner;
   const displayHeight = imageSize.height * displayScale;
-  const displayWidth = imageSize.width * displayScale;
   const fillStroke = hexToRgba(settings.borderFillColor, 0.55);
   const otherSide: CardSide = side === 'front' ? 'back' : 'front';
   const otherSaved = session[otherSide] !== null;
-
-  /** Keep mm chips fully inside the canvas so overflow clipping cannot cut digits. */
-  function borderLabelStyle(edge: 'left' | 'right' | 'top' | 'bottom'): React.CSSProperties {
-    const padX = 44;
-    const padY = 18;
-    let left = 0;
-    let top = 0;
-
-    switch (edge) {
-      case 'left':
-        left = (outerRect.x + Math.max((innerRect.x - outerRect.x) / 2, 0)) * displayScale;
-        top = (outerRect.y + outerRect.height / 2) * displayScale;
-        left = Math.max(padX, Math.min(left, displayWidth / 2 - padX));
-        break;
-      case 'right':
-        left =
-          (innerRect.x +
-            innerRect.width +
-            Math.max((outerRect.x + outerRect.width - innerRect.x - innerRect.width) / 2, 0)) *
-          displayScale;
-        top = (outerRect.y + outerRect.height / 2) * displayScale;
-        left = Math.min(displayWidth - padX, Math.max(left, displayWidth / 2 + padX));
-        break;
-      case 'top':
-        left = (outerRect.x + outerRect.width / 2) * displayScale;
-        top = (outerRect.y + Math.max((innerRect.y - outerRect.y) / 2, 0)) * displayScale;
-        top = Math.max(padY, Math.min(top, displayHeight / 2 - padY));
-        break;
-      case 'bottom':
-        left = (outerRect.x + outerRect.width / 2) * displayScale;
-        top =
-          (innerRect.y +
-            innerRect.height +
-            Math.max((outerRect.y + outerRect.height - innerRect.y - innerRect.height) / 2, 0)) *
-          displayScale;
-        top = Math.min(displayHeight - padY, Math.max(top, displayHeight / 2 + padY));
-        break;
-    }
-
-    return { left, top };
-  }
 
   function renderEdgeHandles(rect: Rect, rectType: 'outer' | 'inner', color: string) {
     const edges: Array<'left' | 'right' | 'top' | 'bottom'> = ['left', 'right', 'top', 'bottom'];
@@ -308,6 +262,13 @@ export function BorderEditor({
       </div>
     ));
   }
+
+  const mmReadings = [
+    { key: 'left', label: 'Left', value: result.bordersMm.left },
+    { key: 'right', label: 'Right', value: result.bordersMm.right },
+    { key: 'top', label: 'Top', value: result.bordersMm.top },
+    { key: 'bottom', label: 'Bottom', value: result.bordersMm.bottom },
+  ] as const;
 
   return (
     <div className="editor editor-shell">
@@ -360,21 +321,25 @@ export function BorderEditor({
             <span className="metric-value">
               {formatPct(result.leftRight.left)} | {formatPct(result.leftRight.right)}
             </span>
-            <span className="metric-mm">
-              {formatMmPair(result.bordersMm.left, result.bordersMm.right)}
-            </span>
           </div>
           <div className="metric">
             <span className="metric-label">T | B</span>
             <span className="metric-value">
               {formatPct(result.topBottom.top)} | {formatPct(result.topBottom.bottom)}
             </span>
-            <span className="metric-mm">
-              {formatMmPair(result.bordersMm.top, result.bordersMm.bottom)}
-            </span>
           </div>
         </div>
         <div className="grade-banner-score">{formatGrade(tfgGrade.grade)}</div>
+      </div>
+
+      <div className="mm-readout" aria-label="Border measurements in millimetres">
+        {mmReadings.map((reading) => (
+          <div key={reading.key} className="mm-readout-cell">
+            <span className="mm-readout-label">{reading.label}</span>
+            <span className="mm-readout-value">{reading.value.toFixed(2)}</span>
+            <span className="mm-readout-unit">mm</span>
+          </div>
+        ))}
       </div>
 
       <div ref={viewportRef} className="editor-viewport" {...viewportHandlers}>
@@ -421,12 +386,6 @@ export function BorderEditor({
           {renderEdgeHandles(outer, 'outer', settings.handleColor)}
           {renderEdgeHandles(inner, 'inner', settings.handleColor)}
         </div>
-
-        {(['left', 'right', 'top', 'bottom'] as const).map((edge) => (
-          <div key={edge} className={`border-label border-label-${edge}`} style={borderLabelStyle(edge)}>
-            {formatMm(result.bordersMm[edge])}
-          </div>
-        ))}
       </div>
       </div>
       {zoom > 1 && (
