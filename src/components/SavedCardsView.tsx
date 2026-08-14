@@ -38,14 +38,44 @@ function plural(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? '' : 's'}`;
 }
 
+const COLLAPSED_KEY = 'tfg-library-collapsed-groups';
+
+function loadCollapsedGroups(): Set<string> {
+  try {
+    const raw = localStorage.getItem(COLLAPSED_KEY);
+    return new Set<string>(raw ? JSON.parse(raw) : []);
+  } catch {
+    return new Set<string>();
+  }
+}
+
+function storeCollapsedGroups(keys: Set<string>): void {
+  try {
+    localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...keys]));
+  } catch {
+    // Collapsing still works for this visit if storage is unavailable.
+  }
+}
+
 export function SavedCardsView({ cards, loading, onClose, onOpen, onDelete }: SavedCardsViewProps) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [progress, setProgress] = useState<ArchiveProgress | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsedGroups);
 
   const groups = useMemo(() => groupSavedCards(cards), [cards]);
   const hasGroups = groups.some((group) => group.key);
+
+  function toggleGroup(key: string) {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      storeCollapsedGroups(next);
+      return next;
+    });
+  }
 
   async function runExport(action: () => Promise<void | 'shared' | 'downloaded'>, success: string) {
     setBusy(true);
@@ -199,28 +229,47 @@ export function SavedCardsView({ cards, loading, onClose, onOpen, onDelete }: Sa
           </p>
         </div>
       ) : (
-        groups.map((group) => (
-          <section key={group.key || 'ungrouped'} className="library-group">
-            {(group.key || hasGroups) && (
-              <div className="library-group-header">
-                <div className="library-group-title">
-                  <span className="library-group-name">{group.label}</span>
-                  <span className="library-group-count">{plural(group.cards.length, 'card')}</span>
+        groups.map((group) => {
+          const id = group.key || 'ungrouped';
+          const grouped = Boolean(group.key) || hasGroups;
+          const isCollapsed = grouped && collapsed.has(id);
+
+          return (
+            <section key={id} className="library-group">
+              {grouped && (
+                <div className="library-group-header">
+                  <button
+                    type="button"
+                    className={`library-group-toggle${isCollapsed ? ' is-collapsed' : ''}`}
+                    onClick={() => toggleGroup(id)}
+                    aria-expanded={!isCollapsed}
+                    aria-controls={`library-group-${id}`}
+                  >
+                    <span className="library-group-chevron" aria-hidden="true">
+                      ▾
+                    </span>
+                    <span className="library-group-name">{group.label}</span>
+                    <span className="library-group-count">{plural(group.cards.length, 'card')}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-small"
+                    disabled={busy}
+                    onClick={() => void handleExportZip(group.cards, group.label)}
+                    title={`Download ${group.label} as one .zip`}
+                  >
+                    Export ZIP
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-small"
-                  disabled={busy}
-                  onClick={() => void handleExportZip(group.cards, group.label)}
-                  title={`Download ${group.label} as one .zip`}
-                >
-                  Export ZIP
-                </button>
-              </div>
-            )}
-            <ul className="library-list">{group.cards.map(renderCard)}</ul>
-          </section>
-        ))
+              )}
+              {!isCollapsed && (
+                <ul className="library-list" id={`library-group-${id}`}>
+                  {group.cards.map(renderCard)}
+                </ul>
+              )}
+            </section>
+          );
+        })
       )}
     </div>
   );
