@@ -18,6 +18,16 @@ export function qualifyRatio(a: number, b: number): number {
   return smaller > 0 ? larger / smaller : 999;
 }
 
+/**
+ * Spreadsheet thresholds are published to 2 decimal places with 0.01 gaps
+ * between bands (e.g. 1.15 then 1.16). Round before lookup so continuous
+ * ratios like 3.72/3.22 ≈ 1.155 map into a band instead of falling through
+ * to the grade-1 fallback.
+ */
+export function roundQualify(n: number): number {
+  return Number(n.toFixed(2));
+}
+
 export const TFG_FRONT_THRESHOLDS: GradeThreshold[] = [
   { grade: 10, label: 'TFG 10', minQualify: 1, maxQualify: 1.06, ratioLabel: '50/50' },
   { grade: 9.5, label: 'TFG 9.5', minQualify: 1.07, maxQualify: 1.15, ratioLabel: '53/47' },
@@ -61,8 +71,8 @@ export function getTfgGrade(
   borders: { left: number; right: number; top: number; bottom: number },
   side: CardSide,
 ): TfgCenteringGrade {
-  const lrQualify = qualifyRatio(borders.left, borders.right);
-  const tbQualify = qualifyRatio(borders.top, borders.bottom);
+  const lrQualify = roundQualify(qualifyRatio(borders.left, borders.right));
+  const tbQualify = roundQualify(qualifyRatio(borders.top, borders.bottom));
   const worstQualify = Math.max(lrQualify, tbQualify);
   const worstAxis = lrQualify >= tbQualify ? 'left-right' : 'top-bottom';
 
@@ -70,6 +80,9 @@ export function getTfgGrade(
 
   const match =
     thresholds.find((t) => worstQualify >= t.minQualify && worstQualify <= t.maxQualify) ??
+    // Safety net if a value somehow still misses a band: pick the tightest
+    // maxQualify that still covers it, instead of defaulting to TFG 1.
+    thresholds.find((t) => worstQualify <= t.maxQualify) ??
     thresholds[thresholds.length - 1];
 
   return {
