@@ -112,16 +112,40 @@ const search = {
   expectedHeight: template.height,
 };
 
-const cases: Array<{ name: string; bg: [number, number, number]; body: [number, number, number]; glare?: boolean }> = [
+const cases: Array<{ name: string; bg: [number, number, number]; body: [number, number, number]; glare?: boolean; whiteRim?: boolean }> = [
   { name: 'dark desk', bg: [28, 30, 32], body: [210, 200, 190] },
   { name: 'white paper', bg: [236, 238, 242], body: [190, 70, 55] },
   { name: 'white paper + holo glare', bg: [236, 238, 242], body: [190, 70, 55], glare: true },
+  { name: 'white rim + holo glare', bg: [236, 238, 242], body: [190, 70, 55], glare: true, whiteRim: true },
   { name: 'light wood', bg: [188, 160, 120], body: [40, 90, 150] },
 ];
 
 let failed = 0;
 for (const c of cases) {
-  const data = makeFrame(w, h, c.bg, { ...card, body: c.body, glare: c.glare });
+  const rim = c.whiteRim ? ([248, 248, 250] as [number, number, number]) : c.body;
+  const data = makeFrame(w, h, c.bg, { ...card, body: rim, glare: c.glare });
+  if (c.whiteRim) {
+    // Recreate with white rim + darker artwork (TCG-like).
+    fillRect(data, w, h, 0, 0, 1, 1, c.bg);
+    fillRect(data, w, h, card.left, card.top, card.left + card.width, card.top + card.height, rim);
+    fillRect(
+      data, w, h,
+      card.left + card.width * 0.06, card.top + card.height * 0.06,
+      card.left + card.width * 0.94, card.top + card.height * 0.94,
+      c.body,
+    );
+    if (c.glare) {
+      for (let i = 0; i < 5; i++) {
+        const gx0 = card.left + card.width * (0.1 + i * 0.15);
+        fillRect(
+          data, w, h,
+          gx0, card.top + card.height * 0.05,
+          gx0 + card.width * 0.06, card.top + card.height * 0.95,
+          [245, 250, 255],
+        );
+      }
+    }
+  }
   const found = detectCardFrameFromImageData(data, w, h, search);
   try {
     assert(found, \`\${c.name}: expected a detection\`);
