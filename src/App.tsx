@@ -11,8 +11,9 @@ import { SavedCardsView } from './components/SavedCardsView';
 import { SettingsPanel } from './components/SettingsPanel';
 import { useSavedCards } from './hooks/useSavedCards';
 import type { SavedCardRecord } from './lib/saved-cards';
+import { autoCropCard, defaultRectsAfterCrop, type CaptureDetectHint } from './lib/auto-crop';
 
-type Phase = 'capture' | 'perspective' | 'crop' | 'editor' | 'compare' | 'library';
+type Phase = 'capture' | 'autocrop' | 'perspective' | 'crop' | 'editor' | 'compare' | 'library';
 
 export default function App() {
   const { settings, updateSettings } = useAppSettings();
@@ -63,16 +64,38 @@ export default function App() {
     setPhase('editor');
   }, []);
 
-  const handleCapture = useCallback((dataUrl: string) => {
+  const handleCapture = useCallback(async (dataUrl: string, hint?: CaptureDetectHint) => {
     setRawImage(dataUrl);
     setEditorRects({});
     setReturnPhaseAfterEdit('editor');
+    setPhase('autocrop');
+
+    const cropped = await autoCropCard(dataUrl, hint);
+    if (cropped) {
+      setWorkingImage(cropped.imageSrc);
+      setEditorRects({ outer: cropped.outer, inner: cropped.inner });
+      setPhase('editor');
+      return;
+    }
+
+    // Detection failed — fall back to manual Perspective Fix.
     setPhase('perspective');
   }, []);
 
-  const handlePerspectiveComplete = useCallback((corrected: string) => {
+  const handlePerspectiveComplete = useCallback(async (corrected: string) => {
     setWorkingImage(corrected);
-    setEditorRects({});
+    try {
+      const img = new Image();
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = reject;
+        img.src = corrected;
+      });
+      const rects = defaultRectsAfterCrop(img.naturalWidth, img.naturalHeight);
+      setEditorRects({ outer: rects.outer, inner: rects.inner });
+    } catch {
+      setEditorRects({});
+    }
     setPhase(returnPhaseAfterEdit === 'crop' ? 'crop' : 'editor');
   }, [returnPhaseAfterEdit]);
 
@@ -196,6 +219,14 @@ export default function App() {
         />
         <SettingsPanel open={showSettings} settings={settings} onChange={updateSettings} onClose={() => setShowSettings(false)} />
       </>
+    );
+  }
+
+  if (phase === 'autocrop') {
+    return (
+      <div className="loading" role="status" aria-live="polite">
+        Auto-cropping card…
+      </div>
     );
   }
 

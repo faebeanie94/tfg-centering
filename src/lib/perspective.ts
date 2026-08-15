@@ -14,7 +14,7 @@ export interface QuadCorners {
 
 const CARD_ASPECT = 63.5 / 88.9;
 /** Margin around the card in the corrected image (each side). */
-const OUTPUT_PADDING_RATIO = 0.08;
+export const OUTPUT_PADDING_RATIO = 0.08;
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {

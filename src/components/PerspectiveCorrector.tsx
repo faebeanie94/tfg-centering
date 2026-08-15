@@ -5,6 +5,7 @@ import {
   defaultCorners,
   perspectiveCorrect,
 } from '../lib/perspective';
+import { detectCardCornersFromImage } from '../lib/auto-crop';
 import { useFitScale, useAppShellMode } from '../hooks/useFitScale';
 
 interface PerspectiveCorrectorProps {
@@ -67,7 +68,16 @@ export function PerspectiveCorrector({
       if (cancelled) return;
       const size = { width: img.naturalWidth, height: img.naturalHeight };
       setImageSize(size);
-      setCorners(defaultCorners(size.width, size.height));
+
+      let nextCorners = defaultCorners(size.width, size.height);
+      try {
+        const detected = await detectCardCornersFromImage(imageSrc);
+        if (!cancelled && detected) nextCorners = detected;
+      } catch {
+        // keep default inset corners
+      }
+      if (!cancelled) setCorners(nextCorners);
+
       bitmapRef.current?.close();
       try {
         bitmapRef.current = await createImageBitmap(img);

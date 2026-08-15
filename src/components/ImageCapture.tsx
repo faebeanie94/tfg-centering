@@ -21,11 +21,12 @@ import {
 } from '../lib/permissions';
 import { getScannerHint } from '../lib/level-hint';
 import { ScannerOverlay } from './ScannerOverlay';
+import type { CaptureDetectHint } from '../lib/auto-crop';
 
 interface ImageCaptureProps {
   side: CardSide;
   settings: AppSettings;
-  onCapture: (dataUrl: string) => void;
+  onCapture: (dataUrl: string, hint?: CaptureDetectHint) => void;
   onSettings: () => void;
   onCompare?: () => void;
   onLibrary?: () => void;
@@ -65,8 +66,10 @@ export function ImageCapture({
   });
   const detectedBoxRef = useRef(detectedBox);
   const guideBoxRef = useRef(guideBox);
+  const alignmentRef = useRef(alignment);
   detectedBoxRef.current = detectedBox;
   guideBoxRef.current = guideBox;
+  alignmentRef.current = alignment;
 
   useEffect(() => {
     void queryCameraPermission();
@@ -93,7 +96,11 @@ export function ImageCapture({
       canvas.height = video.videoHeight;
       const ctx = canvas.getContext('2d')!;
       ctx.drawImage(video, 0, 0);
-      onCapture(canvas.toDataURL('image/jpeg', 0.95));
+      const liveBox = detectedBoxRef.current;
+      onCapture(canvas.toDataURL('image/jpeg', 0.95), {
+        box: liveBox,
+        rotationDeg: alignmentRef.current.rotationDeg,
+      });
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
       setCameraActive(false);
