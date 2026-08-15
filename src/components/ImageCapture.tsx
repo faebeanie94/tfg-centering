@@ -110,7 +110,16 @@ export function ImageCapture({
     !motionGranted ||
     (level.isLevel && alignment.fitsGuide);
 
+  // Manual shutter stays available once the phone is level, even if edge detection
+  // misses (e.g. holographic glare on white paper). Auto-capture still needs a fit.
+  const manualScanReady =
+    !showLevel ||
+    !level.supported ||
+    !motionGranted ||
+    level.isLevel;
+
   const captureReady = scanReady && !capturing && (focusReady || !showLevel);
+  const manualCaptureReady = manualScanReady && !capturing && (focusReady || !scanReady);
 
   useEffect(() => {
     if (!cameraActive || !scanReady) {
@@ -283,7 +292,7 @@ export function ImageCapture({
     reader.readAsDataURL(file);
   }
 
-  const canManualCapture = scanReady && !capturing;
+  const canManualCapture = manualCaptureReady;
 
   const statusHint = capturing
     ? 'Focusing…'

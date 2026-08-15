@@ -29,7 +29,6 @@ function sampleRay(
   thresh: number,
 ): number {
   const steps = Math.max(w, h);
-  let lastInside = 0;
   for (let s = 1; s < steps; s++) {
     const x = Math.round(x0 + dx * s);
     const y = Math.round(y0 + dy * s);
@@ -38,9 +37,9 @@ function sampleRay(
     if (Math.abs(l - ref) > thresh) {
       return s - 1;
     }
-    lastInside = s;
   }
-  return lastInside;
+  // Hitting the frame without a contrast step is not a card edge.
+  return 0;
 }
 
 /** Force axis-aligned rectangle with trading-card aspect ratio. */
@@ -180,16 +179,176 @@ function estimateBackgroundLum(
     [0, span * 1.1],
     [-span * 0.9, span * 0.9],
     [span * 0.9, span * 0.9],
+    // Frame corners — often true background when the card sits on paper.
+    [-0.42, -0.42],
+    [0.42, -0.42],
+    [-0.42, 0.42],
+    [0.42, 0.42],
   ];
 
   for (const [ox, oy] of offsets) {
-    const x = clamp(Math.round(cx + ox * w), 1, w - 2);
-    const y = clamp(Math.round(cy + oy * h), 1, h - 2);
+    const x = clamp(Math.round(cx * w + ox * w), 1, w - 2);
+    const y = clamp(Math.round(cy * h + oy * h), 1, h - 2);
     samples.push(lum(data, y * w + x));
   }
 
   samples.sort((a, b) => a - b);
   return samples[Math.floor(samples.length / 2)] ?? 24;
+}
+
+/** Build a blurred luminance plane so holographic glare spikes don't fake edges. */
+function buildBlurredLuma(data: Uint8ClampedArray, w: number, h: number): Float32Array {
+  const raw = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) raw[i] = lum(data, i);
+
+  // Two-pass box blur (~5×5) damps thin holo streaks without erasing the card rim.
+  const tmp = new Float32Array(w * h);
+  const out = new Float32Array(w * h);
+  const radius = 2;
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let sum = 0;
+      let n = 0;
+      for (let dx = -radius; dx <= radius; dx++) {
+        const xx = x + dx;
+        if (xx < 0 || xx >= w) continue;
+        sum += raw[y * w + xx];
+        n++;
+      }
+      tmp[y * w + x] = sum / n;
+    }
+  }
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let sum = 0;
+      let n = 0;
+      for (let dy = -radius; dy <= radius; dy++) {
+        const yy = y + dy;
+        if (yy < 0 || yy >= h) continue;
+        sum += tmp[yy * w + x];
+        n++;
+      }
+      out[y * w + x] = sum / n;
+    }
+  }
+  return out;
+}
+
+function percentile(sorted: number[], p: number): number {
+  if (sorted.length === 0) return 0;
+  const idx = clamp(Math.round((sorted.length - 1) * p), 0, sorted.length - 1);
+  return sorted[idx];
+}
+
+/**
+ * Walk outward until pixels stay in the bright background (card on paper / desk).
+ * Prefers the outermost transition so a white card border is not mistaken for the edge.
+ */
+function rayEdgeToLightBackground(
+  luma: Float32Array,
+  w: number,
+  h: number,
+  x0: number,
+  y0: number,
+  dx: number,
+  dy: number,
+  bgFloor: number,
+  minDist = 8,
+): number | null {
+  const steps = Math.max(w, h);
+  let lastTransition: number | null = null;
+  let interior = false;
+
+  for (let s = 1; s < steps - 3; s++) {
+    const x = Math.round(x0 + dx * s);
+    const y = Math.round(y0 + dy * s);
+    if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) break;
+
+    const l = luma[y * w + x];
+    if (l < bgFloor) {
+      interior = true;
+      continue;
+    }
+
+    if (!interior || s < minDist) continue;
+
+    const l1 = luma[Math.round(y0 + dy * (s + 1)) * w + Math.round(x0 + dx * (s + 1))];
+    const l2 = luma[Math.round(y0 + dy * (s + 2)) * w + Math.round(x0 + dx * (s + 2))];
+    if (l1 >= bgFloor && l2 >= bgFloor) {
+      lastTransition = Math.max(minDist, s - 1);
+    }
+  }
+
+  if (lastTransition == null) return null;
+  if (dx !== 0) return x0 + dx * lastTransition;
+  return y0 + dy * lastTransition;
+}
+
+/**
+ * Find the strongest luminance step near the expected card half-size.
+ * Works for dark and light desks and is resilient to mid-card glare.
+ */
+function rayEdgeByGradientBand(
+  luma: Float32Array,
+  w: number,
+  h: number,
+  x0: number,
+  y0: number,
+  dx: number,
+  dy: number,
+  minDist: number,
+  maxDist: number,
+  minGrad = 10,
+): number | null {
+  const steps = Math.min(Math.max(w, h), Math.floor(maxDist));
+  let bestS = -1;
+  let bestScore = minGrad;
+
+  let prev = luma[y0 * w + x0];
+  for (let s = 1; s <= steps; s++) {
+    const x = Math.round(x0 + dx * s);
+    const y = Math.round(y0 + dy * s);
+    if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) break;
+
+    const curr = luma[y * w + x];
+    const grad = Math.abs(curr - prev);
+    if (grad < minGrad) {
+      prev = curr;
+      continue;
+    }
+
+    // Look ahead: card rims usually open onto a flatter background patch.
+    let aheadFlat = 0;
+    let aheadN = 0;
+    for (let k = 1; k <= 6; k++) {
+      const ax = Math.round(x0 + dx * (s + k));
+      const ay = Math.round(y0 + dy * (s + k));
+      if (ax < 1 || ay < 1 || ax >= w - 1 || ay >= h - 1) break;
+      const al = luma[ay * w + ax];
+      aheadN++;
+      if (k > 1) {
+        aheadFlat += Math.abs(
+          al - luma[Math.round(y0 + dy * (s + k - 1)) * w + Math.round(x0 + dx * (s + k - 1))],
+        );
+      }
+    }
+    const flatBonus = aheadN >= 4 && aheadFlat / Math.max(1, aheadN - 1) < 10 ? 8 : 0;
+    // Prefer farther candidates so inner artwork / glare loses to the outer rim.
+    const distBias = ((s - minDist) / Math.max(1, maxDist - minDist)) * 14;
+    const score = grad + flatBonus + distBias;
+
+    if (s >= minDist && score > bestScore) {
+      bestScore = score;
+      bestS = s;
+    }
+    prev = curr;
+  }
+
+  if (bestS < 0) return null;
+  if (dx !== 0) return x0 + dx * bestS;
+  return y0 + dy * bestS;
 }
 
 function sampleRef(data: Uint8ClampedArray, w: number, x: number, y: number): number {
@@ -257,15 +416,26 @@ function boxFromOuterEdges(
   bottomYs: number[],
   w: number,
   h: number,
+  /** Prefer outer extent (dark desks) or median (noisy / light desks). */
+  mode: 'outer' | 'median' = 'outer',
 ): CardFrameDetection | null {
   if (leftXs.length < 2 || rightXs.length < 2 || topYs.length < 2 || bottomYs.length < 2) {
     return null;
   }
 
-  const left = Math.min(...leftXs) / w;
-  const right = Math.max(...rightXs) / w;
-  const top = Math.min(...topYs) / h;
-  const bottom = Math.max(...bottomYs) / h;
+  const leftSorted = [...leftXs].sort((a, b) => a - b);
+  const rightSorted = [...rightXs].sort((a, b) => a - b);
+  const topSorted = [...topYs].sort((a, b) => a - b);
+  const bottomSorted = [...bottomYs].sort((a, b) => a - b);
+
+  const left =
+    (mode === 'outer' ? percentile(leftSorted, 0.15) : percentile(leftSorted, 0.5)) / w;
+  const right =
+    (mode === 'outer' ? percentile(rightSorted, 0.85) : percentile(rightSorted, 0.5)) / w;
+  const top =
+    (mode === 'outer' ? percentile(topSorted, 0.15) : percentile(topSorted, 0.5)) / h;
+  const bottom =
+    (mode === 'outer' ? percentile(bottomSorted, 0.85) : percentile(bottomSorted, 0.5)) / h;
 
   const raw: DetectedCard = {
     left,
@@ -311,7 +481,108 @@ function detectFromBackground(
   bgCutoff: number,
 ): CardFrameDetection | null {
   const edges = collectBackgroundEdges(data, w, h, px, py, bgCutoff);
-  return boxFromOuterEdges(edges.leftXs, edges.rightXs, edges.topYs, edges.bottomYs, w, h);
+  return boxFromOuterEdges(edges.leftXs, edges.rightXs, edges.topYs, edges.bottomYs, w, h, 'outer');
+}
+
+function collectLightBackgroundEdges(
+  luma: Float32Array,
+  w: number,
+  h: number,
+  px: number,
+  py: number,
+  bgFloor: number,
+) {
+  const yFracs = [0.3, 0.42, 0.5, 0.58, 0.7];
+  const xFracs = [0.3, 0.42, 0.5, 0.58, 0.7];
+
+  const leftXs: number[] = [];
+  const rightXs: number[] = [];
+  const topYs: number[] = [];
+  const bottomYs: number[] = [];
+
+  for (const yf of yFracs) {
+    const y = clamp(Math.round(py + (yf - 0.5) * h * 0.38), 2, h - 3);
+    const lx = rayEdgeToLightBackground(luma, w, h, px, y, -1, 0, bgFloor);
+    const rx = rayEdgeToLightBackground(luma, w, h, px, y, 1, 0, bgFloor);
+    if (lx != null) leftXs.push(lx);
+    if (rx != null) rightXs.push(rx);
+  }
+
+  for (const xf of xFracs) {
+    const x = clamp(Math.round(px + (xf - 0.5) * w * 0.38), 2, w - 3);
+    const ty = rayEdgeToLightBackground(luma, w, h, x, py, 0, -1, bgFloor);
+    const by = rayEdgeToLightBackground(luma, w, h, x, py, 0, 1, bgFloor);
+    if (ty != null) topYs.push(ty);
+    if (by != null) bottomYs.push(by);
+  }
+
+  return { leftXs, rightXs, topYs, bottomYs };
+}
+
+function detectFromLightBackground(
+  luma: Float32Array,
+  w: number,
+  h: number,
+  px: number,
+  py: number,
+  bgFloor: number,
+): CardFrameDetection | null {
+  const edges = collectLightBackgroundEdges(luma, w, h, px, py, bgFloor);
+  return boxFromOuterEdges(edges.leftXs, edges.rightXs, edges.topYs, edges.bottomYs, w, h, 'median');
+}
+
+function collectGradientBandEdges(
+  luma: Float32Array,
+  w: number,
+  h: number,
+  px: number,
+  py: number,
+  expectedHalfW: number,
+  expectedHalfH: number,
+) {
+  const yFracs = [0.3, 0.42, 0.5, 0.58, 0.7];
+  const xFracs = [0.3, 0.42, 0.5, 0.58, 0.7];
+
+  const minW = Math.max(6, expectedHalfW * 0.55);
+  const maxW = Math.max(minW + 4, expectedHalfW * 1.5);
+  const minH = Math.max(6, expectedHalfH * 0.55);
+  const maxH = Math.max(minH + 4, expectedHalfH * 1.5);
+
+  const leftXs: number[] = [];
+  const rightXs: number[] = [];
+  const topYs: number[] = [];
+  const bottomYs: number[] = [];
+
+  for (const yf of yFracs) {
+    const y = clamp(Math.round(py + (yf - 0.5) * h * 0.38), 2, h - 3);
+    const lx = rayEdgeByGradientBand(luma, w, h, px, y, -1, 0, minW, maxW);
+    const rx = rayEdgeByGradientBand(luma, w, h, px, y, 1, 0, minW, maxW);
+    if (lx != null) leftXs.push(lx);
+    if (rx != null) rightXs.push(rx);
+  }
+
+  for (const xf of xFracs) {
+    const x = clamp(Math.round(px + (xf - 0.5) * w * 0.38), 2, w - 3);
+    const ty = rayEdgeByGradientBand(luma, w, h, x, py, 0, -1, minH, maxH);
+    const by = rayEdgeByGradientBand(luma, w, h, x, py, 0, 1, minH, maxH);
+    if (ty != null) topYs.push(ty);
+    if (by != null) bottomYs.push(by);
+  }
+
+  return { leftXs, rightXs, topYs, bottomYs };
+}
+
+function detectFromGradientBand(
+  luma: Float32Array,
+  w: number,
+  h: number,
+  px: number,
+  py: number,
+  expectedHalfW: number,
+  expectedHalfH: number,
+): CardFrameDetection | null {
+  const edges = collectGradientBandEdges(luma, w, h, px, py, expectedHalfW, expectedHalfH);
+  return boxFromOuterEdges(edges.leftXs, edges.rightXs, edges.topYs, edges.bottomYs, w, h, 'median');
 }
 
 function collectRefEdges(
@@ -397,6 +668,88 @@ function detectFromPointRefOnly(
   return boxFromRefEdges(edges.leftXs, edges.rightXs, edges.topYs, edges.bottomYs, w, h);
 }
 
+/** Core detector that works on raw RGBA frames (also used by unit tests). */
+export function detectCardFrameFromImageData(
+  data: Uint8ClampedArray,
+  w: number,
+  h: number,
+  search?: DetectSearchRegion,
+): CardFrameDetection | null {
+  const cx = search?.cx ?? 0.5;
+  const cy = search?.cy ?? 0.36;
+  const expected =
+    search?.expectedWidth != null && search?.expectedHeight != null
+      ? { width: search.expectedWidth, height: search.expectedHeight }
+      : { width: CARD_ASPECT * 0.4, height: 0.4 };
+
+  const span = expected.height / 2;
+  const bgLum = estimateBackgroundLum(data, w, h, cx, cy, span);
+  const lightBackground = bgLum >= 110;
+  const luma = buildBlurredLuma(data, w, h);
+
+  const expectedHalfW = (expected.width * w) / 2;
+  const expectedHalfH = (expected.height * h) / 2;
+
+  // Multiple seeds so a glare streak on the exact guide centre can't wipe detection.
+  const seeds: Array<[number, number]> = [
+    [Math.floor(cx * w), Math.floor(cy * h)],
+    [Math.floor(cx * w), Math.floor((cy - 0.04) * h)],
+    [Math.floor(cx * w), Math.floor((cy + 0.04) * h)],
+    [Math.floor((cx - 0.04) * w), Math.floor(cy * h)],
+    [Math.floor((cx + 0.04) * w), Math.floor(cy * h)],
+  ];
+
+  let best: CardFrameDetection | null = null;
+  let bestScore = -1;
+
+  const consider = (found: CardFrameDetection | null) => {
+    if (!found) return;
+    const score = scoreCardBox(found.box, expected);
+    if (score > bestScore) {
+      bestScore = score;
+      best = found;
+    }
+  };
+
+  for (const [px, py] of seeds) {
+    const sx = clamp(px, 2, w - 3);
+    const sy = clamp(py, 2, h - 3);
+
+    if (!lightBackground) {
+      for (const margin of [28, 32, 38, 45]) {
+        consider(detectFromBackground(data, w, h, sx, sy, bgLum + margin));
+      }
+    }
+
+    if (lightBackground || bestScore < 0.45) {
+      for (const drop of [18, 28, 40, 55]) {
+        consider(detectFromLightBackground(luma, w, h, sx, sy, bgLum - drop));
+      }
+    }
+
+    consider(detectFromGradientBand(luma, w, h, sx, sy, expectedHalfW, expectedHalfH));
+
+    if (bestScore < 0.4) {
+      for (const thresh of [22, 28, 36, 44]) {
+        consider(detectFromPointRefOnly(data, w, h, sx, sy, thresh));
+      }
+    }
+
+    if (bestScore >= 0.75) break;
+  }
+
+  // Dark-background pass can still win on mixed scenes (white paper on a dark desk).
+  if (lightBackground && bestScore < 0.5) {
+    const sx = clamp(Math.floor(cx * w), 2, w - 3);
+    const sy = clamp(Math.floor(cy * h), 2, h - 3);
+    for (const margin of [28, 32, 38, 45]) {
+      consider(detectFromBackground(data, w, h, sx, sy, Math.min(bgLum, 80) + margin));
+    }
+  }
+
+  return bestScore >= 0.25 ? best : null;
+}
+
 export function detectCardFrame(
   video: HTMLVideoElement,
   canvas: HTMLCanvasElement,
@@ -414,42 +767,7 @@ export function detectCardFrame(
 
   ctx.drawImage(video, 0, 0, w, h);
   const { data } = ctx.getImageData(0, 0, w, h);
-
-  const cx = search?.cx ?? 0.5;
-  const cy = search?.cy ?? 0.36;
-  const expected =
-    search?.expectedWidth != null && search?.expectedHeight != null
-      ? { width: search.expectedWidth, height: search.expectedHeight }
-      : undefined;
-
-  const px = Math.floor(cx * w);
-  const py = Math.floor(cy * h);
-  const span = (search?.expectedHeight ?? 0.4) / 2;
-  const bgLum = estimateBackgroundLum(data, w, h, cx, cy, span);
-
-  let best: CardFrameDetection | null = null;
-  let bestScore = -1;
-
-  const consider = (found: CardFrameDetection | null) => {
-    if (!found) return;
-    const score = scoreCardBox(found.box, expected);
-    if (score > bestScore) {
-      bestScore = score;
-      best = found;
-    }
-  };
-
-  for (const margin of [28, 32, 38, 45]) {
-    consider(detectFromBackground(data, w, h, px, py, bgLum + margin));
-  }
-
-  if (bestScore < 0.35) {
-    for (const thresh of [22, 28, 36, 44]) {
-      consider(detectFromPointRefOnly(data, w, h, px, py, thresh));
-    }
-  }
-
-  return best;
+  return detectCardFrameFromImageData(data, w, h, search);
 }
 
 export function detectCardBox(video: HTMLVideoElement, canvas: HTMLCanvasElement): DetectedCard | null {

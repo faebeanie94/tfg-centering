@@ -36,7 +36,9 @@ export function getLevelHint(state: LevelState): string {
 export function getCardAlignmentHint(alignment: CardAlignmentState): string {
   const { detected, isCardLevel, fitsGuide, offsetX, offsetY, sizeRatio, rotationDeg } = alignment;
 
-  if (!detected) return 'Place card in the upper scan area';
+  if (!detected) {
+    return 'Place card in the upper scan area — darker surface helps detection';
+  }
 
   if (!isCardLevel) {
     return rotationDeg > 0
