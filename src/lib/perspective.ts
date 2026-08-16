@@ -37,6 +37,7 @@ function quadHeight(corners: QuadCorners): number {
 function computeOutputSize(
   corners: QuadCorners,
   cardAspectRatio: number = CARD_ASPECT,
+  paddingRatio: number = OUTPUT_PADDING_RATIO,
 ): {
   width: number;
   height: number;
@@ -45,8 +46,8 @@ function computeOutputSize(
 } {
   const cardHeight = Math.max(Math.round(quadHeight(corners)), 400);
   const cardWidth = Math.round(cardHeight * cardAspectRatio);
-  const padX = Math.round(cardWidth * OUTPUT_PADDING_RATIO);
-  const padY = Math.round(cardHeight * OUTPUT_PADDING_RATIO);
+  const padX = Math.round(cardWidth * paddingRatio);
+  const padY = Math.round(cardHeight * paddingRatio);
   return {
     width: cardWidth + padX * 2,
     height: cardHeight + padY * 2,
@@ -158,9 +159,10 @@ export async function perspectiveCorrect(
   imageSrc: string,
   corners: QuadCorners,
   cardAspectRatio: number = CARD_ASPECT,
+  paddingRatio: number = OUTPUT_PADDING_RATIO,
 ): Promise<string> {
   const img = await loadImage(imageSrc);
-  const { width: outWidth, height: outHeight, padX, padY } = computeOutputSize(corners, cardAspectRatio);
+  const { width: outWidth, height: outHeight, padX, padY } = computeOutputSize(corners, cardAspectRatio, paddingRatio);
 
   const src = [corners.tl, corners.tr, corners.br, corners.bl];
   const dst: Point[] = [

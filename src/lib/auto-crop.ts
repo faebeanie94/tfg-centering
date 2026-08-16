@@ -920,10 +920,23 @@ export function isNearlyFrontal(q: QuadCorners): boolean {
  * instead — producing a small, wrong quad nowhere near the real corners.
  * Reject anything far smaller than expected rather than trust it blindly.
  */
-function quadMatchesExpectedCardArea(q: QuadCorners, imgW: number, imgH: number): boolean {
-  const expectedFrac = 1 / (1 + 2 * OUTPUT_PADDING_RATIO) ** 2;
+function quadMatchesExpectedCardArea(q: QuadCorners, imgW: number, imgH: number, paddingRatio: number): boolean {
+  const expectedFrac = 1 / (1 + 2 * paddingRatio) ** 2;
   const frac = quadArea(q) / (imgW * imgH);
   return frac >= expectedFrac * 0.65;
+}
+
+/**
+ * A ray-cast detection that locks onto an inner feature (rather than the
+ * true rim) undersizes the quad — but since padding extrapolates the same
+ * homography outward, a wider margin can recover real card content that an
+ * undersized quad excluded, not just add empty background. Scale it up when
+ * confidence is lower and we're less sure the quad's size is right; keep it
+ * tight (the normal 8%) when confident, so good crops stay clean.
+ */
+function safetyPaddingRatio(confidence: number): number {
+  const t = Math.max(0, Math.min(1, (0.95 - confidence) / (0.95 - 0.5)));
+  return OUTPUT_PADDING_RATIO + 0.17 * t;
 }
 
 /**
@@ -939,8 +952,10 @@ export async function perspectiveCorrectRefined(
   imageSrc: string,
   corners: QuadCorners,
   cardAspectRatio: number = CARD_ASPECT,
+  confidence: number = 1,
 ): Promise<string> {
-  const firstPass = await perspectiveCorrect(imageSrc, corners, cardAspectRatio);
+  const paddingRatio = safetyPaddingRatio(confidence);
+  const firstPass = await perspectiveCorrect(imageSrc, corners, cardAspectRatio, paddingRatio);
   try {
     const img = await loadImage(firstPass);
     const refined = await detectCardCornersFromImage(firstPass, undefined, { cardAspect: cardAspectRatio });
@@ -948,9 +963,9 @@ export async function perspectiveCorrectRefined(
       refined &&
       refined.confidence >= 0.5 &&
       isNearlyFrontal(refined.corners) &&
-      quadMatchesExpectedCardArea(refined.corners, img.naturalWidth, img.naturalHeight)
+      quadMatchesExpectedCardArea(refined.corners, img.naturalWidth, img.naturalHeight, paddingRatio)
     ) {
-      return await perspectiveCorrect(firstPass, refined.corners, cardAspectRatio);
+      return await perspectiveCorrect(firstPass, refined.corners, cardAspectRatio, paddingRatio);
     }
   } catch {
     // fall through to the first-pass result
@@ -997,7 +1012,7 @@ export async function tryAutoCrop(
         : undefined;
 
   try {
-    const corrected = await perspectiveCorrectRefined(imageSrc, detected.corners, cardAspect);
+    const corrected = await perspectiveCorrectRefined(imageSrc, detected.corners, cardAspect, detected.confidence);
     const img = await loadImage(corrected);
     const rects = rectsAfterCropWithInnerSeed(img);
     return {
