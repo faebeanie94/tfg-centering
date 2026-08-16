@@ -9,6 +9,11 @@ import type { Rect } from './centering';
 import { defaultInnerRect } from './centering';
 import { seedInnerRect, refineOuterRect, pixelBufferFromImage } from './inner-artwork';
 import {
+  detectOuterRectWholeImage,
+  outerSeparationScore,
+  rectLooksLikeCard,
+} from './still-card-detect';
+import {
   type Point,
   type QuadCorners,
   OUTPUT_PADDING_RATIO,
@@ -182,18 +187,45 @@ export function seedRectsFromLoadedImage(
 ): { outer: Rect; inner: Rect } {
   const w = image.naturalWidth;
   const h = image.naturalHeight;
+  const cardAspect = options.cardAspect ?? CARD_ASPECT;
   const padded = defaultRectsAfterCrop(w, h);
-  let outer: Rect | null = knownCorners
-    ? clampRectToImage(rectFromQuad(knownCorners), w, h)
-    : detectOuterRectFromElement(image, hint, options);
-
-  if (outer) {
-    const area = (outer.width * outer.height) / (w * h);
-    if (area < 0.05 || area > 0.97) outer = null;
-  }
-  if (!outer) outer = padded.outer;
-
   const buffer = pixelBufferFromImage(image);
+
+  const candidates: Rect[] = [];
+  const consider = (rect: Rect | null) => {
+    if (!rect) return;
+    const clamped = clampRectToImage(rect, w, h);
+    if (!rectLooksLikeCard(clamped, w, h, cardAspect)) return;
+    candidates.push(clamped);
+  };
+
+  if (buffer.width > 0) {
+    consider(detectOuterRectWholeImage(buffer, cardAspect));
+  }
+
+  consider(detectOuterRectFromElement(image, hint, options));
+
+  if (knownCorners) {
+    const fromCorners = clampRectToImage(rectFromQuad(knownCorners), w, h);
+    if (buffer.width > 0 && outerSeparationScore(buffer, fromCorners) >= 0.2) {
+      consider(fromCorners);
+    }
+  }
+
+  let outer: Rect | null = null;
+  if (buffer.width > 0 && candidates.length > 0) {
+    let best = -1;
+    for (const c of candidates) {
+      const score = outerSeparationScore(buffer, c);
+      if (score > best) {
+        best = score;
+        outer = c;
+      }
+    }
+    if (best < 0.12) outer = candidates[0];
+  }
+
+  if (!outer) outer = padded.outer;
   if (buffer.width > 0) {
     outer = refineOuterRect(buffer, outer);
     return { outer, inner: seedInnerRect(buffer, outer).inner };
