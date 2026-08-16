@@ -878,34 +878,74 @@ const SCAN_FOV_DEG = 50;
 export const SCAN_DISTANCE_OPTIONS = [12, 20, 30] as const;
 export type ScanDistanceCm = (typeof SCAN_DISTANCE_OPTIONS)[number];
 
+/** Fraction of the unobstructed frame the card silhouette should fill. */
+const GUIDE_FILL: Record<ScanDistanceCm, number> = {
+  12: 0.92,
+  20: 0.88,
+  30: 0.78,
+};
+
 /** Guide frame sized for a card at the given phone-to-card distance (cm). */
 export function guideBoxForDistance(
   distanceCm: ScanDistanceCm = 20,
   cardAspectRatio: number = CARD_ASPECT,
   cardHeightMm: number = DEFAULT_CARD_HEIGHT_MM,
+  frameAspect: number = 1,
+  obstructionBottom = 0.32,
 ): DetectedCard {
-  const template = guideTemplateForDistance(distanceCm, cardAspectRatio, cardHeightMm);
-  return positionGuideBox(template, 0.5, defaultGuideAnchorY(template.height, 0.32));
+  const template = guideTemplateForDistance(
+    distanceCm,
+    cardAspectRatio,
+    cardHeightMm,
+    frameAspect,
+    obstructionBottom,
+  );
+  return positionGuideBox(template, 0.5, defaultGuideAnchorY(template.height, obstructionBottom), {
+    obstructionBottom,
+  });
 }
 
+/**
+ * Dashed guide size in normalised video coordinates (0–1).
+ * `frameAspect` is videoWidth/videoHeight so a poker card is not squeezed as if
+ * the preview were square (phone cameras are 4:3 / 16:9).
+ */
 export function guideTemplateForDistance(
   distanceCm: ScanDistanceCm = 20,
   cardAspectRatio: number = CARD_ASPECT,
   cardHeightMm: number = DEFAULT_CARD_HEIGHT_MM,
+  frameAspect: number = 1,
+  obstructionBottom = 0,
 ): { width: number; height: number } {
+  const fa = frameAspect > 0.15 && Number.isFinite(frameAspect) ? frameAspect : 1;
+  const fill = GUIDE_FILL[distanceCm] ?? 0.88;
+  const availableH = Math.max(0.42, 1 - Math.max(0, obstructionBottom) - 0.03);
+  // FOV estimate, then take the larger of that and the fill target so close-up
+  // grading shots are not stuck with a half-frame window.
   const distanceMm = distanceCm * 10;
   const angularHeightRad = 2 * Math.atan(cardHeightMm / (2 * distanceMm));
   const fovRad = (SCAN_FOV_DEG * Math.PI) / 180;
-  const height = Math.max(0.22, Math.min(0.65, angularHeightRad / fovRad));
-  return { width: height * cardAspectRatio, height };
+  const fovHeight = angularHeightRad / fovRad;
+  let height = Math.min(availableH, Math.max(availableH * fill, fovHeight));
+
+  let width = height * (cardAspectRatio / fa);
+  const maxW = 0.94;
+  if (width > maxW) {
+    width = maxW;
+    height = width * (fa / cardAspectRatio);
+    if (height > availableH) {
+      height = availableH;
+      width = height * (cardAspectRatio / fa);
+    }
+  }
+  return { width, height };
 }
 
-/** Vertical centre for the guide when no card is detected yet. */
+/** Vertical centre for the guide — middle of the unobstructed video, not a tiny upper window. */
 export function defaultGuideAnchorY(templateHeight: number, obstructionBottom: number): number {
-  const maxBottom = 1 - obstructionBottom;
-  const centredUpper = 0.36;
-  const maxCentre = maxBottom - templateHeight / 2 - 0.02;
-  return clamp(centredUpper, templateHeight / 2 + 0.02, maxCentre);
+  const available = Math.max(templateHeight + 0.04, 1 - obstructionBottom);
+  const centre = available / 2;
+  return clamp(centre, templateHeight / 2 + 0.02, available - templateHeight / 2 - 0.02);
 }
 
 export interface GuideLayoutOptions {

@@ -99,15 +99,22 @@ function overlaps(a: { left: number; top: number; width: number; height: number 
 const w = 240;
 const h = 426;
 const template = guideTemplateForDistance(20);
+assert(template.height > 0.7, 'default 20cm guide should fill most of the frame, got ' + template.height);
+const portraitGuide = guideTemplateForDistance(20, CARD_ASPECT, 88.9, 3 / 4, 0);
+assert(
+  Math.abs(portraitGuide.width / portraitGuide.height - CARD_ASPECT / (3 / 4)) < 0.03,
+  'portrait frame guide should match poker aspect',
+);
+assert(portraitGuide.width > template.width, 'portrait video makes the dashed card wider');
 const card = {
   left: 0.5 - template.width / 2,
-  top: 0.36 - template.height / 2,
+  top: Math.max(0.02, 0.5 - template.height / 2),
   width: template.width,
   height: template.height,
 };
 const search = {
-  cx: 0.5,
-  cy: 0.36,
+  cx: card.left + card.width / 2,
+  cy: card.top + card.height / 2,
   expectedWidth: template.width,
   expectedHeight: template.height,
 };

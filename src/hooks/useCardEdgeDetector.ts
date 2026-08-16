@@ -37,9 +37,18 @@ export function useCardEdgeDetector(
   const rotationRef = useRef(0);
   const missFramesRef = useRef(0);
 
+  const [frameAspect, setFrameAspect] = useState(1);
+
   const template = useMemo(
-    () => guideTemplateForDistance(scanDistanceCm, cardAspect, cardHeightMm),
-    [scanDistanceCm, cardAspect, cardHeightMm],
+    () =>
+      guideTemplateForDistance(
+        scanDistanceCm,
+        cardAspect,
+        cardHeightMm,
+        frameAspect,
+        obstructionBottom,
+      ),
+    [scanDistanceCm, cardAspect, cardHeightMm, frameAspect, obstructionBottom],
   );
 
   const guideAnchor = useMemo(
@@ -88,6 +97,10 @@ export function useCardEdgeDetector(
       const video = videoRef.current;
       const canvas = canvasRef.current;
       if (video && canvas && video.readyState >= 2) {
+        if (video.videoWidth > 0) {
+          const fa = video.videoWidth / video.videoHeight;
+          if (Math.abs(fa - frameAspect) > 0.02) setFrameAspect(fa);
+        }
         if (frame % 3 === 0) {
           const guide = positionGuideBox(template, guideAnchor.x, guideAnchor.y, { obstructionBottom });
           const search = {
@@ -110,7 +123,7 @@ export function useCardEdgeDetector(
             }
             const box = smoothRef.current;
             if (box) {
-              const next = evaluateCardAlignment(box, rotationRef.current, guide, cardAspect);
+              const next = evaluateCardAlignment(box, rotationRef.current, guide, cardAspect, frameAspect);
               setGuideBox(guide);
               setDetectedBox({ ...box });
               setAlignment(next);
@@ -132,7 +145,7 @@ export function useCardEdgeDetector(
 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [active, videoRef, template, guideAnchor, obstructionBottom, cardAspect]);
+  }, [active, videoRef, template, guideAnchor, obstructionBottom, cardAspect, frameAspect]);
 
   return {
     guideBox,
