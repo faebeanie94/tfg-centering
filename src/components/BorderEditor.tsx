@@ -18,6 +18,14 @@ import { CardMenu } from './CardMenu';
 import { EdgeArrowHandle, edgeHandleStyle } from './EdgeArrowHandle';
 import type { CardFormat } from '../lib/card-sizes';
 import { formatCardSizeMm } from '../lib/card-sizes';
+import type { AutoCropSkipReason } from '../lib/auto-crop';
+
+const SKIP_REASON_LABEL: Record<AutoCropSkipReason, string> = {
+  no_detection: "couldn't find the card automatically",
+  low_confidence: 'not fully confident in the corners',
+  not_frontal: 'card looked tilted',
+  rotation: 'phone wasn’t level at capture',
+};
 
 interface BorderEditorProps {
   imageSrc: string;
@@ -29,6 +37,9 @@ interface BorderEditorProps {
   cardName: string;
   initialOuter?: Rect;
   initialInner?: Rect;
+  /** Auto-crop applied but wasn't fully confident — dismissible "worth checking" note. */
+  autoCropInfo?: { confidence: number; reason: AutoCropSkipReason } | null;
+  onDismissAutoCropInfo?: () => void;
   onNameChange: (name: string) => void;
   onSave: (snapshot: SideSnapshot) => void;
   onSideChange: (side: CardSide) => void;
@@ -67,6 +78,8 @@ export function BorderEditor({
   session,
   initialOuter,
   initialInner,
+  autoCropInfo = null,
+  onDismissAutoCropInfo,
   cardName,
   onNameChange,
   onSave,
@@ -336,6 +349,30 @@ export function BorderEditor({
       </div>
 
       {libraryMessage && <div className="library-toast">{libraryMessage}</div>}
+
+      {autoCropInfo && (
+        <div className="autocrop-note">
+          <span>
+            Auto-crop applied — {SKIP_REASON_LABEL[autoCropInfo.reason]}
+            {autoCropInfo.confidence > 0 ? ` (${Math.round(autoCropInfo.confidence * 100)}% confidence)` : ''}.
+            Worth a check via{' '}
+            <button type="button" className="autocrop-note-link" onClick={onPerspectiveFix}>
+              Fix perspective
+            </button>{' '}
+            if it looks off.
+          </span>
+          {onDismissAutoCropInfo && (
+            <button
+              type="button"
+              className="autocrop-note-dismiss"
+              onClick={onDismissAutoCropInfo}
+              aria-label="Dismiss"
+            >
+              ×
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="grade-banner">
         <div className="grade-banner-brand">

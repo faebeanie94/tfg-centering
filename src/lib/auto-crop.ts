@@ -957,16 +957,16 @@ export async function perspectiveCorrectRefined(
   return firstPass;
 }
 
-/** Why auto-crop didn't apply on its own — shown to the user on the Perspective Fix screen. */
+/** Flags a lower-confidence auto-crop for an optional "review this" note — never blocks it. */
 export type AutoCropSkipReason = 'no_detection' | 'low_confidence' | 'not_frontal' | 'rotation';
 
 /**
- * Detect corners and auto-crop when confidence is high enough.
- * Always returns best-effort corners so Perspective Fix can be pre-seeded.
- *
- * Auto-apply is intentionally conservative: a bad crop is worse than one tap
- * on Apply. Live scanner locks still produce axis-aligned boxes, so a tilted
- * card with a "detection" must NOT auto-apply — require a near-frontal quad.
+ * Detect corners and auto-crop with whatever was found.
+ * Always applies the best-available detection so capture flows straight into
+ * the editor — Perspective Fix stays available afterward (via the editor
+ * menu) for anyone who wants to review or nudge it, but never blocks capture.
+ * `skipReason`/`confidence` are informational only, for a "worth checking"
+ * note in the editor when the detection was less certain than usual.
  */
 export async function tryAutoCrop(
   imageSrc: string,
@@ -987,16 +987,13 @@ export async function tryAutoCrop(
   const liveRotationOk = Math.abs(hint?.rotationDeg ?? 0) <= 8;
   const frontal = isNearlyFrontal(detected.corners);
   const confidenceOk = detected.confidence >= AUTO_CROP_CONFIDENCE;
-  const canAutoApply = confidenceOk && frontal && liveRotationOk;
-
-  if (!canAutoApply) {
-    const skipReason: AutoCropSkipReason = !confidenceOk
-      ? 'low_confidence'
-      : !frontal
-        ? 'not_frontal'
-        : 'rotation';
-    return { result: null, corners: detected.corners, confidence: detected.confidence, skipReason };
-  }
+  const skipReason: AutoCropSkipReason | undefined = !confidenceOk
+    ? 'low_confidence'
+    : !frontal
+      ? 'not_frontal'
+      : !liveRotationOk
+        ? 'rotation'
+        : undefined;
 
   try {
     const corrected = await perspectiveCorrectRefined(imageSrc, detected.corners, cardAspect);
@@ -1012,9 +1009,10 @@ export async function tryAutoCrop(
       },
       corners: detected.corners,
       confidence: detected.confidence,
+      skipReason,
     };
   } catch {
-    return { result: null, corners: detected.corners, confidence: detected.confidence, skipReason: 'low_confidence' };
+    return { result: null, corners: detected.corners, confidence: detected.confidence, skipReason: skipReason ?? 'low_confidence' };
   }
 }
 

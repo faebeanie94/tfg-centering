@@ -1284,18 +1284,6 @@ body.editor-mode #root {
   display: none;
 }
 
-.perspective-autocrop-note {
-  margin: 0;
-  padding: 8px 12px;
-  background: rgba(231, 125, 49, 0.12);
-  border: 1px solid rgba(231, 125, 49, 0.35);
-  border-radius: var(--radius);
-  color: var(--text-muted);
-  font-size: 0.78rem;
-  line-height: 1.4;
-  flex-shrink: 0;
-}
-
 .perspective-canvas {
   touch-action: none;
   cursor: crosshair;
@@ -1746,6 +1734,42 @@ body.editor-mode #root {
 
 .library-toast {
   margin: 0 12px;
+}
+
+.autocrop-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 12px;
+  padding: 8px 10px;
+  background: rgba(231, 125, 49, 0.12);
+  border: 1px solid rgba(231, 125, 49, 0.35);
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.autocrop-note-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #e77d31;
+  font-size: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.autocrop-note-dismiss {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0 2px;
+  cursor: pointer;
 }
 
 .library-feedback-progress {

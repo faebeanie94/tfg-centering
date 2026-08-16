@@ -1,18 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { type CornerKey, type QuadCorners, defaultCorners } from '../lib/perspective';
-import {
-  detectCardCornersFromImage,
-  perspectiveCorrectRefined,
-  type AutoCropSkipReason,
-} from '../lib/auto-crop';
+import { detectCardCornersFromImage, perspectiveCorrectRefined } from '../lib/auto-crop';
 import { useFitScale, useAppShellMode } from '../hooks/useFitScale';
-
-const SKIP_REASON_LABEL: Record<AutoCropSkipReason, string> = {
-  no_detection: "couldn't find the card",
-  low_confidence: 'not confident enough',
-  not_frontal: 'card looked tilted',
-  rotation: 'phone wasn’t level at capture',
-};
 
 interface PerspectiveCorrectorProps {
   imageSrc: string;
@@ -21,8 +10,6 @@ interface PerspectiveCorrectorProps {
   initialCorners?: QuadCorners | null;
   /** Portrait width/height for the selected card format. */
   cardAspect?: number;
-  /** Why auto-crop fell back to manual review, for the "why am I here" banner. */
-  autoCropInfo?: { confidence: number; reason: AutoCropSkipReason } | null;
   onComplete: (correctedSrc: string) => void;
   onSkip: () => void;
   onCancel: () => void;
@@ -73,7 +60,6 @@ export function PerspectiveCorrector({
   invertColors = false,
   initialCorners = null,
   cardAspect,
-  autoCropInfo = null,
   onComplete,
   onSkip,
   onCancel,
@@ -314,16 +300,6 @@ export function PerspectiveCorrector({
         </button>
         <h2>Perspective Fix</h2>
       </div>
-
-      {autoCropInfo && (
-        <p className="perspective-autocrop-note">
-          Auto-crop skipped — {SKIP_REASON_LABEL[autoCropInfo.reason]}
-          {autoCropInfo.reason === 'low_confidence' || autoCropInfo.confidence > 0
-            ? ` (${Math.round(autoCropInfo.confidence * 100)}% confidence, needs 82%)`
-            : ''}
-          . Check the corners below before continuing.
-        </p>
-      )}
 
       <div ref={viewportRef} className="editor-viewport perspective-viewport">
         {!fitted ? (

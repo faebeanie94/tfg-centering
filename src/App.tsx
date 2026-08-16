@@ -131,16 +131,27 @@ export default function App() {
       const { result, corners, confidence, skipReason } = await tryAutoCrop(dataUrl, hint, {
         cardAspect: cardAspect(format),
       });
+      setPerspectiveCorners(corners);
+      // Straight into the editor either way — Perspective Fix is opt-in
+      // later (via the editor menu), never a forced stop after capture.
       if (result) {
         setWorkingImage(result.imageSrc);
         setEditorRects({ outer: result.outer, inner: result.inner });
-        setAutoCropInfo(null);
+        setAutoCropInfo(skipReason ? { confidence, reason: skipReason } : null);
         setPhase('editor');
         return;
       }
-      setPerspectiveCorners(corners);
+      // No usable detection at all — use the raw photo with the best-effort
+      // outer/inner rects rather than blocking on a corners screen.
+      setWorkingImage(dataUrl);
       setAutoCropInfo(skipReason ? { confidence, reason: skipReason } : null);
-      setPhase('perspective');
+      try {
+        const rects = await seedEditorRectsFromImage(dataUrl, { cardAspect: cardAspect(format) }, corners, hint);
+        setEditorRects({ outer: rects.outer, inner: rects.inner });
+      } catch {
+        setEditorRects({});
+      }
+      setPhase('editor');
     },
     [],
   );
@@ -232,6 +243,7 @@ export default function App() {
 
   const loadSideIntoEditor = useCallback((side: CardSide) => {
     const snap = session[side];
+    setAutoCropInfo(null);
     if (snap) {
       setWorkingImage(snap.imageSrc);
       setEditorRects({ outer: snap.outer, inner: snap.inner });
@@ -260,6 +272,7 @@ export default function App() {
     setWorkingImage(null);
     setEditorRects({});
     setSessionCardSize(null);
+    setAutoCropInfo(null);
     setPhase('capture');
   }, []);
 
@@ -271,6 +284,7 @@ export default function App() {
     setWorkingImage(null);
     setEditorRects({});
     setSessionCardSize(null);
+    setAutoCropInfo(null);
     setPhase('capture');
   }, []);
 
@@ -297,6 +311,7 @@ export default function App() {
     setCurrentSide('front');
     setSessionCardSize(null);
     setPendingHint(undefined);
+    setAutoCropInfo(null);
     setPhase('capture');
   }, []);
 
@@ -369,7 +384,6 @@ export default function App() {
         invertColors={settings.invertColors}
         initialCorners={perspectiveCorners}
         cardAspect={autoCropOptions.cardAspect}
-        autoCropInfo={autoCropInfo}
         onComplete={handlePerspectiveComplete}
         onSkip={handlePerspectiveSkip}
         onCancel={() => setPhase(workingImage ? 'editor' : 'capture')}
@@ -401,6 +415,8 @@ export default function App() {
           cardName={cardNames[currentSide]}
           initialOuter={editorRects.outer}
           initialInner={editorRects.inner}
+          autoCropInfo={autoCropInfo}
+          onDismissAutoCropInfo={() => setAutoCropInfo(null)}
           onNameChange={(name) => setCardNames((prev) => ({ ...prev, [currentSide]: name }))}
           onSave={handleSaveSide}
           onSideChange={handleSideChange}
