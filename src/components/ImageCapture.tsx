@@ -52,7 +52,9 @@ export function ImageCapture({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
   const [cameraActive, setCameraActive] = useState(false);
+  const [previewSize, setPreviewSize] = useState<{ width: number; height: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [motionGranted, setMotionGranted] = useState(false);
@@ -197,6 +199,37 @@ export function ImageCapture({
       streamRef.current = null;
       setCameraActive(false);
     });
+  }, [cameraActive]);
+
+  useEffect(() => {
+    if (!cameraActive) {
+      setPreviewSize(null);
+      return;
+    }
+
+    const layout = () => {
+      const video = videoRef.current;
+      const viewport = viewportRef.current;
+      if (!video || !viewport || video.videoWidth < 2) return;
+      const scale = Math.min(
+        viewport.clientWidth / video.videoWidth,
+        viewport.clientHeight / video.videoHeight,
+      );
+      setPreviewSize({
+        width: video.videoWidth * scale,
+        height: video.videoHeight * scale,
+      });
+    };
+
+    const video = videoRef.current;
+    video?.addEventListener('loadedmetadata', layout);
+    const ro = new ResizeObserver(layout);
+    if (viewportRef.current) ro.observe(viewportRef.current);
+    layout();
+    return () => {
+      video?.removeEventListener('loadedmetadata', layout);
+      ro.disconnect();
+    };
   }, [cameraActive]);
 
   async function applyCameraOptions(track: MediaStreamTrack, torch: boolean, macro: boolean) {
@@ -353,8 +386,15 @@ export function ImageCapture({
           </div>
         </header>
 
-        <div className="scanner-viewport">
-          <div className="scanner-media">
+        <div className="scanner-viewport" ref={viewportRef}>
+          <div
+            className="scanner-media"
+            style={
+              previewSize
+                ? { width: previewSize.width, height: previewSize.height, maxHeight: 'none' }
+                : undefined
+            }
+          >
             <video ref={videoRef} playsInline muted className="scanner-video" />
             <ScannerOverlay
               level={level}

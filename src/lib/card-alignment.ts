@@ -29,6 +29,7 @@ export function evaluateCardAlignment(
   rotationDeg: number,
   guide: DetectedCard = getGuideBox(),
   cardAspectRatio: number = CARD_ASPECT,
+  frameAspect = 1,
 ): CardAlignmentState {
   if (!detected) {
     return {
@@ -65,7 +66,8 @@ export function evaluateCardAlignment(
 
   const sized = sizeRatio >= SIZE_MIN && sizeRatio <= SIZE_MAX;
 
-  const aspectOk = Math.abs(detected.width / detected.height - cardAspectRatio) <= 0.025;
+  const expectedNormAspect = cardAspectRatio / (frameAspect > 0.15 ? frameAspect : 1);
+  const aspectOk = Math.abs(detected.width / detected.height - expectedNormAspect) <= 0.06;
 
   const fitsGuide = insideGuide && centered && sized && aspectOk && isCardLevel;
 

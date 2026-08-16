@@ -142,7 +142,8 @@ export function SettingsPanel({ open, settings, onChange, onClose }: SettingsPan
             </select>
           </label>
           <p className="settings-hint">
-            Sets the guide frame size for your working height. Use 20 cm when the phone is about 20 cm above the card.
+            Sets the dashed frame size. Line the card edges up with that frame.
+            Use 20 cm when the phone is about 20 cm above the card.
           </p>
           <label className="settings-field">
             <span className="settings-field-label">Phone stand / box at bottom</span>

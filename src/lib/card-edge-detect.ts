@@ -176,27 +176,41 @@ function estimateBackgroundLum(
   span: number,
 ): number {
   const samples: number[] = [];
-  const offsets: Array<[number, number]> = [
-    [-span * 1.1, 0],
-    [span * 1.1, 0],
-    [0, span * 1.1],
-    [-span * 0.9, span * 0.9],
-    [span * 0.9, span * 0.9],
-    // Frame corners — often true background when the card sits on paper.
-    [-0.42, -0.42],
-    [0.42, -0.42],
-    [-0.42, 0.42],
-    [0.42, 0.42],
+  // Frame edges/corners — not ±span from centre, which lands on the card
+  // (and then the detector treats the yellow print box as the "rim").
+  const border: Array<[number, number]> = [
+    [0.04, 0.04],
+    [0.96, 0.04],
+    [0.04, 0.96],
+    [0.96, 0.96],
+    [0.5, 0.03],
+    [0.5, 0.97],
+    [0.03, 0.5],
+    [0.97, 0.5],
+    [0.2, 0.04],
+    [0.8, 0.04],
+    [0.2, 0.96],
+    [0.8, 0.96],
   ];
-
-  for (const [ox, oy] of offsets) {
+  for (const [nx, ny] of border) {
+    const x = clamp(Math.round(nx * w), 1, w - 2);
+    const y = clamp(Math.round(ny * h), 1, h - 2);
+    samples.push(lum(data, y * w + x));
+  }
+  // Far from the search centre, if that still sits in-frame.
+  for (const [ox, oy] of [
+    [-span * 1.35, 0],
+    [span * 1.35, 0],
+    [0, span * 1.35],
+    [0, -span * 1.35],
+  ] as Array<[number, number]>) {
     const x = clamp(Math.round(cx * w + ox * w), 1, w - 2);
     const y = clamp(Math.round(cy * h + oy * h), 1, h - 2);
     samples.push(lum(data, y * w + x));
   }
 
   samples.sort((a, b) => a - b);
-  return samples[Math.floor(samples.length / 2)] ?? 24;
+  return samples[Math.floor(samples.length * 0.35)] ?? 24;
 }
 
 /** Build a blurred luminance plane so holographic glare spikes don't fake edges. */
@@ -511,11 +525,15 @@ function scoreCardBox(
   if (!expected) return 1 - aspectErr;
 
   const sizeRatio = (box.width / expected.width + box.height / expected.height) / 2;
-  if (sizeRatio < 0.4 || sizeRatio > 1.6) return -1;
+  if (sizeRatio < 0.35 || sizeRatio > 2.8) return -1;
 
-  const sizeScore = 1 - Math.min(1, Math.abs(1 - sizeRatio));
+  const area = box.width * box.height;
+  if (area < 0.06 || area > 0.9) return -1;
+
+  const matchExpected = 1 - Math.min(1, Math.abs(1 - sizeRatio) / 1.5);
+  const outerBias = Math.max(0, Math.min(1, (area - 0.08) / 0.5));
   const aspectScore = 1 - Math.min(1, aspectErr / 0.12);
-  return sizeScore * 0.65 + aspectScore * 0.35;
+  return aspectScore * 0.3 + matchExpected * 0.25 + outerBias * 0.45;
 }
 
 function detectFromBackground(
@@ -600,10 +618,10 @@ function collectGradientBandEdges(
   const yFracs = [0.3, 0.42, 0.5, 0.58, 0.7];
   const xFracs = [0.3, 0.42, 0.5, 0.58, 0.7];
 
-  const minW = Math.max(6, expectedHalfW * 0.55);
-  const maxW = Math.max(minW + 4, expectedHalfW * 1.5);
-  const minH = Math.max(6, expectedHalfH * 0.55);
-  const maxH = Math.max(minH + 4, expectedHalfH * 1.5);
+  const minW = Math.max(6, expectedHalfW * 0.45);
+  const maxW = Math.max(minW + 4, expectedHalfW * 2.5);
+  const minH = Math.max(6, expectedHalfH * 0.45);
+  const maxH = Math.max(minH + 4, expectedHalfH * 2.5);
 
   const leftXs: number[] = [];
   const rightXs: number[] = [];
@@ -787,6 +805,7 @@ export function detectCardFrameFromImageData(
     }
 
     consider(detectFromGradientBand(luma, w, h, sx, sy, expectedHalfW, expectedHalfH));
+    consider(detectFromGradientBand(luma, w, h, sx, sy, expectedHalfW * 1.7, expectedHalfH * 1.7));
 
     if (bestScore < 0.4) {
       for (const thresh of [22, 28, 36, 44]) {
@@ -878,34 +897,74 @@ const SCAN_FOV_DEG = 50;
 export const SCAN_DISTANCE_OPTIONS = [12, 20, 30] as const;
 export type ScanDistanceCm = (typeof SCAN_DISTANCE_OPTIONS)[number];
 
+/** Fraction of the unobstructed frame the card silhouette should fill. */
+const GUIDE_FILL: Record<ScanDistanceCm, number> = {
+  12: 0.92,
+  20: 0.88,
+  30: 0.78,
+};
+
 /** Guide frame sized for a card at the given phone-to-card distance (cm). */
 export function guideBoxForDistance(
   distanceCm: ScanDistanceCm = 20,
   cardAspectRatio: number = CARD_ASPECT,
   cardHeightMm: number = DEFAULT_CARD_HEIGHT_MM,
+  frameAspect: number = 1,
+  obstructionBottom = 0.32,
 ): DetectedCard {
-  const template = guideTemplateForDistance(distanceCm, cardAspectRatio, cardHeightMm);
-  return positionGuideBox(template, 0.5, defaultGuideAnchorY(template.height, 0.32));
+  const template = guideTemplateForDistance(
+    distanceCm,
+    cardAspectRatio,
+    cardHeightMm,
+    frameAspect,
+    obstructionBottom,
+  );
+  return positionGuideBox(template, 0.5, defaultGuideAnchorY(template.height, obstructionBottom), {
+    obstructionBottom,
+  });
 }
 
+/**
+ * Dashed guide size in normalised video coordinates (0–1).
+ * `frameAspect` is videoWidth/videoHeight so a poker card is not squeezed as if
+ * the preview were square (phone cameras are 4:3 / 16:9).
+ */
 export function guideTemplateForDistance(
   distanceCm: ScanDistanceCm = 20,
   cardAspectRatio: number = CARD_ASPECT,
   cardHeightMm: number = DEFAULT_CARD_HEIGHT_MM,
+  frameAspect: number = 1,
+  obstructionBottom = 0,
 ): { width: number; height: number } {
+  const fa = frameAspect > 0.15 && Number.isFinite(frameAspect) ? frameAspect : 1;
+  const fill = GUIDE_FILL[distanceCm] ?? 0.88;
+  const availableH = Math.max(0.42, 1 - Math.max(0, obstructionBottom) - 0.03);
+  // FOV estimate, then take the larger of that and the fill target so close-up
+  // grading shots are not stuck with a half-frame window.
   const distanceMm = distanceCm * 10;
   const angularHeightRad = 2 * Math.atan(cardHeightMm / (2 * distanceMm));
   const fovRad = (SCAN_FOV_DEG * Math.PI) / 180;
-  const height = Math.max(0.22, Math.min(0.65, angularHeightRad / fovRad));
-  return { width: height * cardAspectRatio, height };
+  const fovHeight = angularHeightRad / fovRad;
+  let height = Math.min(availableH, Math.max(availableH * fill, fovHeight));
+
+  let width = height * (cardAspectRatio / fa);
+  const maxW = 0.94;
+  if (width > maxW) {
+    width = maxW;
+    height = width * (fa / cardAspectRatio);
+    if (height > availableH) {
+      height = availableH;
+      width = height * (cardAspectRatio / fa);
+    }
+  }
+  return { width, height };
 }
 
-/** Vertical centre for the guide when no card is detected yet. */
+/** Vertical centre for the guide — middle of the unobstructed video, not a tiny upper window. */
 export function defaultGuideAnchorY(templateHeight: number, obstructionBottom: number): number {
-  const maxBottom = 1 - obstructionBottom;
-  const centredUpper = 0.36;
-  const maxCentre = maxBottom - templateHeight / 2 - 0.02;
-  return clamp(centredUpper, templateHeight / 2 + 0.02, maxCentre);
+  const available = Math.max(templateHeight + 0.04, 1 - obstructionBottom);
+  const centre = available / 2;
+  return clamp(centre, templateHeight / 2 + 0.02, available - templateHeight / 2 - 0.02);
 }
 
 export interface GuideLayoutOptions {
@@ -938,6 +997,11 @@ export function defaultGuideBox(): DetectedCard {
 
 export function shouldAcceptDetection(prev: DetectedCard | null, next: DetectedCard): boolean {
   if (!prev) return true;
+
+  const prevArea = prev.width * prev.height;
+  const nextArea = next.width * next.height;
+  // Inner artwork → outer card rim is a large size jump; always take the bigger box.
+  if (nextArea > prevArea * 1.35) return true;
 
   const prevCx = prev.left + prev.width / 2;
   const prevCy = prev.top + prev.height / 2;

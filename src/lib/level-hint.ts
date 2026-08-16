@@ -37,7 +37,7 @@ export function getCardAlignmentHint(alignment: CardAlignmentState): string {
   const { detected, isCardLevel, fitsGuide, offsetX, offsetY, sizeRatio, rotationDeg } = alignment;
 
   if (!detected) {
-    return 'Place card in the upper scan area — darker surface helps detection';
+    return 'Line the card up with the dashed frame';
   }
 
   if (!isCardLevel) {
@@ -48,8 +48,8 @@ export function getCardAlignmentHint(alignment: CardAlignmentState): string {
 
   if (fitsGuide) return 'Card aligned — hold steady…';
 
-  if (sizeRatio < SIZE_MIN) return 'Hold phone closer ↓ — fill the guide';
-  if (sizeRatio > SIZE_MAX) return 'Hold phone higher ↑ — card too large in frame';
+  if (sizeRatio < SIZE_MIN) return 'Move closer — fill the dashed frame with the card';
+  if (sizeRatio > SIZE_MAX) return 'Move back — the card should sit inside the dashed frame';
 
   if (offsetX > 0.055) return 'Centre card in guide — move left ←';
   if (offsetX < -0.055) return 'Centre card in guide — move right →';
@@ -62,11 +62,11 @@ export function getCardAlignmentHint(alignment: CardAlignmentState): string {
   if (detected.left + detected.width > guide.left + guide.width + 0.025) return 'Move card left ←';
   if (detected.top + detected.height > guide.top + guide.height + 0.025) return 'Move card up ↑';
 
-  return 'Adjust card to fit inside the guide';
+  return 'Fit the card inside the dashed frame';
 }
 
 export function getScannerHint(phone: LevelState, alignment: CardAlignmentState, showLevel: boolean): string {
-  if (!showLevel) return 'Fill the frame with your card and tap capture';
+  if (!showLevel) return 'Line the card up with the dashed frame, then tap capture';
   if (!phone.supported) return 'Align phone parallel to the card';
   if (!phone.permissionGranted) return 'Tap "Enable Motion" below to allow levelling';
   if (!phone.isLevel) return getLevelHint(phone);
