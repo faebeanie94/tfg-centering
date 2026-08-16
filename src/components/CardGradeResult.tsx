@@ -38,6 +38,10 @@ export default function CardGradeResult({ result, onRetake, onConfirm }: Props) 
           <span className="card-result__grade-label">{grade.label}</span>
           <span className="card-result__grade-value">{formatGrade(grade.grade)}</span>
           <span className="card-result__grade-band">{grade.ratioLabel} band</span>
+          <span className="card-result__grade-axis">
+            Worst {grade.worstAxis === 'left-right' ? 'L/R' : 'T/B'} · qualify {grade.worstQualify.toFixed(2)}
+            {grade.ocEligible ? ' · OC eligible' : ''}
+          </span>
         </div>
 
         <div className="card-result__section">

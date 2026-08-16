@@ -17,6 +17,8 @@ writeFileSync(
   `
 import { CenteringGrader } from '${join(root, 'src/card/centering/CenteringGrader.ts').replace(/\\\\/g, '/')}';
 import { gradeCard } from '${join(root, 'src/card/centering/gradeCard.ts').replace(/\\\\/g, '/')}';
+import { snapshotFromRects } from '${join(root, 'src/lib/session.ts').replace(/\\\\/g, '/')}';
+import { CARD_FORMAT_PRESETS } from '${join(root, 'src/lib/card-sizes.ts').replace(/\\\\/g, '/')}';
 
 function assert(cond: unknown, msg: string) {
   if (!cond) throw new Error(msg);
@@ -62,6 +64,16 @@ const frontSame = gradeCard({ left: 40, right: 60, top: 50, bottom: 50 }, 'front
 assert(frontSame.grade === 8, '40/60 borders are TFG 8 on the front');
 const backWider = gradeCard({ left: 40, right: 60, top: 50, bottom: 50 }, 'back');
 assert(backWider.grade === 9.5, 'same 40/60 borders are TFG 9.5 on the back');
+
+const review = snapshotFromRects(
+  'data:image/gif;base64,R0lGODlhAQABAAAAACw=',
+  { x: 0, y: 0, width: 200, height: 280 },
+  { x: 40, y: 50, width: 120, height: 180 },
+  'front',
+  CARD_FORMAT_PRESETS.pokemon,
+);
+assert(review.grade.label === 'TFG 10', 'review snapshot uses getTfgGrade');
+assert(Math.round(review.result.leftRight.left + review.result.leftRight.right) === 100, 'L/R percents sum to 100');
 
 console.log('ok - centering grader uses TFG rules', centered.horizontal.ratio, off.horizontal.ratio);
 `,
