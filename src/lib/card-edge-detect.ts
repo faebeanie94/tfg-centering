@@ -537,6 +537,8 @@ function scoreCardBox(
   cardAspectRatio: number = CARD_ASPECT,
   frameW?: number,
   frameH?: number,
+  seedX = 0.5,
+  seedY = 0.4,
 ): number {
   const aspectErr = boxAspectError(box, cardAspectRatio, frameW, frameH);
   if (aspectErr > 0.12) return -1;
@@ -544,17 +546,27 @@ function scoreCardBox(
   if (!expected) return 1 - aspectErr;
 
   const sizeRatio = (box.width / expected.width + box.height / expected.height) / 2;
-  if (sizeRatio < 0.4 || sizeRatio > 1.85) return -1;
+  if (sizeRatio < 0.45 || sizeRatio > 2.3) return -1;
 
   const area = box.width * box.height;
   if (area < 0.04 || area > 0.82) return -1;
 
-  const matchExpected = 1 - Math.min(1, Math.abs(1 - sizeRatio) / 0.9);
-  const outerBias = Math.max(0, Math.min(1, (area - 0.08) / 0.4));
+  const matchExpected = 1 - Math.min(1, Math.abs(1 - sizeRatio) / 1.2);
+  const outerBias = Math.max(0, Math.min(1, (area - 0.06) / 0.35));
   const aspectScore = 1 - Math.min(1, aspectErr / 0.12);
-  let score = aspectScore * 0.28 + matchExpected * 0.4 + outerBias * 0.32;
-  // Inner artwork is ~70% of the outer card — do not let it beat the rim.
-  if (sizeRatio < 0.72) score *= 0.65;
+  const cx = box.left + box.width / 2;
+  const cy = box.top + box.height / 2;
+  const centerDist = Math.hypot(cx - seedX, cy - seedY);
+  const centerScore = 1 - Math.min(1, centerDist / 0.28);
+  const containsSeed =
+    seedX >= box.left &&
+    seedX <= box.left + box.width &&
+    seedY >= box.top &&
+    seedY <= box.top + box.height;
+
+  let score = aspectScore * 0.26 + outerBias * 0.34 + matchExpected * 0.2 + centerScore * 0.2;
+  if (sizeRatio < 0.8) score *= 0.7;
+  if (!containsSeed) score *= 0.35;
   return score;
 }
 
@@ -836,7 +848,7 @@ export function detectCardFrameFromImageData(
       box = { ...box, height: clippedH };
       found = { ...found, box };
     }
-    let score = scoreCardBox(box, expected, cardAspectRatio, w, h);
+    let score = scoreCardBox(box, expected, cardAspectRatio, w, h, cx, cy);
     if (score < 0) return;
     score += boxPrintScore(data, w, h, box) * 0.18;
     if (score > bestScore) {

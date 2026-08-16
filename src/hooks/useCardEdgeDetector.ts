@@ -113,8 +113,8 @@ export function useCardEdgeDetector(
           const search = {
             cx: guideAnchor.x,
             cy: guideAnchor.y,
-            expectedWidth: template.width,
-            expectedHeight: template.height,
+            expectedWidth: template.width * 1.12,
+            expectedHeight: template.height * 1.12,
             cardAspect,
             maxBottom,
           };
