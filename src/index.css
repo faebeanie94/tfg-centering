@@ -1281,16 +1281,6 @@ body.editor-mode #root {
   font-size: 1rem;
 }
 
-.perspective-detect-warning {
-  margin: 0 12px 4px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: rgba(231, 125, 49, 0.16);
-  color: #f3d2b8;
-  font-size: 0.82rem;
-  line-height: 1.35;
-}
-
 .perspective-hint {
   display: none;
 }

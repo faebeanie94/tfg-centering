@@ -5,7 +5,7 @@ import {
   defaultCorners,
   perspectiveCorrect,
 } from '../lib/perspective';
-import { DETECT_CONFIRM_CONFIDENCE, detectCardCornersFromImage } from '../lib/auto-crop';
+import { detectCardCornersFromImage } from '../lib/auto-crop';
 import { useFitScale, useAppShellMode } from '../hooks/useFitScale';
 
 interface PerspectiveCorrectorProps {
@@ -13,8 +13,6 @@ interface PerspectiveCorrectorProps {
   invertColors?: boolean;
   /** Pre-detected corners from auto-crop (pixel coords). */
   initialCorners?: QuadCorners | null;
-  /** True when the detector was below the confirm threshold — do not re-guess. */
-  uncertainDetection?: boolean;
   /** Portrait width/height for the selected card format. */
   cardAspect?: number;
   onComplete: (correctedSrc: string) => void;
@@ -49,7 +47,6 @@ export function PerspectiveCorrector({
   imageSrc,
   invertColors = false,
   initialCorners = null,
-  uncertainDetection = false,
   cardAspect,
   onComplete,
   onSkip,
@@ -82,14 +79,12 @@ export function PerspectiveCorrector({
       setImageSize(size);
       setCorners(fallback);
 
-      if (!initialCorners && !uncertainDetection) {
+      if (!initialCorners) {
         try {
           const detected = await detectCardCornersFromImage(imageSrc, undefined, {
             cardAspect,
           });
-          if (!cancelled && detected && detected.confidence >= DETECT_CONFIRM_CONFIDENCE) {
-            setCorners(detected.corners);
-          }
+          if (!cancelled && detected) setCorners(detected.corners);
         } catch {
           // keep fallback corners
         }
@@ -108,7 +103,7 @@ export function PerspectiveCorrector({
       bitmapRef.current?.close();
       bitmapRef.current = null;
     };
-  }, [imageSrc, initialCorners, uncertainDetection]);
+  }, [imageSrc, initialCorners]);
 
   const drawLoupe = useCallback(
     (corner: CornerKey) => {
@@ -289,11 +284,6 @@ export function PerspectiveCorrector({
         </button>
         <h2>Perspective Fix</h2>
       </div>
-      {uncertainDetection && (
-        <p className="perspective-detect-warning" role="status">
-          Couldn't confidently detect the card. Adjust the corners manually.
-        </p>
-      )}
 
       <div ref={viewportRef} className="editor-viewport perspective-viewport">
         {!fitted ? (
