@@ -19,6 +19,8 @@ import { OUTPUT_PADDING_RATIO } from '${join(root, 'src/lib/perspective.ts').rep
 import {
   boxToCorners,
   defaultRectsAfterCrop,
+  AUTO_CROP_CONFIDENCE,
+  isNearlyFrontal,
 } from '${join(root, 'src/lib/auto-crop.ts').replace(/\\\\/g, '/')}';
 import {
   CARD_ASPECT,
@@ -97,9 +99,21 @@ const expectedPadX = outW * OUTPUT_PADDING_RATIO / (1 + 2 * OUTPUT_PADDING_RATIO
 assert(Math.abs(rects.outer.x - expectedPadX) < 1, 'outer pad x');
 assert(rects.inner.x > rects.outer.x, 'inner inset');
 assert(rects.inner.width < rects.outer.width, 'inner narrower');
+assert(AUTO_CROP_CONFIDENCE > 0.5 && AUTO_CROP_CONFIDENCE < 0.95, 'confidence gate sane');
+
+// Live scanner AABB for a tilted card must not look "frontal".
+const tilted = boxToCorners(
+  { left: 0.3, top: 0.2, width: 0.35, height: 0.35 / CARD_ASPECT },
+  1200,
+  1600,
+  18,
+);
+assert(!isNearlyFrontal(tilted), 'rotated AABB must fail frontal gate');
 
 console.log('ok - boxToCorners', corners);
 console.log('ok - defaultRectsAfterCrop', rects);
+console.log('ok - confidence gate', AUTO_CROP_CONFIDENCE);
+console.log('ok - tilted live AABB rejected by frontal gate');
 console.log('All auto-crop checks passed.');
 `,
 );
