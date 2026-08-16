@@ -250,7 +250,10 @@ export function rectsAfterCropWithInnerSeed(image: HTMLImageElement): { outer: R
 }
 
 function analysisSize(naturalWidth: number, naturalHeight: number): { w: number; h: number; scale: number } {
-  const maxW = 560;
+  // Corner positions found here get scaled back up by 1/scale, so quantization
+  // error at this resolution is amplified by the same factor at full res —
+  // higher analysis resolution directly buys sharper final corners.
+  const maxW = 900;
   const scale = Math.min(1, maxW / Math.max(1, naturalWidth));
   return {
     w: Math.max(32, Math.round(naturalWidth * scale)),
@@ -515,6 +518,42 @@ const RIM_STABLE_AVG_STEP = 8;
 /** Minimum single-pixel luminance jump to count as a real edge, not noise. */
 const RIM_EDGE_THRESHOLD = 35;
 
+/**
+ * Refine an integer edge step to a fractional one. Camera blur/JPEG smoothing
+ * spreads a real edge over a few pixels, so the strongest single-pixel delta
+ * isn't necessarily the true crossing — interpolate where the ray actually
+ * crosses the midpoint between the flat levels just before/after it.
+ */
+function subPixelRim(lums: number[], s: number, maxS: number): number {
+  const beforeStart = Math.max(0, s - 5);
+  const beforeEnd = Math.max(0, s - 2);
+  const afterStart = Math.min(maxS, s + 1);
+  const afterEnd = Math.min(maxS, s + 4);
+  if (beforeEnd < beforeStart || afterEnd < afterStart) return s;
+
+  let beforeSum = 0;
+  for (let i = beforeStart; i <= beforeEnd; i++) beforeSum += lums[i];
+  const levelBefore = beforeSum / (beforeEnd - beforeStart + 1);
+
+  let afterSum = 0;
+  for (let i = afterStart; i <= afterEnd; i++) afterSum += lums[i];
+  const levelAfter = afterSum / (afterEnd - afterStart + 1);
+
+  const mid = (levelBefore + levelAfter) / 2;
+  const searchStart = Math.max(1, s - 3);
+  const searchEnd = Math.min(maxS, s + 3);
+  for (let i = searchStart; i <= searchEnd; i++) {
+    const a = lums[i - 1];
+    const b = lums[i];
+    const crosses = (a <= mid && b >= mid) || (a >= mid && b <= mid);
+    if (crosses && b !== a) {
+      const frac = Math.max(0, Math.min(1, (mid - a) / (b - a)));
+      return i - 1 + frac;
+    }
+  }
+  return s;
+}
+
 function findRimPoint(
   data: Uint8ClampedArray,
   w: number,
@@ -563,7 +602,8 @@ function findRimPoint(
     if (n > 0 && stepSum / n <= RIM_STABLE_AVG_STEP) farthestStable = s;
   }
   if (farthestStable >= 0) {
-    return { x: cx + dx * farthestStable, y: cy + dy * farthestStable };
+    const refined = subPixelRim(lums, farthestStable, maxS);
+    return { x: cx + dx * refined, y: cy + dy * refined };
   }
 
   // Fallback: distance-weighted scoring (no clean "edge into uniform
@@ -590,7 +630,8 @@ function findRimPoint(
   }
 
   if (bestS < 0) return null;
-  return { x: cx + dx * bestS, y: cy + dy * bestS };
+  const refined = subPixelRim(lums, bestS, maxS);
+  return { x: cx + dx * refined, y: cy + dy * refined };
 }
 
 /** Mean chroma in a normalised box — pale paper scores low, printed cards score higher. */
@@ -633,6 +674,12 @@ function refineQuadFromSeed(
 
   const buckets: Point[][] = [[], [], [], []]; // L R T B by dominant axis angle
 
+  // Cards are portrait rectangles, not squares — the true corners sit at
+  // atan2(halfH, halfW) from centre, not at the four 45°/135°/225°/315°
+  // marks a square would use. Bucketing by fixed 90° quadrants misclassifies
+  // rays near each corner into the wrong side, corrupting that side's line fit.
+  const cornerAngle = Math.atan2(halfH, halfW);
+
   for (let i = 0; i < 72; i++) {
     const angle = (i / 72) * Math.PI * 2;
     // Expected rim distance for a rectangle varies with angle.
@@ -642,10 +689,9 @@ function refineQuadFromSeed(
     if (!p) continue;
 
     // Classify by angle relative to card centre into 4 sides.
-    const deg = ((angle * 180) / Math.PI + 360) % 360;
-    if (deg >= 315 || deg < 45) buckets[1].push(p); // right
-    else if (deg >= 45 && deg < 135) buckets[3].push(p); // bottom
-    else if (deg >= 135 && deg < 225) buckets[0].push(p); // left
+    if (angle < cornerAngle || angle >= Math.PI * 2 - cornerAngle) buckets[1].push(p); // right
+    else if (angle < Math.PI - cornerAngle) buckets[3].push(p); // bottom
+    else if (angle < Math.PI + cornerAngle) buckets[0].push(p); // left
     else buckets[2].push(p); // top
   }
 
