@@ -37,7 +37,7 @@ export function useCardEdgeDetector(
   const rotationRef = useRef(0);
   const missFramesRef = useRef(0);
 
-  const [frameAspect, setFrameAspect] = useState(1);
+  const [frameAspect, setFrameAspect] = useState(3 / 4);
 
   const template = useMemo(
     () =>
@@ -117,7 +117,7 @@ export function useCardEdgeDetector(
             const candidate = found.box;
             if (shouldAcceptDetection(smoothRef.current, candidate)) {
               missFramesRef.current = 0;
-              smoothRef.current = smoothBox(smoothRef.current, candidate, 0.2, cardAspect);
+              smoothRef.current = smoothBox(smoothRef.current, candidate, 0.2, cardAspect, frameAspect);
               rotationRef.current = rotationRef.current * 0.7 + found.rotationDeg * 0.3;
             } else {
               missFramesRef.current = 0;
