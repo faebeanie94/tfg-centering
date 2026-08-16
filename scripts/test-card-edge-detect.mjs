@@ -111,8 +111,17 @@ assert(
 assert(portraitGuide.width > template.width, 'portrait video makes the dashed card wider');
 const standGuide = guideTemplateForDistance(20, CARD_ASPECT, 88.9, 3 / 4, 0.32);
 assert(
-  standGuide.height >= 0.3 && standGuide.height <= 0.42,
-  'phone-on-box 20cm guide should match a card at arm length, got ' + standGuide.height,
+  Math.abs(standGuide.width / standGuide.height - CARD_ASPECT / (3 / 4)) < 0.03,
+  'stand guide must keep poker aspect, got ' + standGuide.width / standGuide.height,
+);
+assert(
+  standGuide.height <= 0.68 && standGuide.height >= 0.5,
+  'phone-on-box guide must fit above the stand without shrinking to a postage stamp, got ' + standGuide.height,
+);
+const tallPhoneGuide = guideTemplateForDistance(20, CARD_ASPECT, 88.9, 9 / 16, 0.32);
+assert(
+  Math.abs(tallPhoneGuide.width / tallPhoneGuide.height - CARD_ASPECT / (9 / 16)) < 0.03,
+  '9:16 stand guide must not be taller than a poker card',
 );
 assert(standGuide.height < template.height - 0.15, 'stand crop must shrink the dashes vs full frame');
 {
@@ -368,10 +377,21 @@ for (const c of cases) {
   const hintFill = getCardAlignmentHint(evaluateCardAlignment(cardInDashes, 0, oversizedGuide));
   try {
     assert(
-      /in the frame|hold steady/i.test(hintFill) && !/Move closer|Move back|sit inside|move (up|down)/i.test(hintFill),
-      'card already in dashes must not nag fill/sit, got: ' + hintFill,
+      /Move closer|fill the dashed frame/i.test(hintFill),
+      'card much smaller than the dashes should ask to fill the frame, got: ' + hintFill,
     );
-    console.log('ok - hint when card is already in dashes', hintFill);
+    console.log('ok - hint when card is smaller than dashes', hintFill);
+  } catch (e) {
+    failed++;
+    console.error('FAIL -', (e as Error).message);
+  }
+
+  const innerArt = { left: 0.3, top: 0.18, width: 0.32, height: 0.3 };
+  const outerGuide = { left: 0.22, top: 0.1, width: 0.5, height: 0.48 };
+  const innerAlign = evaluateCardAlignment(innerArt, 0, outerGuide, CARD_ASPECT, 3 / 4, 0.68);
+  try {
+    assert(!innerAlign.fitsGuide, 'inner artwork must not count as Ready');
+    console.log('ok - inner artwork is not Ready');
   } catch (e) {
     failed++;
     console.error('FAIL -', (e as Error).message);

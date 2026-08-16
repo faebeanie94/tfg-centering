@@ -82,6 +82,7 @@ export function ImageCapture({
     obstructionBottom: settings.scanObstructionBottom,
     cardAspect: cardAspect(scanFormat),
     cardHeightMm: scanFormat.heightMm,
+    previewAspect: previewSize ? previewSize.width / previewSize.height : undefined,
   });
   const detectedBoxRef = useRef(detectedBox);
   const guideBoxRef = useRef(guideBox);
