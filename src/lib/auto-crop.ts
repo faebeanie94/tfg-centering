@@ -508,6 +508,13 @@ function scoreQuad(
  * Walk outward from the card centre; stop at the strongest luminance step
  * near the expected rim distance. Prefer the card rim over a farther paper/desk edge.
  */
+/** How far past a candidate edge to check for a uniform (background-like) run. */
+const RIM_STABLE_WINDOW = 18;
+/** Average per-pixel luminance step below this reads as "uniform background". */
+const RIM_STABLE_AVG_STEP = 8;
+/** Minimum single-pixel luminance jump to count as a real edge, not noise. */
+const RIM_EDGE_THRESHOLD = 35;
+
 function findRimPoint(
   data: Uint8ClampedArray,
   w: number,
@@ -521,46 +528,65 @@ function findRimPoint(
 ): Point | null {
   const dx = Math.cos(angle);
   const dy = Math.sin(angle);
-  let bestS = -1;
-  let bestScore = 10;
-
-  let prev = lumAt(data, w, Math.round(cx), Math.round(cy));
   const steps = Math.floor(maxDist);
-  const sigma = Math.max(6, (maxDist - minDist) * 0.28);
 
+  // Sample luminance along the whole ray once; stop at the frame edge.
+  const lums: number[] = [lumAt(data, w, Math.round(cx), Math.round(cy))];
+  let maxS = 0;
   for (let s = 1; s <= steps; s++) {
     const x = Math.round(cx + dx * s);
     const y = Math.round(cy + dy * s);
     if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) break;
-    const curr = lumAt(data, w, x, y);
-    const grad = Math.abs(curr - prev);
+    lums.push(lumAt(data, w, x, y));
+    maxS = s;
+  }
+  if (maxS < minDist) return null;
+  const scanStart = Math.max(1, Math.ceil(minDist));
 
+  // Real card designs often have inner borders/frames (foil, coloured bezel)
+  // whose edges are just as strong as the true outer rim. Only the outer rim
+  // is followed by a long uniform run (the background), so prefer the
+  // farthest strong edge that leads into a stable stretch over the nearest
+  // or strongest one — otherwise detection snags on the inner artwork frame.
+  let farthestStable = -1;
+  for (let s = scanStart; s <= maxS; s++) {
+    const grad = Math.abs(lums[s] - lums[s - 1]);
+    if (grad < RIM_EDGE_THRESHOLD) continue;
+    const windowEnd = Math.min(maxS, s + RIM_STABLE_WINDOW);
+    if (windowEnd - s < RIM_STABLE_WINDOW * 0.6) continue; // too close to the frame edge to judge
+    let stepSum = 0;
+    let n = 0;
+    for (let k = s + 1; k <= windowEnd; k++) {
+      stepSum += Math.abs(lums[k] - lums[k - 1]);
+      n++;
+    }
+    if (n > 0 && stepSum / n <= RIM_STABLE_AVG_STEP) farthestStable = s;
+  }
+  if (farthestStable >= 0) {
+    return { x: cx + dx * farthestStable, y: cy + dy * farthestStable };
+  }
+
+  // Fallback: distance-weighted scoring (no clean "edge into uniform
+  // background" was found — e.g. a plain card, or a busy/noisy backdrop).
+  const sigma = Math.max(6, (maxDist - minDist) * 0.28);
+  let bestS = -1;
+  let bestScore = 10;
+  for (let s = scanStart; s <= maxS; s++) {
+    const grad = Math.abs(lums[s] - lums[s - 1]);
     let flat = 0;
     let n = 0;
-    for (let k = 1; k <= 5; k++) {
-      const ax = Math.round(cx + dx * (s + k));
-      const ay = Math.round(cy + dy * (s + k));
-      if (ax < 1 || ay < 1 || ax >= w - 1 || ay >= h - 1) break;
-      const al = lumAt(data, w, ax, ay);
-      const pl = lumAt(
-        data,
-        w,
-        Math.round(cx + dx * (s + k - 1)),
-        Math.round(cy + dy * (s + k - 1)),
-      );
-      flat += Math.abs(al - pl);
+    for (let k = 1; k <= 5 && s + k <= maxS; k++) {
+      flat += Math.abs(lums[s + k] - lums[s + k - 1]);
       n++;
     }
     const flatBonus = n >= 3 && flat / n < 12 ? 8 : 0;
     // Peak at the expected card half-size so white paper edges lose to the card rim.
     const distWeight = Math.exp(-((s - expectedDist) ** 2) / (2 * sigma * sigma)) * 28;
     const score = grad + flatBonus + distWeight;
-
-    if (s >= minDist && score > bestScore) {
+    if (score > bestScore) {
       bestScore = score;
       bestS = s;
     }
-    prev = curr;
   }
 
   if (bestS < 0) return null;

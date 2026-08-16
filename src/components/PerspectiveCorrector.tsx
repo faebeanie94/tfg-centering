@@ -267,15 +267,12 @@ export function PerspectiveCorrector({
 
   const displayHeight = imageSize.height * displayScale;
   const displayWidth = imageSize.width * displayScale;
-  const crosshairArm = screenPx(16, displayScale);
-  const crosshairStroke = screenPx(1.75, displayScale);
-  const crosshairStrokeActive = screenPx(2.25, displayScale);
+  const crosshairArm = screenPx(9, displayScale);
+  const crosshairStroke = screenPx(1.5, displayScale);
+  const crosshairStrokeActive = screenPx(2, displayScale);
   const guideStroke = screenPx(1.25, displayScale);
   const hitRadius = screenPx(26, displayScale);
-  const hubRadius = screenPx(5, displayScale);
-  const hubStroke = screenPx(1.25, displayScale);
-  const hubStrokeActive = screenPx(1.75, displayScale);
-  const centerDot = screenPx(2, displayScale);
+  const centerDot = screenPx(1.5, displayScale);
   const outlineExtra = screenPx(0.75, displayScale);
   const points = [corners.tl, corners.tr, corners.br, corners.bl, corners.tl];
   const linePoints = points.map((p) => `${p.x},${p.y}`).join(' ');
@@ -401,15 +398,6 @@ export function PerspectiveCorrector({
                       beginDrag(e.clientX, e.clientY, key);
                       containerRef.current?.setPointerCapture(e.pointerId);
                     }}
-                  />
-                  <circle
-                    cx={p.x}
-                    cy={p.y}
-                    r={hubRadius}
-                    fill="rgba(0,0,0,0.28)"
-                    stroke={color}
-                    strokeWidth={isActive ? hubStrokeActive : hubStroke}
-                    pointerEvents="none"
                   />
                   <circle cx={p.x} cy={p.y} r={centerDot} fill={color} pointerEvents="none" />
                 </g>
