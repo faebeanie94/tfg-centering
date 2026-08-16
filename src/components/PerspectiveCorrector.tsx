@@ -30,6 +30,17 @@ function screenPx(px: number, displayScale: number) {
   return px / Math.max(displayScale, 0.02);
 }
 
+function quadArea(q: QuadCorners): number {
+  const pts = [q.tl, q.tr, q.br, q.bl];
+  let sum = 0;
+  for (let i = 0; i < 4; i++) {
+    const a = pts[i];
+    const b = pts[(i + 1) % 4];
+    sum += a.x * b.y - b.x * a.y;
+  }
+  return Math.abs(sum) / 2;
+}
+
 function cornerAtPoint(corners: QuadCorners, x: number, y: number, hitRadius: number): CornerKey | null {
   let closest: CornerKey | null = null;
   let closestDist = hitRadius;
@@ -85,7 +96,14 @@ export function PerspectiveCorrector({
           const detected = await detectCardCornersFromImage(imageSrc, undefined, {
             cardAspect,
           });
-          if (!cancelled && detected) setCorners(detected.corners);
+          // Busy edge-to-edge card art (holo/full-art) can have internal
+          // contrast as strong as the true rim, so detection can confidently
+          // lock onto an inner artwork feature instead of the card's actual
+          // corners. A real card should fill at least as much of the frame
+          // as our conservative fallback guess — reject anything smaller.
+          if (!cancelled && detected && quadArea(detected.corners) >= quadArea(fallback) * 0.7) {
+            setCorners(detected.corners);
+          }
         } catch {
           // keep fallback corners
         }
