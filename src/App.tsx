@@ -60,7 +60,6 @@ export default function App() {
   const autoCropOptions = useMemo(
     () => ({
       cardAspect: cardAspect(activeCardFormat),
-      cardHeightMm: activeCardFormat.heightMm,
     }),
     [activeCardFormat],
   );
@@ -108,7 +107,6 @@ export default function App() {
       const format = resolveCardFormat(selection);
       const { result, corners } = await tryAutoCrop(dataUrl, hint, {
         cardAspect: cardAspect(format),
-        cardHeightMm: format.heightMm,
       });
       if (result) {
         setWorkingImage(result.imageSrc);

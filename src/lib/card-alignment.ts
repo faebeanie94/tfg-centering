@@ -1,5 +1,5 @@
 import type { DetectedCard } from './card-edge-detect';
-import { CARD_ASPECT, guideBoxForDistance, type ScanDistanceCm } from './card-edge-detect';
+import { CARD_ASPECT, guideBox as computeGuideBox } from './card-edge-detect';
 
 export interface CardAlignmentState {
   guide: DetectedCard;
@@ -34,8 +34,8 @@ function rectIou(
   return union > 0 ? inter / union : 0;
 }
 
-export function getGuideBox(distanceCm: ScanDistanceCm = 20): DetectedCard {
-  return guideBoxForDistance(distanceCm);
+export function getGuideBox(): DetectedCard {
+  return computeGuideBox();
 }
 
 export function evaluateCardAlignment(

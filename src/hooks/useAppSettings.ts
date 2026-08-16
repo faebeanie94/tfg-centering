@@ -17,8 +17,6 @@ export interface AppSettings {
   autoCaptureDelayMs: number;
   torchEnabled: boolean;
   macroMode: boolean;
-  /** Phone-to-card distance the scanner guide is calibrated for (cm). */
-  scanDistanceCm: 12 | 20 | 30;
   /** Bottom of frame blocked by phone stand (0.2 = small, 0.32 = typical, 0.45 = large). */
   scanObstructionBottom: number;
   /** Display-only negative view while aligning borders. */
@@ -51,7 +49,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   autoCaptureDelayMs: 1500,
   torchEnabled: false,
   macroMode: false,
-  scanDistanceCm: 20,
   scanObstructionBottom: 0.32,
   invertColors: false,
   cardFormat: DEFAULT_CARD_FORMAT_SETTING,
@@ -64,7 +61,6 @@ function loadSettings(): AppSettings {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_SETTINGS;
     const parsed = { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
-    if (![12, 20, 30].includes(parsed.scanDistanceCm)) parsed.scanDistanceCm = 20;
     if (typeof parsed.scanObstructionBottom !== 'number') {
       parsed.scanObstructionBottom = DEFAULT_SETTINGS.scanObstructionBottom;
     }

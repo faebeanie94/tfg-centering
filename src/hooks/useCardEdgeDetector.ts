@@ -1,26 +1,21 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import {
   CARD_ASPECT,
-  DEFAULT_CARD_HEIGHT_MM,
   defaultGuideAnchorY,
   detectCardFrame,
-  guideTemplateForDistance,
+  guideTemplate,
   positionGuideBox,
   shouldAcceptDetection,
   smoothBox,
   clipBoxToMaxBottom,
   type DetectedCard,
-  type ScanDistanceCm,
 } from '../lib/card-edge-detect';
 import { evaluateCardAlignment, type CardAlignmentState } from '../lib/card-alignment';
 
 interface CardEdgeDetectorOptions {
-  scanDistanceCm: ScanDistanceCm;
   obstructionBottom: number;
   /** Portrait width/height for the selected card format. */
   cardAspect?: number;
-  /** Physical card height (mm) for distance-based guide sizing. */
-  cardHeightMm?: number;
   /** Live preview width/height (matches the overlay). */
   previewAspect?: number;
 }
@@ -28,13 +23,7 @@ interface CardEdgeDetectorOptions {
 export function useCardEdgeDetector(
   active: boolean,
   videoRef: RefObject<HTMLVideoElement | null>,
-  {
-    scanDistanceCm,
-    obstructionBottom,
-    cardAspect = CARD_ASPECT,
-    cardHeightMm = DEFAULT_CARD_HEIGHT_MM,
-    previewAspect,
-  }: CardEdgeDetectorOptions,
+  { obstructionBottom, cardAspect = CARD_ASPECT, previewAspect }: CardEdgeDetectorOptions,
 ) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const smoothRef = useRef<DetectedCard | null>(null);
@@ -46,15 +35,8 @@ export function useCardEdgeDetector(
     previewAspect && previewAspect > 0.15 ? previewAspect : videoAspect && videoAspect > 0.15 ? videoAspect : 3 / 4;
 
   const template = useMemo(
-    () =>
-      guideTemplateForDistance(
-        scanDistanceCm,
-        cardAspect,
-        cardHeightMm,
-        frameAspect,
-        obstructionBottom,
-      ),
-    [scanDistanceCm, cardAspect, cardHeightMm, frameAspect, obstructionBottom],
+    () => guideTemplate(cardAspect, frameAspect, obstructionBottom),
+    [cardAspect, frameAspect, obstructionBottom],
   );
 
   const guideAnchor = useMemo(
@@ -81,7 +63,7 @@ export function useCardEdgeDetector(
     setGuideBox(guide);
     setDetectedBox(null);
     setAlignment(evaluateCardAlignment(null, 0, guide, cardAspect));
-  }, [scanDistanceCm, obstructionBottom, template, guideAnchor, cardAspect]);
+  }, [obstructionBottom, template, guideAnchor, cardAspect]);
 
   useEffect(() => {
     if (!active) {

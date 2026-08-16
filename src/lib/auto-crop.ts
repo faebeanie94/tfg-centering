@@ -1,7 +1,7 @@
 import {
   CARD_ASPECT,
   detectCardFrameFromImageData,
-  guideTemplateForDistance,
+  guideTemplate,
   type DetectedCard,
   type DetectSearchRegion,
 } from './card-edge-detect';
@@ -48,8 +48,6 @@ export interface AutoCropResult {
 export interface AutoCropOptions {
   /** Portrait width/height for the card format. */
   cardAspect?: number;
-  /** Physical card height (mm) for distance-based search templates. */
-  cardHeightMm?: number;
 }
 
 /**
@@ -158,7 +156,6 @@ function detectOuterRectFromElement(
   options: AutoCropOptions,
 ): Rect | null {
   const cardAspect = options.cardAspect ?? CARD_ASPECT;
-  const cardHeightMm = options.cardHeightMm ?? 88.9;
   const imgW = img.naturalWidth;
   const imgH = img.naturalHeight;
   const { w, h, scale } = analysisSize(imgW, imgH);
@@ -169,7 +166,7 @@ function detectOuterRectFromElement(
   if (!ctx) return null;
   ctx.drawImage(img, 0, 0, w, h);
   const { data } = ctx.getImageData(0, 0, w, h);
-  const seed = findBestSeedBox(data, w, h, hint, cardAspect, cardHeightMm);
+  const seed = findBestSeedBox(data, w, h, hint, cardAspect);
   if (!seed) return null;
 
   let corners = boxToCorners(seed.box, w, h, seed.rotationDeg);
@@ -262,11 +259,7 @@ function analysisSize(naturalWidth: number, naturalHeight: number): { w: number;
   };
 }
 
-function searchCandidates(
-  hint: CaptureDetectHint | undefined,
-  cardAspect: number,
-  cardHeightMm: number,
-): DetectSearchRegion[] {
+function searchCandidates(hint: CaptureDetectHint | undefined, cardAspect: number): DetectSearchRegion[] {
   const searches: DetectSearchRegion[] = [];
 
   const paddedFrac = 1 / (1 + 2 * OUTPUT_PADDING_RATIO);
@@ -295,8 +288,8 @@ function searchCandidates(
     });
   }
 
-  for (const distance of [20, 12, 30] as const) {
-    const template = guideTemplateForDistance(distance, cardAspect, cardHeightMm);
+  for (const heightFill of [0.52, 0.4, 0.3]) {
+    const template = guideTemplate(cardAspect, 1, 0, heightFill);
     searches.push({
       cx: 0.5,
       cy: 0.36,
@@ -687,7 +680,6 @@ function findBestSeedBox(
   h: number,
   hint: CaptureDetectHint | undefined,
   cardAspect: number,
-  cardHeightMm: number,
 ): { box: DetectedCard; rotationDeg: number; score: number } | null {
   let bestBox: DetectedCard | null = null;
   let bestRot = 0;
@@ -728,7 +720,7 @@ function findBestSeedBox(
     }
   }
 
-  for (const search of [...chromaSeeds, ...searchCandidates(hint, cardAspect, cardHeightMm)]) {
+  for (const search of [...chromaSeeds, ...searchCandidates(hint, cardAspect)]) {
     const found = detectCardFrameFromImageData(data, w, h, search);
     if (!found) continue;
 
@@ -784,7 +776,6 @@ export async function detectCardCornersFromImage(
   options: AutoCropOptions = {},
 ): Promise<CornerDetection | null> {
   const cardAspect = options.cardAspect ?? CARD_ASPECT;
-  const cardHeightMm = options.cardHeightMm ?? 88.9;
   const img = await loadImage(imageSrc);
   const { naturalWidth: imgW, naturalHeight: imgH } = img;
 
@@ -798,7 +789,7 @@ export async function detectCardCornersFromImage(
   ctx.drawImage(img, 0, 0, w, h);
   const { data } = ctx.getImageData(0, 0, w, h);
 
-  const seed = findBestSeedBox(data, w, h, hint, cardAspect, cardHeightMm);
+  const seed = findBestSeedBox(data, w, h, hint, cardAspect);
   // Also try the live hint box directly as a seed region.
   const seeds: DetectedCard[] = [];
   if (seed) seeds.push(seed.box);

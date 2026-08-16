@@ -959,31 +959,16 @@ export function detectCardBox(video: HTMLVideoElement, canvas: HTMLCanvasElement
   return enforceCardRect(raw, CARD_ASPECT, w / h);
 }
 
-export const SCAN_DISTANCE_OPTIONS = [12, 20, 30] as const;
-export type ScanDistanceCm = (typeof SCAN_DISTANCE_OPTIONS)[number];
+/** Card silhouette height as a fraction of the full preview — just "big enough to frame comfortably". */
+const GUIDE_HEIGHT_FILL = 0.55;
 
-/** Card silhouette height as a fraction of the full preview (20 cm ≈ a poker card at arm length). */
-const GUIDE_HEIGHT_FILL: Record<ScanDistanceCm, number> = {
-  12: 0.52,
-  20: 0.4,
-  30: 0.3,
-};
-
-/** Guide frame sized for a card at the given phone-to-card distance (cm). */
-export function guideBoxForDistance(
-  distanceCm: ScanDistanceCm = 20,
+/** Guide frame sized to comfortably frame a card, centred in the unobstructed preview. */
+export function guideBox(
   cardAspectRatio: number = CARD_ASPECT,
-  cardHeightMm: number = DEFAULT_CARD_HEIGHT_MM,
   frameAspect: number = 1,
   obstructionBottom = 0,
 ): DetectedCard {
-  const template = guideTemplateForDistance(
-    distanceCm,
-    cardAspectRatio,
-    cardHeightMm,
-    frameAspect,
-    obstructionBottom,
-  );
+  const template = guideTemplate(cardAspectRatio, frameAspect, obstructionBottom);
   return positionGuideBox(template, 0.5, defaultGuideAnchorY(template.height, obstructionBottom), {
     obstructionBottom,
   });
@@ -993,17 +978,21 @@ export function guideBoxForDistance(
  * Dashed guide size in normalised video coordinates (0–1).
  * `frameAspect` is videoWidth/videoHeight so a poker card is not squeezed as if
  * the preview were square (phone cameras are 4:3 / 16:9).
+ *
+ * This is not tied to a physical phone-to-card distance — phone camera field of
+ * view varies too much by device for a fixed cm-based guess to line up with the
+ * live-detected card. It's just a fixed, generous fraction of the frame; the user
+ * moves the phone until the real card (orange) fills it.
  */
-export function guideTemplateForDistance(
-  distanceCm: ScanDistanceCm = 20,
+export function guideTemplate(
   cardAspectRatio: number = CARD_ASPECT,
-  _cardHeightMm: number = DEFAULT_CARD_HEIGHT_MM,
   frameAspect: number = 1,
   obstructionBottom = 0,
+  heightFill: number = GUIDE_HEIGHT_FILL,
 ): { width: number; height: number } {
   const fa = frameAspect > 0.15 && Number.isFinite(frameAspect) ? frameAspect : 1;
   const availableH = Math.max(0.38, 1 - Math.max(0, obstructionBottom) - 0.02);
-  let height = Math.min(availableH, GUIDE_HEIGHT_FILL[distanceCm] ?? 0.4);
+  let height = Math.min(availableH, heightFill);
   let width = height * (cardAspectRatio / fa);
   if (width > 0.92) {
     width = 0.92;
@@ -1056,7 +1045,7 @@ export function clipBoxToMaxBottom(box: DetectedCard, maxBottom: number): Detect
 }
 
 export function defaultGuideBox(): DetectedCard {
-  return guideBoxForDistance(20);
+  return guideBox();
 }
 
 export function shouldAcceptDetection(prev: DetectedCard | null, next: DetectedCard): boolean {

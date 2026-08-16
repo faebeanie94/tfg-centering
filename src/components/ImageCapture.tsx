@@ -78,10 +78,8 @@ export function ImageCapture({
     });
   }, [settings.cardFormat, settings.customWidthMm, settings.customHeightMm]);
   const { guideBox, detectedBox, alignment } = useCardEdgeDetector(cameraActive, videoRef, {
-    scanDistanceCm: settings.scanDistanceCm,
     obstructionBottom: settings.scanObstructionBottom,
     cardAspect: cardAspect(scanFormat),
-    cardHeightMm: scanFormat.heightMm,
     previewAspect: previewSize ? previewSize.width / previewSize.height : undefined,
   });
   const detectedBoxRef = useRef(detectedBox);
