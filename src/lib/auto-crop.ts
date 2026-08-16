@@ -51,10 +51,11 @@ export interface AutoCropOptions {
 }
 
 /**
- * Minimum confidence required to skip Perspective Fix and open the editor.
- * Kept high on purpose — a bad auto-crop is worse than one tap on Apply.
+ * Confidence below this shows the "worth a check" note in the editor.
+ * Auto-crop itself always applies regardless — this only flags when it's
+ * worth a manual look via Perspective Fix, not whether cropping happens.
  */
-export const AUTO_CROP_CONFIDENCE = 0.82;
+export const AUTO_CROP_CONFIDENCE = 0.775;
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
