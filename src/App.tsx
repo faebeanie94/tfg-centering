@@ -12,7 +12,7 @@ import { SettingsPanel } from './components/SettingsPanel';
 import { CardSizePickerScreen, selectionFromSettings } from './components/CardSizeFields';
 import { useSavedCards } from './hooks/useSavedCards';
 import type { SavedCardRecord } from './lib/saved-cards';
-import { tryAutoCrop, defaultRectsAfterCrop, type CaptureDetectHint } from './lib/auto-crop';
+import { tryAutoCrop, rectsAfterCropWithInnerSeed, type CaptureDetectHint } from './lib/auto-crop';
 import type { QuadCorners } from './lib/perspective';
 import {
   cardAspect,
@@ -160,7 +160,7 @@ export default function App() {
         img.onerror = reject;
         img.src = corrected;
       });
-      const rects = defaultRectsAfterCrop(img.naturalWidth, img.naturalHeight);
+      const rects = rectsAfterCropWithInnerSeed(img);
       setEditorRects({ outer: rects.outer, inner: rects.inner });
     } catch {
       setEditorRects({});

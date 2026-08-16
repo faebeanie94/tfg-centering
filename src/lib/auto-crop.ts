@@ -7,6 +7,7 @@ import {
 } from './card-edge-detect';
 import type { Rect } from './centering';
 import { defaultInnerRect } from './centering';
+import { seedInnerFromImage } from './inner-artwork';
 import {
   type Point,
   type QuadCorners,
@@ -118,6 +119,17 @@ export function defaultRectsAfterCrop(imgWidth: number, imgHeight: number): {
     height: cardHeight,
   };
   return { outer, inner: defaultInnerRect(outer) };
+}
+
+/** Padded outer box plus yellow-handle seed from the inner-artwork detector. */
+export function rectsAfterCropWithInnerSeed(image: HTMLImageElement): { outer: Rect; inner: Rect } {
+  const rects = defaultRectsAfterCrop(image.naturalWidth, image.naturalHeight);
+  try {
+    const seeded = seedInnerFromImage(image, rects.outer);
+    return { outer: rects.outer, inner: seeded.inner };
+  } catch {
+    return rects;
+  }
 }
 
 function analysisSize(naturalWidth: number, naturalHeight: number): { w: number; h: number; scale: number } {
@@ -727,7 +739,7 @@ export async function tryAutoCrop(
   try {
     const corrected = await perspectiveCorrect(imageSrc, detected.corners, cardAspect);
     const img = await loadImage(corrected);
-    const rects = defaultRectsAfterCrop(img.naturalWidth, img.naturalHeight);
+    const rects = rectsAfterCropWithInnerSeed(img);
     return {
       result: {
         imageSrc: corrected,
