@@ -1,3 +1,5 @@
+import { CardAutoCapture, OVERLAY_SPACE } from '../lib/cardCapture';
+
 export type Point = {
   x: number;
   y: number;
@@ -13,6 +15,9 @@ export type CardCorners = [
 type UpdateDetectionArgs = {
   corners: CardCorners;
   confidence: number;
+  /** Mean Laplacian sharpness from the RAF analysis canvas (omit in unit tests). */
+  blur?: number;
+  imageSize?: { width: number; height: number };
 };
 
 type CardDetectorOptions = {
@@ -24,22 +29,21 @@ export class CardDetector {
   confidence = 0;
 
   private readonly captureConfidence = 0.9;
-  private readonly requiredStableFrames = 8;
-  private readonly maxCornerMovement = 8;
-
-  private hasCaptured = false;
-  private stableFrames = 0;
-  private previousCorners: CardCorners | null = null;
-
-  private onAutoCapture?: () => void | Promise<void>;
+  private readonly auto = new CardAutoCapture({
+    minimumConfidence: 0.9,
+    requiredStableFrames: 8,
+    maximumCornerMovement: 8,
+    minimumSharpness: 18,
+    captureCooldown: 1500,
+  });
 
   constructor(options: CardDetectorOptions = {}) {
-    this.onAutoCapture = options.onAutoCapture;
+    this.auto.onCapture = () => options.onAutoCapture?.();
   }
 
-  updateDetection({ corners, confidence }: UpdateDetectionArgs): void {
+  updateDetection({ corners, confidence, blur, imageSize }: UpdateDetectionArgs): void {
     if (!corners || corners.length !== 4) {
-      this.resetStability();
+      this.auto.resetStability();
       return;
     }
 
@@ -51,78 +55,45 @@ export class CardDetector {
       { ...corners[2] },
       { ...corners[3] },
     ];
-
     this.confidence = cleanConfidence;
 
-    if (this.hasCaptured) {
-      return;
-    }
-
-    const stable = this.isStable(corners);
-
-    if (cleanConfidence >= this.captureConfidence && stable) {
-      this.stableFrames++;
-
-      if (this.stableFrames >= this.requiredStableFrames) {
-        this.hasCaptured = true;
-        void this.onAutoCapture?.();
-      }
-    } else {
-      this.stableFrames = Math.max(0, this.stableFrames - 2);
-    }
-
-    this.previousCorners = [
-      { ...corners[0] },
-      { ...corners[1] },
-      { ...corners[2] },
-      { ...corners[3] },
-    ];
-  }
-
-  private isStable(corners: CardCorners): boolean {
-    if (!this.previousCorners || this.previousCorners.length !== 4) {
-      return true;
-    }
-
-    let totalMovement = 0;
-    for (let i = 0; i < 4; i++) {
-      const dx = corners[i].x - this.previousCorners[i].x;
-      const dy = corners[i].y - this.previousCorners[i].y;
-      totalMovement += Math.sqrt(dx * dx + dy * dy);
-    }
-
-    return totalMovement / 4 <= this.maxCornerMovement;
+    this.auto.processDetection({
+      corners: this.detectedCorners,
+      confidence: cleanConfidence,
+      imageSize: imageSize ?? { width: OVERLAY_SPACE, height: OVERLAY_SPACE },
+      blur,
+    });
   }
 
   resetAutoCapture(): void {
-    this.hasCaptured = false;
-    this.stableFrames = 0;
-    this.previousCorners = null;
-  }
-
-  private resetStability(): void {
-    this.stableFrames = 0;
-    this.previousCorners = null;
+    this.auto.reset();
   }
 
   get captureProgress(): number {
-    return Math.max(0, Math.min(1, this.stableFrames / this.requiredStableFrames));
+    return this.auto.captureProgress;
   }
 
   get isReadyToCapture(): boolean {
-    return this.confidence >= this.captureConfidence && this.stableFrames >= this.requiredStableFrames;
+    return (
+      this.confidence >= this.captureConfidence &&
+      (this.auto.stableFrames >= this.auto.requiredStableFrames || this.auto.isCapturing || this.auto.isLocked)
+    );
   }
 
   get stableFrameCount(): number {
-    return this.stableFrames;
+    return this.auto.stableFrames;
   }
 
   get requiredFrames(): number {
-    return this.requiredStableFrames;
+    return this.auto.requiredStableFrames;
+  }
+
+  get blurScore(): number {
+    return this.auto.blurScore;
   }
 
   setAutoCaptureCallback(callback: () => void | Promise<void>): void {
-    this.onAutoCapture = callback;
+    this.auto.onCapture = callback;
   }
 }
 
