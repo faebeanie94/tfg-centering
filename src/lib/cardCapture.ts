@@ -26,7 +26,7 @@ const DEFAULT_OPTIONS: Required<CardCaptureOptions> = {
   minimumCardWidthRatio: 0.25,
   minimumCardHeightRatio: 0.15,
   minimumSharpness: 18,
-  requiredStableFrames: 8,
+  requiredStableFrames: 3,
   maximumCornerMovement: 8,
   captureCooldown: 1500,
 };

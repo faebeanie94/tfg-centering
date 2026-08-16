@@ -1,5 +1,5 @@
 /**
- * CardDetector: 90% confidence, size/perspective/sharpness gates, 8-frame auto-capture.
+ * CardDetector: 90% confidence, size/perspective/sharpness gates, 3-frame auto-capture.
  * Run: node scripts/test-card-tracker.mjs
  */
 import { spawnSync } from 'node:child_process';
@@ -45,36 +45,32 @@ detector.updateDetection({ corners: card(), confidence: 0.92 });
 assert(detector.detectedCorners?.length === 4, 'first frame keeps corners');
 assert(detector.stableFrameCount === 1, 'first good frame counts toward the streak');
 
-for (let i = 0; i < 7; i++) {
+for (let i = 0; i < 2; i++) {
   detector.updateDetection({ corners: card(0.4, 0.2), confidence: 0.93 });
 }
-assert(detector.isReadyToCapture, 'eight steady high-confidence frames are ready');
+assert(detector.isReadyToCapture, 'three steady high-confidence frames are ready');
 assert(captures === 1, 'auto-capture fires once');
 
 detector.updateDetection({ corners: card(0.3, 0.1), confidence: 0.94 });
 assert(captures === 1, 'further stable frames do not recapture');
 
 detector.resetAutoCapture();
-for (let i = 0; i < 8; i++) {
+for (let i = 0; i < 3; i++) {
   detector.updateDetection({ corners: card(0.2, 0.1), confidence: 0.94 });
 }
 assert(captures === 2, 'resetAutoCapture permits another shot');
 
 const jumpy = new CardDetector();
 jumpy.updateDetection({ corners: card(), confidence: 0.95 });
-for (let i = 0; i < 4; i++) {
-  jumpy.updateDetection({ corners: card(), confidence: 0.95 });
-}
-assert(jumpy.stableFrameCount >= 3, 'steady frames accumulate');
+jumpy.updateDetection({ corners: card(), confidence: 0.95 });
+assert(jumpy.stableFrameCount >= 2, 'steady frames accumulate');
 jumpy.updateDetection({ corners: card(80, 40), confidence: 0.95 });
-assert(jumpy.stableFrameCount <= 3, 'large movement reduces the streak');
+assert(jumpy.stableFrameCount <= 1, 'large movement reduces the streak');
 
 const lost = new CardDetector();
 lost.updateDetection({ corners: card(), confidence: 0.9 });
-for (let i = 0; i < 5; i++) {
-  lost.updateDetection({ corners: card(), confidence: 0.9 });
-}
-assert(lost.stableFrameCount >= 4, 'pre-miss streak');
+lost.updateDetection({ corners: card(), confidence: 0.9 });
+assert(lost.stableFrameCount >= 2, 'pre-miss streak');
 lost.updateDetection({ corners: [] as unknown as CardCorners, confidence: 0 });
 assert(lost.detectedCorners?.length === 4, 'a miss keeps overlay corners');
 assert(lost.stableFrameCount === 0, 'a miss resets the stable streak');
