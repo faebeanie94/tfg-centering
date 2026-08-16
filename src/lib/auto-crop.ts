@@ -24,6 +24,8 @@ export interface CaptureDetectHint {
    * A live box alone is not enough — tilted desk shots still get an AABB.
    */
   liveReady?: boolean;
+  /** True when the capture was already perspective-flattened by CardImageProcessor. */
+  preCorrected?: boolean;
 }
 
 export interface AutoCropResult {

@@ -111,6 +111,25 @@ export default function App() {
     async (dataUrl: string, hint: CaptureDetectHint | undefined, selection: CardSizeSelection) => {
       setSessionCardSize(selection);
       setPhase('autocrop');
+      if (hint?.preCorrected) {
+        try {
+          const img = new Image();
+          await new Promise<void>((resolve, reject) => {
+            img.onload = () => resolve();
+            img.onerror = reject;
+            img.src = dataUrl;
+          });
+          const rects = defaultRectsAfterCrop(img.naturalWidth, img.naturalHeight);
+          setWorkingImage(dataUrl);
+          setEditorRects({ outer: rects.outer, inner: rects.inner });
+          setPhase('editor');
+        } catch {
+          setWorkingImage(dataUrl);
+          setEditorRects({});
+          setPhase('editor');
+        }
+        return;
+      }
       const format = resolveCardFormat(selection);
       const { result, corners, confidence } = await tryAutoCrop(dataUrl, hint, {
         cardAspect: cardAspect(format),
