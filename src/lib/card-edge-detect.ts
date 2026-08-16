@@ -950,16 +950,9 @@ export function detectCardBox(video: HTMLVideoElement, canvas: HTMLCanvasElement
 export const SCAN_DISTANCE_OPTIONS = [12, 20, 30] as const;
 export type ScanDistanceCm = (typeof SCAN_DISTANCE_OPTIONS)[number];
 
-/** Fraction of preview *width* a poker card should fill (height follows aspect). */
-const GUIDE_WIDTH_FILL: Record<ScanDistanceCm, number> = {
-  12: 0.9,
-  20: 0.84,
-  30: 0.72,
-};
-
-/** Phone-on-box: card silhouette as a fraction of *full* preview height (not the whole clear band). */
-const GUIDE_HEIGHT_FILL_STAND: Record<ScanDistanceCm, number> = {
-  12: 0.5,
+/** Card silhouette height as a fraction of the full preview (20 cm ≈ a poker card at arm length). */
+const GUIDE_HEIGHT_FILL: Record<ScanDistanceCm, number> = {
+  12: 0.52,
   20: 0.4,
   30: 0.3,
 };
@@ -997,24 +990,14 @@ export function guideTemplateForDistance(
   obstructionBottom = 0,
 ): { width: number; height: number } {
   const fa = frameAspect > 0.15 && Number.isFinite(frameAspect) ? frameAspect : 1;
-  const stand = obstructionBottom > 0.05;
-  const availableH = Math.max(stand ? 0.4 : 0.55, 1 - Math.max(0, obstructionBottom) - 0.02);
-  let width: number;
-  let height: number;
-  if (stand) {
-    // Height-first so a 20 cm box-stand shot is a card, not 3/4 of the screen.
-    height = Math.min(availableH, GUIDE_HEIGHT_FILL_STAND[distanceCm] ?? 0.4);
-    width = height * (cardAspectRatio / fa);
-    if (width > 0.92) {
-      width = 0.92;
-      height = width * (fa / cardAspectRatio);
-    }
-  } else {
-    const maxH = Math.min(availableH, 0.88);
-    width = Math.min(0.94, GUIDE_WIDTH_FILL[distanceCm] ?? 0.84);
+  const availableH = Math.max(0.38, 1 - Math.max(0, obstructionBottom) - 0.02);
+  let height = Math.min(availableH, GUIDE_HEIGHT_FILL[distanceCm] ?? 0.4);
+  let width = height * (cardAspectRatio / fa);
+  if (width > 0.92) {
+    width = 0.92;
     height = width * (fa / cardAspectRatio);
-    if (height > maxH) {
-      height = maxH;
+    if (height > availableH) {
+      height = availableH;
       width = height * (cardAspectRatio / fa);
     }
   }
