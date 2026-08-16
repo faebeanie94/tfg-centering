@@ -109,6 +109,7 @@ export function useCardEdgeDetector(
             expectedWidth: template.width,
             expectedHeight: template.height,
             cardAspect,
+            maxBottom: 1 - obstructionBottom,
           };
           const found = detectCardFrame(video, canvas, search);
 
