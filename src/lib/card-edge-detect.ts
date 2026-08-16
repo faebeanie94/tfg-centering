@@ -200,7 +200,7 @@ function estimateBackgroundLum(
 }
 
 /** Build a blurred luminance plane so holographic glare spikes don't fake edges. */
-function buildBlurredLuma(data: Uint8ClampedArray, w: number, h: number): Float32Array {
+export function buildBlurredLuma(data: Uint8ClampedArray, w: number, h: number): Float32Array {
   const raw = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) raw[i] = lum(data, i);
 
