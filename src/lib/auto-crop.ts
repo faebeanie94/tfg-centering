@@ -18,6 +18,11 @@ export interface CaptureDetectHint {
   /** Normalised axis-aligned box from the live scanner (0–1). */
   box?: DetectedCard | null;
   rotationDeg?: number;
+  /**
+   * True when the live scanner considered the card ready (in guide, level).
+   * A live box alone is not enough — tilted desk shots still get an AABB.
+   */
+  liveReady?: boolean;
 }
 
 export interface CornerDetection {
@@ -666,8 +671,8 @@ export function isNearlyFrontal(q: QuadCorners): boolean {
  * Always returns best-effort corners so Perspective Fix can be pre-seeded.
  *
  * Auto-apply is intentionally conservative: a bad crop is worse than one tap
- * on Apply. We only skip Perspective Fix when the still looks near-frontal
- * (or the live scanner already had a lock on the card).
+ * on Apply. Live scanner locks still produce axis-aligned boxes, so a tilted
+ * card with a "detection" must NOT auto-apply — require a near-frontal quad.
  */
 export async function tryAutoCrop(
   imageSrc: string,
@@ -678,10 +683,11 @@ export async function tryAutoCrop(
     return { result: null, corners: null, confidence: 0 };
   }
 
-  const hasLiveLock = !!(hint?.box && hint.box.width > 0.1 && hint.box.height > 0.1);
+  const liveRotationOk = Math.abs(hint?.rotationDeg ?? 0) <= 8;
   const canAutoApply =
     detected.confidence >= AUTO_CROP_CONFIDENCE &&
-    (hasLiveLock || isNearlyFrontal(detected.corners));
+    isNearlyFrontal(detected.corners) &&
+    liveRotationOk;
 
   if (!canAutoApply) {
     return { result: null, corners: detected.corners, confidence: detected.confidence };

@@ -100,6 +100,8 @@ export function ImageCapture({
       onCapture(canvas.toDataURL('image/jpeg', 0.95), {
         box: liveBox,
         rotationDeg: alignmentRef.current.rotationDeg,
+        // fitsGuide already requires card level + in-guide; AABB alone is unsafe for tilt.
+        liveReady: alignmentRef.current.fitsGuide,
       });
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
