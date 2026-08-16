@@ -6,36 +6,20 @@ import {
   detectCardFrame,
   guideTemplateForDistance,
   positionGuideBox,
+  shouldAcceptDetection,
+  smoothBox,
   type DetectedCard,
   type ScanDistanceCm,
 } from '../lib/card-edge-detect';
 import { evaluateCardAlignment, type CardAlignmentState } from '../lib/card-alignment';
-import { boxToCorners } from '../lib/auto-crop';
-import {
-  CardDetector,
-  cornersToOverlaySpace,
-  overlayCornersToBox,
-  type CardCorners,
-} from '../components/CardDetector';
-import { overlayCornersToImagePixels } from '../utils/cardImageProcessor';
-import { calculateBlurScore, evaluateCardQuality, type CardQuality } from '../card/LiveCardQuality';
-
-function clearLiveLock(detector: CardDetector | null) {
-  detector?.resetAutoCapture();
-  if (detector) {
-    detector.detectedCorners = null;
-    detector.confidence = 0;
-  }
-}
 
 interface CardEdgeDetectorOptions {
   scanDistanceCm: ScanDistanceCm;
   obstructionBottom: number;
+  /** Portrait width/height for the selected card format. */
   cardAspect?: number;
+  /** Physical card height (mm) for distance-based guide sizing. */
   cardHeightMm?: number;
-  onAutoCapture?: () => void;
-  autoCaptureEnabled?: boolean;
-  canAutoCapture?: () => boolean;
 }
 
 export function useCardEdgeDetector(
@@ -46,32 +30,12 @@ export function useCardEdgeDetector(
     obstructionBottom,
     cardAspect = CARD_ASPECT,
     cardHeightMm = DEFAULT_CARD_HEIGHT_MM,
-    onAutoCapture,
-    autoCaptureEnabled = false,
-    canAutoCapture,
   }: CardEdgeDetectorOptions,
 ) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const qualityCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const onAutoCaptureRef = useRef(onAutoCapture);
-  onAutoCaptureRef.current = onAutoCapture;
-  const autoEnabledRef = useRef(autoCaptureEnabled);
-  autoEnabledRef.current = autoCaptureEnabled;
-  const canAutoCaptureRef = useRef(canAutoCapture);
-  canAutoCaptureRef.current = canAutoCapture;
-
-  const detectorRef = useRef<CardDetector | null>(null);
-  if (!detectorRef.current) {
-    detectorRef.current = new CardDetector({
-      onAutoCapture: () => {
-        if (!autoEnabledRef.current || canAutoCaptureRef.current?.() === false) {
-          detectorRef.current?.resetAutoCapture();
-          return;
-        }
-        onAutoCaptureRef.current?.();
-      },
-    });
-  }
+  const smoothRef = useRef<DetectedCard | null>(null);
+  const rotationRef = useRef(0);
+  const missFramesRef = useRef(0);
 
   const template = useMemo(
     () => guideTemplateForDistance(scanDistanceCm, cardAspect, cardHeightMm),
@@ -93,66 +57,37 @@ export function useCardEdgeDetector(
   const [alignment, setAlignment] = useState<CardAlignmentState>(() =>
     evaluateCardAlignment(null, 0, guideBox, cardAspect),
   );
-  const [detectorTick, setDetectorTick] = useState(0);
-  const [liveQuality, setLiveQuality] = useState<CardQuality | null>(null);
 
   useEffect(() => {
-    clearLiveLock(detectorRef.current);
+    smoothRef.current = null;
+    rotationRef.current = 0;
+    missFramesRef.current = 0;
     const guide = positionGuideBox(template, guideAnchor.x, guideAnchor.y, { obstructionBottom });
     setGuideBox(guide);
     setDetectedBox(null);
-    setLiveQuality(null);
     setAlignment(evaluateCardAlignment(null, 0, guide, cardAspect));
-    setDetectorTick((n) => n + 1);
   }, [scanDistanceCm, obstructionBottom, template, guideAnchor, cardAspect]);
 
   useEffect(() => {
     if (!active) {
-      clearLiveLock(detectorRef.current);
+      smoothRef.current = null;
+      rotationRef.current = 0;
+      missFramesRef.current = 0;
       const guide = positionGuideBox(template, guideAnchor.x, guideAnchor.y, { obstructionBottom });
       setGuideBox(guide);
       setDetectedBox(null);
-      setLiveQuality(null);
       setAlignment(evaluateCardAlignment(null, 0, guide, cardAspect));
-      setDetectorTick((n) => n + 1);
       return;
     }
 
     if (!canvasRef.current) canvasRef.current = document.createElement('canvas');
-    if (!qualityCanvasRef.current) qualityCanvasRef.current = document.createElement('canvas');
     let frame = 0;
     let raf = 0;
-
-    function sampleLiveBlur(video: HTMLVideoElement, videoCorners?: { x: number; y: number }[]): number {
-      const qualityCanvas = qualityCanvasRef.current;
-      if (!qualityCanvas || video.videoWidth < 2 || video.videoHeight < 2) return 0;
-      qualityCanvas.width = 320;
-      qualityCanvas.height = Math.max(3, Math.round((320 * video.videoHeight) / video.videoWidth));
-      const qctx = qualityCanvas.getContext('2d', { willReadFrequently: true });
-      if (!qctx) return 0;
-      qctx.drawImage(video, 0, 0, qualityCanvas.width, qualityCanvas.height);
-      if (videoCorners && videoCorners.length === 4) {
-        const sx = qualityCanvas.width / video.videoWidth;
-        const sy = qualityCanvas.height / video.videoHeight;
-        const xs = videoCorners.map((p) => p.x * sx);
-        const ys = videoCorners.map((p) => p.y * sy);
-        const left = Math.min(...xs);
-        const top = Math.min(...ys);
-        return calculateBlurScore(qualityCanvas, {
-          x: left,
-          y: top,
-          width: Math.max(...xs) - left,
-          height: Math.max(...ys) - top,
-        });
-      }
-      return calculateBlurScore(qualityCanvas);
-    }
 
     function tick() {
       const video = videoRef.current;
       const canvas = canvasRef.current;
-      const detector = detectorRef.current;
-      if (video && canvas && detector && video.readyState >= 2) {
+      if (video && canvas && video.readyState >= 2) {
         if (frame % 3 === 0) {
           const guide = positionGuideBox(template, guideAnchor.x, guideAnchor.y, { obstructionBottom });
           const search = {
@@ -163,54 +98,32 @@ export function useCardEdgeDetector(
             cardAspect,
           };
           const found = detectCardFrame(video, canvas, search);
-          const frameWidth = canvas.width || 240;
-          const frameHeight = canvas.height || Math.round(frameWidth * 1.77);
 
           if (found) {
-            const quad = boxToCorners(found.box, frameWidth, frameHeight, found.rotationDeg);
-            const preview = evaluateCardAlignment(found.box, found.rotationDeg, guide, cardAspect);
-            const confidence = preview.fitsGuide
-              ? Math.max(found.score ?? 0.5, 0.9)
-              : (found.score ?? 0.4);
-            const overlayCorners = cornersToOverlaySpace(
-              [quad.tl, quad.tr, quad.br, quad.bl],
-              frameWidth,
-              frameHeight,
-            );
-            const videoCorners = overlayCornersToImagePixels(
-              overlayCorners,
-              video.videoWidth,
-              video.videoHeight,
-            );
-            const blur = sampleLiveBlur(video, videoCorners);
-            const quality = evaluateCardQuality(videoCorners, video.videoWidth, video.videoHeight, blur);
-
-            detector.updateDetection({
-              corners: overlayCorners,
-              confidence,
-              allowCapture: quality.valid,
-            });
-            setLiveQuality(quality);
+            const candidate = found.box;
+            if (shouldAcceptDetection(smoothRef.current, candidate)) {
+              missFramesRef.current = 0;
+              smoothRef.current = smoothBox(smoothRef.current, candidate, 0.2, cardAspect);
+              rotationRef.current = rotationRef.current * 0.7 + found.rotationDeg * 0.3;
+            } else {
+              missFramesRef.current = 0;
+            }
+            const box = smoothRef.current;
+            if (box) {
+              const next = evaluateCardAlignment(box, rotationRef.current, guide, cardAspect);
+              setGuideBox(guide);
+              setDetectedBox({ ...box });
+              setAlignment(next);
+            }
           } else {
-            detector.updateDetection({
-              corners: [] as unknown as CardCorners,
-              confidence: 0,
-            });
-            setLiveQuality(
-              evaluateCardQuality([], video.videoWidth, video.videoHeight, sampleLiveBlur(video)),
-            );
+            missFramesRef.current++;
+            setGuideBox(guide);
+            if (missFramesRef.current > 15) {
+              smoothRef.current = null;
+              setDetectedBox(null);
+              setAlignment(evaluateCardAlignment(null, 0, guide, cardAspect));
+            }
           }
-
-          const tracked = detector.detectedCorners
-            ? overlayCornersToBox(detector.detectedCorners)
-            : null;
-          const box = tracked ?? (found ? found.box : null);
-          const rotation = found?.rotationDeg ?? 0;
-
-          setGuideBox(guide);
-          setDetectedBox(box);
-          setAlignment(evaluateCardAlignment(box, rotation, guide, cardAspect));
-          setDetectorTick((n) => n + 1);
         }
         frame++;
       }
@@ -226,8 +139,5 @@ export function useCardEdgeDetector(
     detectedBox,
     alignment,
     detected: detectedBox !== null,
-    detector: detectorRef.current,
-    detectorTick,
-    liveQuality,
   };
 }
