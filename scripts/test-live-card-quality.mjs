@@ -48,9 +48,12 @@ const tiny = evaluateCardQuality(
 assert(!tiny.valid, 'tiny quad fails');
 assert(tiny.message === 'Move closer to the card', tiny.message);
 
+const unmeasured = evaluateCardQuality(fullCard, video.width, video.height, 0);
+assert(unmeasured.valid, 'unmeasured sharpness (0) must not block a well-sized card');
+
 const soft = evaluateCardQuality(fullCard, video.width, video.height, 4);
 assert(!soft.valid, 'soft frame fails');
-assert(soft.message === 'Hold still', soft.message);
+assert(soft.message === 'Image looks soft', soft.message);
 
 const clipped = evaluateCardQuality(
   [

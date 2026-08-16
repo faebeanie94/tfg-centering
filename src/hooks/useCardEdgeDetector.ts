@@ -123,7 +123,7 @@ export function useCardEdgeDetector(
     let frame = 0;
     let raf = 0;
 
-    function sampleLiveBlur(video: HTMLVideoElement): number {
+    function sampleLiveBlur(video: HTMLVideoElement, videoCorners?: { x: number; y: number }[]): number {
       const qualityCanvas = qualityCanvasRef.current;
       if (!qualityCanvas || video.videoWidth < 2 || video.videoHeight < 2) return 0;
       qualityCanvas.width = 320;
@@ -131,6 +131,20 @@ export function useCardEdgeDetector(
       const qctx = qualityCanvas.getContext('2d', { willReadFrequently: true });
       if (!qctx) return 0;
       qctx.drawImage(video, 0, 0, qualityCanvas.width, qualityCanvas.height);
+      if (videoCorners && videoCorners.length === 4) {
+        const sx = qualityCanvas.width / video.videoWidth;
+        const sy = qualityCanvas.height / video.videoHeight;
+        const xs = videoCorners.map((p) => p.x * sx);
+        const ys = videoCorners.map((p) => p.y * sy);
+        const left = Math.min(...xs);
+        const top = Math.min(...ys);
+        return calculateBlurScore(qualityCanvas, {
+          x: left,
+          y: top,
+          width: Math.max(...xs) - left,
+          height: Math.max(...ys) - top,
+        });
+      }
       return calculateBlurScore(qualityCanvas);
     }
 
@@ -151,7 +165,6 @@ export function useCardEdgeDetector(
           const found = detectCardFrame(video, canvas, search);
           const frameWidth = canvas.width || 240;
           const frameHeight = canvas.height || Math.round(frameWidth * 1.77);
-          const blur = sampleLiveBlur(video);
 
           if (found) {
             const quad = boxToCorners(found.box, frameWidth, frameHeight, found.rotationDeg);
@@ -169,12 +182,12 @@ export function useCardEdgeDetector(
               video.videoWidth,
               video.videoHeight,
             );
+            const blur = sampleLiveBlur(video, videoCorners);
             const quality = evaluateCardQuality(videoCorners, video.videoWidth, video.videoHeight, blur);
 
             detector.updateDetection({
               corners: overlayCorners,
               confidence,
-              blur,
               allowCapture: quality.valid,
             });
             setLiveQuality(quality);
@@ -184,7 +197,7 @@ export function useCardEdgeDetector(
               confidence: 0,
             });
             setLiveQuality(
-              evaluateCardQuality([], video.videoWidth, video.videoHeight, blur),
+              evaluateCardQuality([], video.videoWidth, video.videoHeight, sampleLiveBlur(video)),
             );
           }
 

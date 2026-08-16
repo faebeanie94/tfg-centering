@@ -93,9 +93,9 @@ assert(tiny.stableFrameCount === 0, 'undersized quads never start the stable str
 
 const blurry = new CardDetector({ onAutoCapture: () => { captures++; } });
 for (let i = 0; i < 10; i++) {
-  blurry.updateDetection({ corners: card(), confidence: 0.99, blur: 4 });
+  blurry.updateDetection({ corners: card(), confidence: 0.99, allowCapture: false });
 }
-assert(blurry.stableFrameCount === 0, 'soft frames (low Laplacian) do not auto-capture');
+assert(blurry.stableFrameCount === 0, 'live quality fail does not auto-capture');
 
 const gated = new CardDetector({ onAutoCapture: () => { captures++; } });
 for (let i = 0; i < 10; i++) {

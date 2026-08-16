@@ -35,7 +35,7 @@ export class CardDetector {
     minimumConfidence: 0.9,
     requiredStableFrames: 3,
     maximumCornerMovement: 8,
-    minimumSharpness: 18,
+    minimumSharpness: 0,
     captureCooldown: 1500,
   });
 
