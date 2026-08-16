@@ -70,18 +70,20 @@ export function PerspectiveCorrector({
     img.onload = async () => {
       if (cancelled) return;
       const size = { width: img.naturalWidth, height: img.naturalHeight };
+      // Set size + corners together so the viewport mounts immediately and
+      // useFitScale can measure it (waiting on async detect left scale stuck).
+      const fallback = initialCorners ?? defaultCorners(size.width, size.height);
       setImageSize(size);
+      setCorners(fallback);
 
-      let nextCorners = initialCorners ?? defaultCorners(size.width, size.height);
       if (!initialCorners) {
         try {
           const detected = await detectCardCornersFromImage(imageSrc);
-          if (!cancelled && detected) nextCorners = detected.corners;
+          if (!cancelled && detected) setCorners(detected.corners);
         } catch {
-          // keep default inset corners
+          // keep fallback corners
         }
       }
-      if (!cancelled) setCorners(nextCorners);
 
       bitmapRef.current?.close();
       try {
@@ -267,6 +269,7 @@ export function PerspectiveCorrector({
   const points = [corners.tl, corners.tr, corners.br, corners.bl, corners.tl];
   const linePoints = points.map((p) => `${p.x},${p.y}`).join(' ');
   const active = corners[selectedCorner];
+  const fitted = displayScale > 0;
 
   return (
     <div className="perspective editor-shell">
@@ -278,6 +281,9 @@ export function PerspectiveCorrector({
       </div>
 
       <div ref={viewportRef} className="editor-viewport perspective-viewport">
+        {!fitted ? (
+          <div className="loading">Fitting image…</div>
+        ) : (
         <div
           ref={containerRef}
           className="editor-canvas perspective-canvas"
@@ -400,8 +406,9 @@ export function PerspectiveCorrector({
             })}
           </svg>
         </div>
+        )}
 
-        {dragging && (
+        {fitted && dragging && (
           <div
             className={`perspective-loupe-dock ${
               selectedCorner === 'tl' || selectedCorner === 'tr' ? 'dock-bottom' : 'dock-top'
