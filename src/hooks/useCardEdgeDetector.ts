@@ -12,11 +12,18 @@ import {
 import { evaluateCardAlignment, type CardAlignmentState } from '../lib/card-alignment';
 import { boxToCorners } from '../lib/auto-crop';
 import {
-  CardTracker,
-  cornersToNormalizedBox,
-  emptyTrackerSnapshot,
-  type CardTrackerSnapshot,
-} from '../lib/card-tracker';
+  CardDetector,
+  cornersToOverlaySpace,
+  overlayCornersToBox,
+  type CardCorners,
+} from '../components/CardDetector';
+
+const LOST_CORNERS: CardCorners = [
+  { x: 0, y: 0 },
+  { x: 0, y: 0 },
+  { x: 0, y: 0 },
+  { x: 0, y: 0 },
+];
 
 interface CardEdgeDetectorOptions {
   scanDistanceCm: ScanDistanceCm;
@@ -25,7 +32,6 @@ interface CardEdgeDetectorOptions {
   cardHeightMm?: number;
   onAutoCapture?: () => void;
   autoCaptureEnabled?: boolean;
-  /** Return false to skip this auto-capture (e.g. phone not level) and try again. */
   canAutoCapture?: () => boolean;
 }
 
@@ -50,16 +56,16 @@ export function useCardEdgeDetector(
   const canAutoCaptureRef = useRef(canAutoCapture);
   canAutoCaptureRef.current = canAutoCapture;
 
-  const trackerRef = useRef<CardTracker | null>(null);
-  if (!trackerRef.current) {
-    trackerRef.current = new CardTracker({
+  const detectorRef = useRef<CardDetector | null>(null);
+  if (!detectorRef.current) {
+    detectorRef.current = new CardDetector({
       minimumConfidence: 0.88,
       requiredStableFrames: 8,
       maximumCornerMovement: 18,
       smoothingFactor: 0.3,
       onAutoCapture: () => {
         if (!autoEnabledRef.current || canAutoCaptureRef.current?.() === false) {
-          trackerRef.current?.allowNextCapture();
+          detectorRef.current?.allowNextCapture();
           return;
         }
         onAutoCaptureRef.current?.();
@@ -87,26 +93,25 @@ export function useCardEdgeDetector(
   const [alignment, setAlignment] = useState<CardAlignmentState>(() =>
     evaluateCardAlignment(null, 0, guideBox, cardAspect),
   );
-  const [tracker, setTracker] = useState<CardTrackerSnapshot>(() => emptyTrackerSnapshot());
-  const [analysisSize, setAnalysisSize] = useState({ width: 240, height: 426 });
+  const [detectorTick, setDetectorTick] = useState(0);
 
   useEffect(() => {
-    trackerRef.current?.reset();
+    detectorRef.current?.reset();
     const guide = positionGuideBox(template, guideAnchor.x, guideAnchor.y, { obstructionBottom });
     setGuideBox(guide);
     setDetectedBox(null);
     setAlignment(evaluateCardAlignment(null, 0, guide, cardAspect));
-    setTracker(emptyTrackerSnapshot());
+    setDetectorTick((n) => n + 1);
   }, [scanDistanceCm, obstructionBottom, template, guideAnchor, cardAspect]);
 
   useEffect(() => {
     if (!active) {
-      trackerRef.current?.reset();
+      detectorRef.current?.reset();
       const guide = positionGuideBox(template, guideAnchor.x, guideAnchor.y, { obstructionBottom });
       setGuideBox(guide);
       setDetectedBox(null);
       setAlignment(evaluateCardAlignment(null, 0, guide, cardAspect));
-      setTracker(emptyTrackerSnapshot());
+      setDetectorTick((n) => n + 1);
       return;
     }
 
@@ -117,8 +122,8 @@ export function useCardEdgeDetector(
     function tick() {
       const video = videoRef.current;
       const canvas = canvasRef.current;
-      const cardTracker = trackerRef.current;
-      if (video && canvas && cardTracker && video.readyState >= 2) {
+      const detector = detectorRef.current;
+      if (video && canvas && detector && video.readyState >= 2) {
         if (frame % 3 === 0) {
           const guide = positionGuideBox(template, guideAnchor.x, guideAnchor.y, { obstructionBottom });
           const search = {
@@ -131,7 +136,6 @@ export function useCardEdgeDetector(
           const found = detectCardFrame(video, canvas, search);
           const frameWidth = canvas.width || 240;
           const frameHeight = canvas.height || Math.round(frameWidth * 1.77);
-          setAnalysisSize({ width: frameWidth, height: frameHeight });
 
           if (found) {
             const quad = boxToCorners(found.box, frameWidth, frameHeight, found.rotationDeg);
@@ -140,30 +144,31 @@ export function useCardEdgeDetector(
               ? Math.max(found.score ?? 0.5, 0.9)
               : (found.score ?? 0.4);
 
-            cardTracker.setDetection({
-              corners: [quad.tl, quad.tr, quad.br, quad.bl],
+            detector.setDetection({
+              corners: cornersToOverlaySpace(
+                [quad.tl, quad.tr, quad.br, quad.bl],
+                frameWidth,
+                frameHeight,
+              ),
               confidence,
-              frameWidth,
-              frameHeight,
             });
           } else {
-            cardTracker.setDetection({
-              corners: [],
+            detector.setDetection({
+              corners: LOST_CORNERS,
               confidence: 0,
-              frameWidth,
-              frameHeight,
             });
           }
 
-          const snap = cardTracker.snapshot();
-          const trackedBox = cornersToNormalizedBox(snap.corners, frameWidth, frameHeight);
-          const box = trackedBox ?? (found ? found.box : null);
+          const tracked = detector.detectedCorners
+            ? overlayCornersToBox(detector.detectedCorners)
+            : null;
+          const box = tracked ?? (found ? found.box : null);
           const rotation = found?.rotationDeg ?? 0;
 
           setGuideBox(guide);
           setDetectedBox(box);
           setAlignment(evaluateCardAlignment(box, rotation, guide, cardAspect));
-          setTracker(snap);
+          setDetectorTick((n) => n + 1);
         }
         frame++;
       }
@@ -179,7 +184,7 @@ export function useCardEdgeDetector(
     detectedBox,
     alignment,
     detected: detectedBox !== null,
-    tracker,
-    analysisSize,
+    detector: detectorRef.current,
+    detectorTick,
   };
 }

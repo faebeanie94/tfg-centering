@@ -20,6 +20,7 @@ import {
 } from '../lib/permissions';
 import { getScannerHint } from '../lib/level-hint';
 import { ScannerOverlay } from './ScannerOverlay';
+import { CardDebugOverlay } from './CardDetector';
 import type { CaptureDetectHint } from '../lib/auto-crop';
 import {
   cardAspect,
@@ -76,7 +77,7 @@ export function ImageCapture({
   }, [settings.cardFormat, settings.customWidthMm, settings.customHeightMm]);
   const takePhotoRef = useRef<() => void>(() => {});
 
-  const { guideBox, detectedBox, alignment, tracker, analysisSize } = useCardEdgeDetector(
+  const { guideBox, detectedBox, alignment, detector, detectorTick } = useCardEdgeDetector(
     cameraActive,
     videoRef,
     {
@@ -328,10 +329,10 @@ export function ImageCapture({
     ? 'Focusing…'
     : scanReady && !focusReady
       ? 'Focusing on card…'
-      : tracker.isStable
+      : detector.isStable
         ? 'READY — HOLD STEADY'
-        : tracker.corners.length === 4 && settings.autoCapture
-          ? `Hold steady… ${Math.round(tracker.stabilityPercentage)}% stable`
+        : detector.detectedCorners && settings.autoCapture
+          ? `Hold steady… ${detector.stabilityPercentage}% stable`
           : getScannerHint(level, alignment, showLevel);
 
   if (cameraActive) {
@@ -368,9 +369,8 @@ export function ImageCapture({
               detectedBox={detectedBox}
               alignment={alignment}
               showLevel={showLevel}
-              tracker={tracker}
-              analysisSize={analysisSize}
             />
+            <CardDebugOverlay key={detectorTick} detector={detector} />
           </div>
           <canvas ref={canvasRef} hidden />
         </div>
