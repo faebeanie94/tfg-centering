@@ -290,27 +290,43 @@ function rayEdgeToLightBackground(
   minDist = 8,
 ): number | null {
   const steps = Math.max(w, h);
-  let lastTransition: number | null = null;
-  let interior = false;
 
-  for (let s = 1; s < steps - 3; s++) {
+  // Sample the whole ray once. `interior` used to be a one-way latch: once
+  // set by a single dark pixel (e.g. crossing dark artwork), it never reset,
+  // so *any* later bright pixel — including the true background well past
+  // the card — kept re-registering as "the edge", walking the result out
+  // toward the frame boundary with no real stopping condition. A card design
+  // with multiple bands (dark art, light text box, bright border) breaks
+  // that latch immediately.
+  const vals: number[] = [];
+  let maxS = 0;
+  for (let s = 0; s < steps - 3; s++) {
     const x = Math.round(x0 + dx * s);
     const y = Math.round(y0 + dy * s);
     if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) break;
+    vals.push(luma[y * w + x]);
+    maxS = s;
+  }
+  if (maxS < minDist) return null;
 
-    const l = luma[y * w + x];
-    if (l < bgFloor) {
-      interior = true;
-      continue;
+  // Prefer the farthest dark-to-light crossing that leads into a *sustained*
+  // light run, not just a brief bright patch inside the card (a text box, a
+  // thin border) — only a genuine exit into the background stays light for
+  // a real stretch afterward.
+  const STABLE_WINDOW = 16;
+  let lastTransition: number | null = null;
+  for (let s = minDist; s <= maxS; s++) {
+    if (vals[s - 1] >= bgFloor || vals[s] < bgFloor) continue; // not a dark→light crossing
+    const windowEnd = Math.min(maxS, s + STABLE_WINDOW);
+    if (windowEnd - s < STABLE_WINDOW * 0.6) continue; // too close to the frame edge to judge
+    let stable = true;
+    for (let k = s; k <= windowEnd; k++) {
+      if (vals[k] < bgFloor) {
+        stable = false;
+        break;
+      }
     }
-
-    if (!interior || s < minDist) continue;
-
-    const l1 = luma[Math.round(y0 + dy * (s + 1)) * w + Math.round(x0 + dx * (s + 1))];
-    const l2 = luma[Math.round(y0 + dy * (s + 2)) * w + Math.round(x0 + dx * (s + 2))];
-    if (l1 >= bgFloor && l2 >= bgFloor) {
-      lastTransition = Math.max(minDist, s - 1);
-    }
+    if (stable) lastTransition = Math.max(minDist, s - 1);
   }
 
   if (lastTransition == null) return null;
