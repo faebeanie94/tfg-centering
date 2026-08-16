@@ -1,8 +1,9 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { CardSide } from './lib/tfg-standards';
 import { useAppSettings } from './hooks/useAppSettings';
-import { emptySession, sessionHasAny, type GradingSession, type SideSnapshot } from './lib/session';
+import { emptySession, sessionHasAny, snapshotFromRects, type GradingSession, type SideSnapshot } from './lib/session';
 import { ImageCapture } from './components/ImageCapture';
+import CardGradeResult, { type CardGradeResultData } from './components/CardGradeResult';
 import { PerspectiveCorrector } from './components/PerspectiveCorrector';
 import { CropEditor } from './components/CropEditor';
 import { BorderEditor } from './components/BorderEditor';
@@ -23,6 +24,7 @@ import {
   cardAspect,
   fallbackCardFormatForDetection,
   resolveCardFormat,
+  type CardFormat,
   type CardSizeSelection,
 } from './lib/card-sizes';
 
@@ -33,6 +35,7 @@ type Phase =
   | 'perspective'
   | 'crop'
   | 'editor'
+  | 'result'
   | 'compare'
   | 'library';
 
@@ -55,6 +58,7 @@ export default function App() {
   /** Concrete size for this capture — set from Settings or post-capture picker. */
   const [sessionCardSize, setSessionCardSize] = useState<CardSizeSelection | null>(null);
   const [pendingHint, setPendingHint] = useState<CaptureDetectHint | undefined>(undefined);
+  const [gradeResult, setGradeResult] = useState<CardGradeResultData | null>(null);
 
   const activeCardFormat = useMemo(() => {
     const fromSettings = selectionFromSettings(settings);
@@ -107,16 +111,37 @@ export default function App() {
     setPhase('editor');
   }, [settings]);
 
+  const showEstimatedResult = useCallback(
+    (
+      imageSrc: string,
+      outer: SideSnapshot['outer'],
+      inner: SideSnapshot['inner'],
+      side: CardSide,
+      format: CardFormat,
+    ) => {
+      const snap = snapshotFromRects(imageSrc, outer, inner, side, format, cardNames[side]);
+      setWorkingImage(imageSrc);
+      setEditorRects({ outer, inner });
+      setGradeResult({
+        side,
+        grade: snap.grade,
+        measurements: snap.result,
+        imageUrl: imageSrc,
+      });
+      setPhase('result');
+    },
+    [cardNames],
+  );
+
   const finishAutoCrop = useCallback(
     async (dataUrl: string, hint: CaptureDetectHint | undefined, selection: CardSizeSelection) => {
       setSessionCardSize(selection);
       setPhase('autocrop');
+      const format = resolveCardFormat(selection);
       if (hint?.preCorrected) {
         try {
           const rects = await estimateRectsFromImage(dataUrl, { padded: false });
-          setWorkingImage(dataUrl);
-          setEditorRects({ outer: rects.outer, inner: rects.inner });
-          setPhase('editor');
+          showEstimatedResult(dataUrl, rects.outer, rects.inner, currentSide, format);
         } catch {
           setWorkingImage(dataUrl);
           setEditorRects({});
@@ -124,22 +149,19 @@ export default function App() {
         }
         return;
       }
-      const format = resolveCardFormat(selection);
       const { result, corners, confidence } = await tryAutoCrop(dataUrl, hint, {
         cardAspect: cardAspect(format),
         cardHeightMm: format.heightMm,
       });
       if (result) {
-        setWorkingImage(result.imageSrc);
-        setEditorRects({ outer: result.outer, inner: result.inner });
-        setPhase('editor');
+        showEstimatedResult(result.imageSrc, result.outer, result.inner, currentSide, format);
         return;
       }
       setPerspectiveCorners(corners);
       setDetectionUncertain(!corners || confidence < DETECT_CONFIRM_CONFIDENCE);
       setPhase('perspective');
     },
-    [],
+    [currentSide, showEstimatedResult],
   );
 
   const handleCapture = useCallback(
@@ -149,6 +171,7 @@ export default function App() {
       setEditorRects({});
       setPerspectiveCorners(null);
       setDetectionUncertain(false);
+      setGradeResult(null);
       setReturnPhaseAfterEdit('editor');
       setSessionCardSize(null);
 
@@ -176,12 +199,17 @@ export default function App() {
     setWorkingImage(corrected);
     try {
       const rects = await estimateRectsFromImage(corrected, { padded: true });
-      setEditorRects({ outer: rects.outer, inner: rects.inner });
+      if (returnPhaseAfterEdit === 'crop') {
+        setEditorRects({ outer: rects.outer, inner: rects.inner });
+        setPhase('crop');
+        return;
+      }
+      showEstimatedResult(corrected, rects.outer, rects.inner, currentSide, activeCardFormat);
     } catch {
       setEditorRects({});
+      setPhase(returnPhaseAfterEdit === 'crop' ? 'crop' : 'editor');
     }
-    setPhase(returnPhaseAfterEdit === 'crop' ? 'crop' : 'editor');
-  }, [returnPhaseAfterEdit]);
+  }, [returnPhaseAfterEdit, showEstimatedResult, currentSide, activeCardFormat]);
 
   const handlePerspectiveSkip = useCallback(() => {
     if (rawImage) {
@@ -236,6 +264,7 @@ export default function App() {
     setRawImage(null);
     setWorkingImage(null);
     setEditorRects({});
+    setGradeResult(null);
     setSessionCardSize(null);
     setPhase('capture');
   }, []);
@@ -269,6 +298,7 @@ export default function App() {
     setRawImage(null);
     setWorkingImage(null);
     setEditorRects({});
+    setGradeResult(null);
     setCardNames({ front: '', back: '' });
     setCurrentSide('front');
     setSessionCardSize(null);
@@ -360,6 +390,30 @@ export default function App() {
         invertColors={settings.invertColors}
         onComplete={handleCropComplete}
         onCancel={() => setPhase('editor')}
+      />
+    );
+  }
+
+  if (phase === 'result' && gradeResult) {
+    return (
+      <CardGradeResult
+        result={gradeResult}
+        onRetake={() => handleCaptureSide(currentSide)}
+        onConfirm={() => {
+          if (workingImage && editorRects.outer && editorRects.inner) {
+            handleSaveSide(
+              snapshotFromRects(
+                workingImage,
+                editorRects.outer,
+                editorRects.inner,
+                currentSide,
+                activeCardFormat,
+                cardNames[currentSide],
+              ),
+            );
+          }
+          setPhase('editor');
+        }}
       />
     );
   }

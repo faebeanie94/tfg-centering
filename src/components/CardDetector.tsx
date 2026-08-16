@@ -33,7 +33,7 @@ export class CardDetector {
   private readonly captureConfidence = 0.9;
   private readonly auto = new CardAutoCapture({
     minimumConfidence: 0.9,
-    requiredStableFrames: 8,
+    requiredStableFrames: 3,
     maximumCornerMovement: 8,
     minimumSharpness: 18,
     captureCooldown: 1500,
@@ -123,21 +123,12 @@ export function CardDebugOverlay({ detector }: CardDebugOverlayProps) {
   const isReady = detector.isReadyToCapture;
   const color = isReady ? '#00ff66' : confidence >= 0.9 ? '#ffff00' : '#ff4444';
   const percentage = Math.round(confidence * 100);
-  const progress = detector.captureProgress;
 
   const centerX = corners.reduce((sum, point) => sum + point.x, 0) / 4;
   const centerY = corners.reduce((sum, point) => sum + point.y, 0) / 4;
   const points = corners.map((point) => `${point.x},${point.y}`).join(' ');
 
-  let message: string;
-  if (isReady) {
-    message = 'CAPTURING...';
-  } else if (confidence >= 0.9) {
-    const remaining = Math.ceil((1 - progress) * 8);
-    message = `HOLD STEADY  ${remaining}`;
-  } else {
-    message = `${percentage}% confidence`;
-  }
+  const message = isReady ? 'CAPTURING...' : confidence >= 0.9 ? null : `${percentage}% confidence`;
 
   return (
     <div
@@ -174,6 +165,7 @@ export function CardDebugOverlay({ detector }: CardDebugOverlayProps) {
         ))}
       </svg>
 
+      {message && (
       <div
         style={{
           position: 'absolute',
@@ -192,29 +184,8 @@ export function CardDebugOverlay({ detector }: CardDebugOverlayProps) {
         }}
       >
         {message}
-        {confidence >= 0.9 && !isReady && (
-          <div
-            style={{
-              width: '180px',
-              height: '6px',
-              marginTop: '12px',
-              background: 'rgba(255,255,255,0.25)',
-              borderRadius: '4px',
-              overflow: 'hidden',
-            }}
-          >
-            <div
-              style={{
-                width: `${progress * 100}%`,
-                height: '100%',
-                background: '#00ff66',
-                borderRadius: '4px',
-                transition: 'width 100ms linear',
-              }}
-            />
-          </div>
-        )}
       </div>
+      )}
     </div>
   );
 }
