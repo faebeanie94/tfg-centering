@@ -80,6 +80,12 @@
   font-weight: 600;
 }
 
+.card-result__grade-axis {
+  margin-top: 6px;
+  color: #888;
+  font-size: 13px;
+}
+
 .card-result__section {
   background: #151518;
   border-radius: 16px;
