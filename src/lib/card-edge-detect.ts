@@ -45,8 +45,19 @@ function sampleRay(
   return 0;
 }
 
+/** Normalized width/height for a poker card in a non-square video frame. */
+export function normalizedCardAspect(cardAspectRatio: number, frameAspect: number): number {
+  const fa = frameAspect > 0.15 && Number.isFinite(frameAspect) ? frameAspect : 1;
+  return cardAspectRatio / fa;
+}
+
 /** Force axis-aligned rectangle with trading-card aspect ratio. */
-export function enforceCardRect(box: DetectedCard, cardAspectRatio: number = CARD_ASPECT): DetectedCard {
+export function enforceCardRect(
+  box: DetectedCard,
+  cardAspectRatio: number = CARD_ASPECT,
+  frameAspect: number = 1,
+): DetectedCard {
+  const target = normalizedCardAspect(cardAspectRatio, frameAspect);
   const cx = box.left + box.width / 2;
   const cy = box.top + box.height / 2;
 
@@ -54,10 +65,10 @@ export function enforceCardRect(box: DetectedCard, cardAspectRatio: number = CAR
   let height = box.height;
   const ratio = width / height;
 
-  if (ratio > cardAspectRatio) {
-    width = height * cardAspectRatio;
+  if (ratio > target) {
+    width = height * target;
   } else {
-    height = width / cardAspectRatio;
+    height = width / target;
   }
 
   let left = cx - width / 2;
@@ -512,10 +523,12 @@ function maybeEnforceCardRect(
   h: number,
   cardAspectRatio: number,
 ): DetectedCard {
-  const normErr = Math.abs(raw.width / raw.height - cardAspectRatio);
+  const fa = h > 0 ? w / h : 1;
+  const targetNorm = normalizedCardAspect(cardAspectRatio, fa);
+  const normErr = Math.abs(raw.width / raw.height - targetNorm);
   const pixErr = Math.abs((raw.width * w) / (raw.height * h) - cardAspectRatio);
   if (pixErr <= normErr) return raw;
-  return enforceCardRect(raw, cardAspectRatio);
+  return enforceCardRect(raw, cardAspectRatio, fa);
 }
 
 function scoreCardBox(
@@ -534,7 +547,7 @@ function scoreCardBox(
   if (sizeRatio < 0.4 || sizeRatio > 1.85) return -1;
 
   const area = box.width * box.height;
-  if (area < 0.08 || area > 0.82) return -1;
+  if (area < 0.04 || area > 0.82) return -1;
 
   const matchExpected = 1 - Math.min(1, Math.abs(1 - sizeRatio) / 0.9);
   const outerBias = Math.max(0, Math.min(1, (area - 0.1) / 0.45));
@@ -928,7 +941,7 @@ export function detectCardBox(video: HTMLVideoElement, canvas: HTMLCanvasElement
 
   if (raw.width < 0.12 || raw.height < 0.12) return null;
 
-  return enforceCardRect(raw);
+  return enforceCardRect(raw, CARD_ASPECT, w / h);
 }
 
 export const SCAN_DISTANCE_OPTIONS = [12, 20, 30] as const;
@@ -941,11 +954,11 @@ const GUIDE_FILL: Record<ScanDistanceCm, number> = {
   30: 0.78,
 };
 
-/** With a box stand, the card is a silhouette in the clear band — not 86% of that band. */
+/** With a box stand, phone is ~20 cm up: card is ~1/3 of the preview, not half. */
 const GUIDE_FILL_WITH_STAND: Record<ScanDistanceCm, number> = {
-  12: 0.56,
-  20: 0.5,
-  30: 0.42,
+  12: 0.5,
+  20: 0.36,
+  30: 0.26,
 };
 
 /** Guide frame sized for a card at the given phone-to-card distance (cm). */
@@ -1059,6 +1072,7 @@ export function smoothBox(
   next: DetectedCard,
   alpha = 0.2,
   cardAspectRatio: number = CARD_ASPECT,
+  frameAspect: number = 1,
 ): DetectedCard {
   const blended = !prev
     ? next
@@ -1068,5 +1082,5 @@ export function smoothBox(
         width: prev.width + (next.width - prev.width) * alpha,
         height: prev.height + (next.height - prev.height) * alpha,
       };
-  return enforceCardRect(blended, cardAspectRatio);
+  return enforceCardRect(blended, cardAspectRatio, frameAspect);
 }

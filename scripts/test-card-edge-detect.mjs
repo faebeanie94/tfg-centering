@@ -23,6 +23,7 @@ writeFileSync(
 import {
   CARD_ASPECT,
   detectCardFrameFromImageData,
+  enforceCardRect,
   guideTemplateForDistance,
 } from '${join(root, 'src/lib/card-edge-detect.ts').replace(/\\\\/g, '/')}';
 import { evaluateCardAlignment } from '${join(root, 'src/lib/card-alignment.ts').replace(/\\\\/g, '/')}';
@@ -110,10 +111,18 @@ assert(
 assert(portraitGuide.width > template.width, 'portrait video makes the dashed card wider');
 const standGuide = guideTemplateForDistance(20, CARD_ASPECT, 88.9, 3 / 4, 0.32);
 assert(
-  standGuide.height >= 0.38 && standGuide.height <= 0.56,
-  'phone-on-box 20cm guide should be a card silhouette, got ' + standGuide.height,
+  standGuide.height >= 0.3 && standGuide.height <= 0.42,
+  'phone-on-box 20cm guide should match a card at arm length, got ' + standGuide.height,
 );
 assert(standGuide.height < template.height - 0.15, 'stand crop must shrink the dashes vs full frame');
+{
+  const fa = 3 / 4;
+  const height = 0.36;
+  const width = height * (CARD_ASPECT / fa);
+  const kept = enforceCardRect({ left: 0.28, top: 0.1, width, height }, CARD_ASPECT, fa);
+  assert(Math.abs(kept.width - width) < 0.02 && Math.abs(kept.height - height) < 0.02,
+    'portrait overlay must keep poker aspect, got ' + JSON.stringify(kept));
+}
 const card = {
   left: 0.5 - template.width / 2,
   top: Math.max(0.02, 0.5 - template.height / 2),
