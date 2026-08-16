@@ -72,11 +72,11 @@ export function getCardAlignmentHint(alignment: CardAlignmentState): string {
   }
 
   // Card already sits in the dashes; a slightly large/small guide should not nag.
-  if (overlap.ofA > 0.72 && overlap.ofB > 0.38) {
-    if (offsetX > 0.08) return 'Centre card in guide — move left ←';
-    if (offsetX < -0.08) return 'Centre card in guide — move right →';
-    if (offsetY > 0.08) return 'Centre card in guide — move up ↑';
-    if (offsetY < -0.08) return 'Centre card in guide — move down ↓';
+  if (overlap.ofA > 0.7 && overlap.ofB > 0.2) {
+    if (offsetX > 0.12) return 'Centre card in guide — move left ←';
+    if (offsetX < -0.12) return 'Centre card in guide — move right →';
+    if (offsetY > 0.12) return 'Centre card in guide — move up ↑';
+    if (offsetY < -0.12) return 'Centre card in guide — move down ↓';
     return 'Card is in the frame — hold steady…';
   }
 

@@ -359,7 +359,7 @@ for (const c of cases) {
   const hintFill = getCardAlignmentHint(evaluateCardAlignment(cardInDashes, 0, oversizedGuide));
   try {
     assert(
-      !/Move closer|Move back|sit inside/i.test(hintFill),
+      /in the frame|hold steady/i.test(hintFill) && !/Move closer|Move back|sit inside|move (up|down)/i.test(hintFill),
       'card already in dashes must not nag fill/sit, got: ' + hintFill,
     );
     console.log('ok - hint when card is already in dashes', hintFill);
