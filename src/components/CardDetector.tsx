@@ -33,7 +33,7 @@ export class CardDetector {
   private readonly captureConfidence = 0.9;
   private readonly auto = new CardAutoCapture({
     minimumConfidence: 0.9,
-    requiredStableFrames: 8,
+    requiredStableFrames: 3,
     maximumCornerMovement: 8,
     minimumSharpness: 18,
     captureCooldown: 1500,
