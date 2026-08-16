@@ -11,6 +11,8 @@ import { useFitScale, useAppShellMode } from '../hooks/useFitScale';
 interface PerspectiveCorrectorProps {
   imageSrc: string;
   invertColors?: boolean;
+  /** Pre-detected corners from auto-crop (pixel coords). */
+  initialCorners?: QuadCorners | null;
   onComplete: (correctedSrc: string) => void;
   onSkip: () => void;
   onCancel: () => void;
@@ -42,6 +44,7 @@ function cornerAtPoint(corners: QuadCorners, x: number, y: number, hitRadius: nu
 export function PerspectiveCorrector({
   imageSrc,
   invertColors = false,
+  initialCorners = null,
   onComplete,
   onSkip,
   onCancel,
@@ -69,12 +72,14 @@ export function PerspectiveCorrector({
       const size = { width: img.naturalWidth, height: img.naturalHeight };
       setImageSize(size);
 
-      let nextCorners = defaultCorners(size.width, size.height);
-      try {
-        const detected = await detectCardCornersFromImage(imageSrc);
-        if (!cancelled && detected) nextCorners = detected;
-      } catch {
-        // keep default inset corners
+      let nextCorners = initialCorners ?? defaultCorners(size.width, size.height);
+      if (!initialCorners) {
+        try {
+          const detected = await detectCardCornersFromImage(imageSrc);
+          if (!cancelled && detected) nextCorners = detected.corners;
+        } catch {
+          // keep default inset corners
+        }
       }
       if (!cancelled) setCorners(nextCorners);
 
@@ -91,7 +96,7 @@ export function PerspectiveCorrector({
       bitmapRef.current?.close();
       bitmapRef.current = null;
     };
-  }, [imageSrc]);
+  }, [imageSrc, initialCorners]);
 
   const drawLoupe = useCallback(
     (corner: CornerKey) => {
