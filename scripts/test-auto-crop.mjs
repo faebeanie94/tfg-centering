@@ -19,6 +19,7 @@ import { OUTPUT_PADDING_RATIO } from '${join(root, 'src/lib/perspective.ts').rep
 import {
   boxToCorners,
   defaultRectsAfterCrop,
+  AUTO_CROP_CONFIDENCE,
 } from '${join(root, 'src/lib/auto-crop.ts').replace(/\\\\/g, '/')}';
 import {
   CARD_ASPECT,
@@ -97,9 +98,11 @@ const expectedPadX = outW * OUTPUT_PADDING_RATIO / (1 + 2 * OUTPUT_PADDING_RATIO
 assert(Math.abs(rects.outer.x - expectedPadX) < 1, 'outer pad x');
 assert(rects.inner.x > rects.outer.x, 'inner inset');
 assert(rects.inner.width < rects.outer.width, 'inner narrower');
+assert(AUTO_CROP_CONFIDENCE > 0.5 && AUTO_CROP_CONFIDENCE < 0.95, 'confidence gate sane');
 
 console.log('ok - boxToCorners', corners);
 console.log('ok - defaultRectsAfterCrop', rects);
+console.log('ok - confidence gate', AUTO_CROP_CONFIDENCE);
 console.log('All auto-crop checks passed.');
 `,
 );

@@ -11,7 +11,8 @@ import { SavedCardsView } from './components/SavedCardsView';
 import { SettingsPanel } from './components/SettingsPanel';
 import { useSavedCards } from './hooks/useSavedCards';
 import type { SavedCardRecord } from './lib/saved-cards';
-import { autoCropCard, defaultRectsAfterCrop, type CaptureDetectHint } from './lib/auto-crop';
+import { tryAutoCrop, defaultRectsAfterCrop, type CaptureDetectHint } from './lib/auto-crop';
+import type { QuadCorners } from './lib/perspective';
 
 type Phase = 'capture' | 'autocrop' | 'perspective' | 'crop' | 'editor' | 'compare' | 'library';
 
@@ -29,6 +30,7 @@ export default function App() {
   const [returnPhaseAfterEdit, setReturnPhaseAfterEdit] = useState<Phase>('editor');
   const [libraryReturnPhase, setLibraryReturnPhase] = useState<Phase>('capture');
   const [libraryMessage, setLibraryMessage] = useState<string | null>(null);
+  const [perspectiveCorners, setPerspectiveCorners] = useState<QuadCorners | null>(null);
 
   const openLibrary = useCallback((returnTo: Phase = phase) => {
     setLibraryReturnPhase(returnTo);
@@ -67,18 +69,20 @@ export default function App() {
   const handleCapture = useCallback(async (dataUrl: string, hint?: CaptureDetectHint) => {
     setRawImage(dataUrl);
     setEditorRects({});
+    setPerspectiveCorners(null);
     setReturnPhaseAfterEdit('editor');
     setPhase('autocrop');
 
-    const cropped = await autoCropCard(dataUrl, hint);
-    if (cropped) {
-      setWorkingImage(cropped.imageSrc);
-      setEditorRects({ outer: cropped.outer, inner: cropped.inner });
+    const { result, corners } = await tryAutoCrop(dataUrl, hint);
+    if (result) {
+      setWorkingImage(result.imageSrc);
+      setEditorRects({ outer: result.outer, inner: result.inner });
       setPhase('editor');
       return;
     }
 
-    // Detection failed — fall back to manual Perspective Fix.
+    // Not confident enough — open Perspective Fix with best-effort corners.
+    setPerspectiveCorners(corners);
     setPhase('perspective');
   }, []);
 
@@ -168,6 +172,7 @@ export default function App() {
   const handlePerspectiveFix = useCallback(() => {
     if (!workingImage) return;
     setRawImage(workingImage);
+    setPerspectiveCorners(null);
     setReturnPhaseAfterEdit('editor');
     setPhase('perspective');
   }, [workingImage]);
@@ -235,6 +240,7 @@ export default function App() {
       <PerspectiveCorrector
         imageSrc={rawImage}
         invertColors={settings.invertColors}
+        initialCorners={perspectiveCorners}
         onComplete={handlePerspectiveComplete}
         onSkip={handlePerspectiveSkip}
         onCancel={() => setPhase(workingImage ? 'editor' : 'capture')}
