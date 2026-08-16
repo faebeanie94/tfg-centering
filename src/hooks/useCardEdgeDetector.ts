@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import {
+  CARD_ASPECT,
+  DEFAULT_CARD_HEIGHT_MM,
   defaultGuideAnchorY,
   detectCardFrame,
   guideTemplateForDistance,
@@ -14,19 +16,31 @@ import { evaluateCardAlignment, type CardAlignmentState } from '../lib/card-alig
 interface CardEdgeDetectorOptions {
   scanDistanceCm: ScanDistanceCm;
   obstructionBottom: number;
+  /** Portrait width/height for the selected card format. */
+  cardAspect?: number;
+  /** Physical card height (mm) for distance-based guide sizing. */
+  cardHeightMm?: number;
 }
 
 export function useCardEdgeDetector(
   active: boolean,
   videoRef: RefObject<HTMLVideoElement | null>,
-  { scanDistanceCm, obstructionBottom }: CardEdgeDetectorOptions,
+  {
+    scanDistanceCm,
+    obstructionBottom,
+    cardAspect = CARD_ASPECT,
+    cardHeightMm = DEFAULT_CARD_HEIGHT_MM,
+  }: CardEdgeDetectorOptions,
 ) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const smoothRef = useRef<DetectedCard | null>(null);
   const rotationRef = useRef(0);
   const missFramesRef = useRef(0);
 
-  const template = useMemo(() => guideTemplateForDistance(scanDistanceCm), [scanDistanceCm]);
+  const template = useMemo(
+    () => guideTemplateForDistance(scanDistanceCm, cardAspect, cardHeightMm),
+    [scanDistanceCm, cardAspect, cardHeightMm],
+  );
 
   const guideAnchor = useMemo(
     () => ({
@@ -41,7 +55,7 @@ export function useCardEdgeDetector(
   );
   const [detectedBox, setDetectedBox] = useState<DetectedCard | null>(null);
   const [alignment, setAlignment] = useState<CardAlignmentState>(() =>
-    evaluateCardAlignment(null, 0, guideBox),
+    evaluateCardAlignment(null, 0, guideBox, cardAspect),
   );
 
   useEffect(() => {
@@ -51,8 +65,8 @@ export function useCardEdgeDetector(
     const guide = positionGuideBox(template, guideAnchor.x, guideAnchor.y, { obstructionBottom });
     setGuideBox(guide);
     setDetectedBox(null);
-    setAlignment(evaluateCardAlignment(null, 0, guide));
-  }, [scanDistanceCm, obstructionBottom, template, guideAnchor]);
+    setAlignment(evaluateCardAlignment(null, 0, guide, cardAspect));
+  }, [scanDistanceCm, obstructionBottom, template, guideAnchor, cardAspect]);
 
   useEffect(() => {
     if (!active) {
@@ -62,7 +76,7 @@ export function useCardEdgeDetector(
       const guide = positionGuideBox(template, guideAnchor.x, guideAnchor.y, { obstructionBottom });
       setGuideBox(guide);
       setDetectedBox(null);
-      setAlignment(evaluateCardAlignment(null, 0, guide));
+      setAlignment(evaluateCardAlignment(null, 0, guide, cardAspect));
       return;
     }
 
@@ -81,6 +95,7 @@ export function useCardEdgeDetector(
             cy: guideAnchor.y,
             expectedWidth: template.width,
             expectedHeight: template.height,
+            cardAspect,
           };
           const found = detectCardFrame(video, canvas, search);
 
@@ -88,14 +103,14 @@ export function useCardEdgeDetector(
             const candidate = found.box;
             if (shouldAcceptDetection(smoothRef.current, candidate)) {
               missFramesRef.current = 0;
-              smoothRef.current = smoothBox(smoothRef.current, candidate);
+              smoothRef.current = smoothBox(smoothRef.current, candidate, 0.2, cardAspect);
               rotationRef.current = rotationRef.current * 0.7 + found.rotationDeg * 0.3;
             } else {
               missFramesRef.current = 0;
             }
             const box = smoothRef.current;
             if (box) {
-              const next = evaluateCardAlignment(box, rotationRef.current, guide);
+              const next = evaluateCardAlignment(box, rotationRef.current, guide, cardAspect);
               setGuideBox(guide);
               setDetectedBox({ ...box });
               setAlignment(next);
@@ -106,7 +121,7 @@ export function useCardEdgeDetector(
             if (missFramesRef.current > 15) {
               smoothRef.current = null;
               setDetectedBox(null);
-              setAlignment(evaluateCardAlignment(null, 0, guide));
+              setAlignment(evaluateCardAlignment(null, 0, guide, cardAspect));
             }
           }
         }
@@ -117,7 +132,7 @@ export function useCardEdgeDetector(
 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [active, videoRef, template, guideAnchor, obstructionBottom]);
+  }, [active, videoRef, template, guideAnchor, obstructionBottom, cardAspect]);
 
   return {
     guideBox,

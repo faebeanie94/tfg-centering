@@ -1,3 +1,5 @@
+import { CARD_ASPECT } from './card-edge-detect';
+
 export interface Point {
   x: number;
   y: number;
@@ -12,7 +14,6 @@ export interface QuadCorners {
   bl: Point;
 }
 
-const CARD_ASPECT = 63.5 / 88.9;
 /** Margin around the card in the corrected image (each side). */
 export const OUTPUT_PADDING_RATIO = 0.08;
 
@@ -33,14 +34,17 @@ function quadHeight(corners: QuadCorners): number {
   return (dist(corners.tl, corners.bl) + dist(corners.tr, corners.br)) / 2;
 }
 
-function computeOutputSize(corners: QuadCorners): {
+function computeOutputSize(
+  corners: QuadCorners,
+  cardAspectRatio: number = CARD_ASPECT,
+): {
   width: number;
   height: number;
   padX: number;
   padY: number;
 } {
   const cardHeight = Math.max(Math.round(quadHeight(corners)), 400);
-  const cardWidth = Math.round(cardHeight * CARD_ASPECT);
+  const cardWidth = Math.round(cardHeight * cardAspectRatio);
   const padX = Math.round(cardWidth * OUTPUT_PADDING_RATIO);
   const padY = Math.round(cardHeight * OUTPUT_PADDING_RATIO);
   return {
@@ -150,9 +154,13 @@ export function defaultCorners(imgWidth: number, imgHeight: number): QuadCorners
   };
 }
 
-export async function perspectiveCorrect(imageSrc: string, corners: QuadCorners): Promise<string> {
+export async function perspectiveCorrect(
+  imageSrc: string,
+  corners: QuadCorners,
+  cardAspectRatio: number = CARD_ASPECT,
+): Promise<string> {
   const img = await loadImage(imageSrc);
-  const { width: outWidth, height: outHeight, padX, padY } = computeOutputSize(corners);
+  const { width: outWidth, height: outHeight, padX, padY } = computeOutputSize(corners, cardAspectRatio);
 
   const src = [corners.tl, corners.tr, corners.br, corners.bl];
   const dst: Point[] = [

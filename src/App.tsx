@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { CardSide } from './lib/tfg-standards';
 import { useAppSettings } from './hooks/useAppSettings';
 import { emptySession, sessionHasAny, type GradingSession, type SideSnapshot } from './lib/session';
@@ -9,12 +9,27 @@ import { BorderEditor } from './components/BorderEditor';
 import { CompareView } from './components/CompareView';
 import { SavedCardsView } from './components/SavedCardsView';
 import { SettingsPanel } from './components/SettingsPanel';
+import { CardSizePickerScreen, selectionFromSettings } from './components/CardSizeFields';
 import { useSavedCards } from './hooks/useSavedCards';
 import type { SavedCardRecord } from './lib/saved-cards';
 import { tryAutoCrop, defaultRectsAfterCrop, type CaptureDetectHint } from './lib/auto-crop';
 import type { QuadCorners } from './lib/perspective';
+import {
+  cardAspect,
+  fallbackCardFormatForDetection,
+  resolveCardFormat,
+  type CardSizeSelection,
+} from './lib/card-sizes';
 
-type Phase = 'capture' | 'autocrop' | 'perspective' | 'crop' | 'editor' | 'compare' | 'library';
+type Phase =
+  | 'capture'
+  | 'cardsize'
+  | 'autocrop'
+  | 'perspective'
+  | 'crop'
+  | 'editor'
+  | 'compare'
+  | 'library';
 
 export default function App() {
   const { settings, updateSettings } = useAppSettings();
@@ -31,6 +46,24 @@ export default function App() {
   const [libraryReturnPhase, setLibraryReturnPhase] = useState<Phase>('capture');
   const [libraryMessage, setLibraryMessage] = useState<string | null>(null);
   const [perspectiveCorners, setPerspectiveCorners] = useState<QuadCorners | null>(null);
+  /** Concrete size for this capture — set from Settings or post-capture picker. */
+  const [sessionCardSize, setSessionCardSize] = useState<CardSizeSelection | null>(null);
+  const [pendingHint, setPendingHint] = useState<CaptureDetectHint | undefined>(undefined);
+
+  const activeCardFormat = useMemo(() => {
+    const fromSettings = selectionFromSettings(settings);
+    if (fromSettings) return resolveCardFormat(fromSettings);
+    if (sessionCardSize) return resolveCardFormat(sessionCardSize);
+    return fallbackCardFormatForDetection(settings.customWidthMm, settings.customHeightMm);
+  }, [settings, sessionCardSize]);
+
+  const autoCropOptions = useMemo(
+    () => ({
+      cardAspect: cardAspect(activeCardFormat),
+      cardHeightMm: activeCardFormat.heightMm,
+    }),
+    [activeCardFormat],
+  );
 
   const openLibrary = useCallback((returnTo: Phase = phase) => {
     setLibraryReturnPhase(returnTo);
@@ -54,6 +87,8 @@ export default function App() {
       front: record.session.front?.name ?? '',
       back: record.session.back?.name ?? '',
     });
+    const fromSettings = selectionFromSettings(settings);
+    setSessionCardSize(fromSettings);
     if (record.session.front) {
       setWorkingImage(record.session.front.imageSrc);
       setEditorRects({ outer: record.session.front.outer, inner: record.session.front.inner });
@@ -64,27 +99,57 @@ export default function App() {
       setCurrentSide('back');
     }
     setPhase('editor');
-  }, []);
+  }, [settings]);
 
-  const handleCapture = useCallback(async (dataUrl: string, hint?: CaptureDetectHint) => {
-    setRawImage(dataUrl);
-    setEditorRects({});
-    setPerspectiveCorners(null);
-    setReturnPhaseAfterEdit('editor');
-    setPhase('autocrop');
+  const finishAutoCrop = useCallback(
+    async (dataUrl: string, hint: CaptureDetectHint | undefined, selection: CardSizeSelection) => {
+      setSessionCardSize(selection);
+      setPhase('autocrop');
+      const format = resolveCardFormat(selection);
+      const { result, corners } = await tryAutoCrop(dataUrl, hint, {
+        cardAspect: cardAspect(format),
+        cardHeightMm: format.heightMm,
+      });
+      if (result) {
+        setWorkingImage(result.imageSrc);
+        setEditorRects({ outer: result.outer, inner: result.inner });
+        setPhase('editor');
+        return;
+      }
+      setPerspectiveCorners(corners);
+      setPhase('perspective');
+    },
+    [],
+  );
 
-    const { result, corners } = await tryAutoCrop(dataUrl, hint);
-    if (result) {
-      setWorkingImage(result.imageSrc);
-      setEditorRects({ outer: result.outer, inner: result.inner });
-      setPhase('editor');
-      return;
-    }
+  const handleCapture = useCallback(
+    async (dataUrl: string, hint?: CaptureDetectHint) => {
+      setRawImage(dataUrl);
+      setPendingHint(hint);
+      setEditorRects({});
+      setPerspectiveCorners(null);
+      setReturnPhaseAfterEdit('editor');
+      setSessionCardSize(null);
 
-    // Not confident enough — open Perspective Fix with best-effort corners.
-    setPerspectiveCorners(corners);
-    setPhase('perspective');
-  }, []);
+      const fromSettings = selectionFromSettings(settings);
+      if (!fromSettings) {
+        // Settings left on “Ask after each photo” — pick size before auto-crop.
+        setPhase('cardsize');
+        return;
+      }
+
+      await finishAutoCrop(dataUrl, hint, fromSettings);
+    },
+    [settings, finishAutoCrop],
+  );
+
+  const handleCardSizeConfirm = useCallback(
+    async (selection: CardSizeSelection) => {
+      if (!rawImage) return;
+      await finishAutoCrop(rawImage, pendingHint, selection);
+    },
+    [rawImage, pendingHint, finishAutoCrop],
+  );
 
   const handlePerspectiveComplete = useCallback(async (corrected: string) => {
     setWorkingImage(corrected);
@@ -156,6 +221,7 @@ export default function App() {
     setRawImage(null);
     setWorkingImage(null);
     setEditorRects({});
+    setSessionCardSize(null);
     setPhase('capture');
   }, []);
 
@@ -166,6 +232,7 @@ export default function App() {
     setRawImage(null);
     setWorkingImage(null);
     setEditorRects({});
+    setSessionCardSize(null);
     setPhase('capture');
   }, []);
 
@@ -189,6 +256,8 @@ export default function App() {
     setEditorRects({});
     setCardNames({ front: '', back: '' });
     setCurrentSide('front');
+    setSessionCardSize(null);
+    setPendingHint(undefined);
     setPhase('capture');
   }, []);
 
@@ -227,6 +296,25 @@ export default function App() {
     );
   }
 
+  if (phase === 'cardsize' && rawImage) {
+    return (
+      <CardSizePickerScreen
+        imageSrc={rawImage}
+        initial={{
+          cardFormat: 'pokemon',
+          customWidthMm: settings.customWidthMm,
+          customHeightMm: settings.customHeightMm,
+        }}
+        onConfirm={(selection) => void handleCardSizeConfirm(selection)}
+        onCancel={() => {
+          setRawImage(null);
+          setPendingHint(undefined);
+          setPhase('capture');
+        }}
+      />
+    );
+  }
+
   if (phase === 'autocrop') {
     return (
       <div className="loading" role="status" aria-live="polite">
@@ -241,6 +329,7 @@ export default function App() {
         imageSrc={rawImage}
         invertColors={settings.invertColors}
         initialCorners={perspectiveCorners}
+        cardAspect={autoCropOptions.cardAspect}
         onComplete={handlePerspectiveComplete}
         onSkip={handlePerspectiveSkip}
         onCancel={() => setPhase(workingImage ? 'editor' : 'capture')}
@@ -267,6 +356,7 @@ export default function App() {
           imageSrc={workingImage}
           side={currentSide}
           settings={settings}
+          cardFormat={activeCardFormat}
           session={session}
           cardName={cardNames[currentSide]}
           initialOuter={editorRects.outer}

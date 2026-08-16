@@ -853,6 +853,76 @@ body.editor-mode #root {
   line-height: 1.3;
 }
 
+.mm-scale-hint {
+  margin: -2px 0 0;
+  padding: 0 4px;
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.3;
+}
+
+.card-size-custom-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.card-size-number {
+  font-variant-numeric: tabular-nums;
+}
+
+.card-size-picker {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding: 12px 14px 20px;
+  gap: 12px;
+  background: var(--bg);
+}
+
+.card-size-picker-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.card-size-picker-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.card-size-picker-preview {
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #111;
+  max-height: 36vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-size-picker-preview img {
+  max-width: 100%;
+  max-height: 36vh;
+  object-fit: contain;
+  display: block;
+}
+
+.card-size-picker-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.card-size-picker-lead {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
 .editor-canvas {
   position: relative;
   border-radius: var(--radius);

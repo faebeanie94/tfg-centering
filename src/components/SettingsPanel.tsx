@@ -3,6 +3,7 @@ import type { AppSettings } from '../hooks/useAppSettings';
 import { DEFAULT_SETTINGS, SCAN_OBSTRUCTION_OPTIONS } from '../hooks/useAppSettings';
 import { SCAN_DISTANCE_OPTIONS } from '../lib/card-edge-detect';
 import { getAppBuildLabel, refreshAppToLatest } from '../lib/app-update';
+import { CardSizeFields } from './CardSizeFields';
 
 interface SettingsPanelProps {
   open: boolean;
@@ -109,6 +110,19 @@ export function SettingsPanel({ open, settings, onChange, onClose }: SettingsPan
             />
           </label>
           <p className="settings-hint">Display only — helps see borders on dark or light cards. Exports stay normal.</p>
+        </section>
+
+        <section className="settings-section">
+          <h3>Card size</h3>
+          <CardSizeFields
+            allowAsk
+            value={{
+              cardFormat: settings.cardFormat,
+              customWidthMm: settings.customWidthMm,
+              customHeightMm: settings.customHeightMm,
+            }}
+            onChange={(patch) => onChange(patch)}
+          />
         </section>
 
         <section className="settings-section">

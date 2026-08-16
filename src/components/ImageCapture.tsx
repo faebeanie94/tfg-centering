@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useEffect } from 'react';
+import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { useDeviceLevel } from '../hooks/useDeviceLevel';
 import { useCardEdgeDetector } from '../hooks/useCardEdgeDetector';
 import { useAutoCapture } from '../hooks/useAutoCapture';
@@ -22,6 +22,11 @@ import {
 import { getScannerHint } from '../lib/level-hint';
 import { ScannerOverlay } from './ScannerOverlay';
 import type { CaptureDetectHint } from '../lib/auto-crop';
+import {
+  cardAspect,
+  fallbackCardFormatForDetection,
+  resolveCardFormat,
+} from '../lib/card-sizes';
 
 interface ImageCaptureProps {
   side: CardSide;
@@ -60,9 +65,21 @@ export function ImageCapture({
 
   const showLevel = settings.levelIndicators;
   const level = useDeviceLevel(cameraActive && showLevel, motionGranted);
+  const scanFormat = useMemo(() => {
+    if (settings.cardFormat === 'ask') {
+      return fallbackCardFormatForDetection(settings.customWidthMm, settings.customHeightMm);
+    }
+    return resolveCardFormat({
+      cardFormat: settings.cardFormat,
+      customWidthMm: settings.customWidthMm,
+      customHeightMm: settings.customHeightMm,
+    });
+  }, [settings.cardFormat, settings.customWidthMm, settings.customHeightMm]);
   const { guideBox, detectedBox, alignment } = useCardEdgeDetector(cameraActive, videoRef, {
     scanDistanceCm: settings.scanDistanceCm,
     obstructionBottom: settings.scanObstructionBottom,
+    cardAspect: cardAspect(scanFormat),
+    cardHeightMm: scanFormat.heightMm,
   });
   const detectedBoxRef = useRef(detectedBox);
   const guideBoxRef = useRef(guideBox);
