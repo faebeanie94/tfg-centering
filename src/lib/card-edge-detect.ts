@@ -176,27 +176,41 @@ function estimateBackgroundLum(
   span: number,
 ): number {
   const samples: number[] = [];
-  const offsets: Array<[number, number]> = [
-    [-span * 1.1, 0],
-    [span * 1.1, 0],
-    [0, span * 1.1],
-    [-span * 0.9, span * 0.9],
-    [span * 0.9, span * 0.9],
-    // Frame corners — often true background when the card sits on paper.
-    [-0.42, -0.42],
-    [0.42, -0.42],
-    [-0.42, 0.42],
-    [0.42, 0.42],
+  // Frame edges/corners — not ±span from centre, which lands on the card
+  // (and then the detector treats the yellow print box as the "rim").
+  const border: Array<[number, number]> = [
+    [0.04, 0.04],
+    [0.96, 0.04],
+    [0.04, 0.96],
+    [0.96, 0.96],
+    [0.5, 0.03],
+    [0.5, 0.97],
+    [0.03, 0.5],
+    [0.97, 0.5],
+    [0.2, 0.04],
+    [0.8, 0.04],
+    [0.2, 0.96],
+    [0.8, 0.96],
   ];
-
-  for (const [ox, oy] of offsets) {
+  for (const [nx, ny] of border) {
+    const x = clamp(Math.round(nx * w), 1, w - 2);
+    const y = clamp(Math.round(ny * h), 1, h - 2);
+    samples.push(lum(data, y * w + x));
+  }
+  // Far from the search centre, if that still sits in-frame.
+  for (const [ox, oy] of [
+    [-span * 1.35, 0],
+    [span * 1.35, 0],
+    [0, span * 1.35],
+    [0, -span * 1.35],
+  ] as Array<[number, number]>) {
     const x = clamp(Math.round(cx * w + ox * w), 1, w - 2);
     const y = clamp(Math.round(cy * h + oy * h), 1, h - 2);
     samples.push(lum(data, y * w + x));
   }
 
   samples.sort((a, b) => a - b);
-  return samples[Math.floor(samples.length / 2)] ?? 24;
+  return samples[Math.floor(samples.length * 0.35)] ?? 24;
 }
 
 /** Build a blurred luminance plane so holographic glare spikes don't fake edges. */
@@ -511,11 +525,15 @@ function scoreCardBox(
   if (!expected) return 1 - aspectErr;
 
   const sizeRatio = (box.width / expected.width + box.height / expected.height) / 2;
-  if (sizeRatio < 0.4 || sizeRatio > 1.6) return -1;
+  if (sizeRatio < 0.35 || sizeRatio > 2.8) return -1;
 
-  const sizeScore = 1 - Math.min(1, Math.abs(1 - sizeRatio));
+  const area = box.width * box.height;
+  if (area < 0.06 || area > 0.9) return -1;
+
+  const matchExpected = 1 - Math.min(1, Math.abs(1 - sizeRatio) / 1.5);
+  const outerBias = Math.max(0, Math.min(1, (area - 0.08) / 0.5));
   const aspectScore = 1 - Math.min(1, aspectErr / 0.12);
-  return sizeScore * 0.65 + aspectScore * 0.35;
+  return aspectScore * 0.3 + matchExpected * 0.25 + outerBias * 0.45;
 }
 
 function detectFromBackground(
@@ -600,10 +618,10 @@ function collectGradientBandEdges(
   const yFracs = [0.3, 0.42, 0.5, 0.58, 0.7];
   const xFracs = [0.3, 0.42, 0.5, 0.58, 0.7];
 
-  const minW = Math.max(6, expectedHalfW * 0.55);
-  const maxW = Math.max(minW + 4, expectedHalfW * 1.5);
-  const minH = Math.max(6, expectedHalfH * 0.55);
-  const maxH = Math.max(minH + 4, expectedHalfH * 1.5);
+  const minW = Math.max(6, expectedHalfW * 0.45);
+  const maxW = Math.max(minW + 4, expectedHalfW * 2.5);
+  const minH = Math.max(6, expectedHalfH * 0.45);
+  const maxH = Math.max(minH + 4, expectedHalfH * 2.5);
 
   const leftXs: number[] = [];
   const rightXs: number[] = [];
@@ -787,6 +805,7 @@ export function detectCardFrameFromImageData(
     }
 
     consider(detectFromGradientBand(luma, w, h, sx, sy, expectedHalfW, expectedHalfH));
+    consider(detectFromGradientBand(luma, w, h, sx, sy, expectedHalfW * 1.7, expectedHalfH * 1.7));
 
     if (bestScore < 0.4) {
       for (const thresh of [22, 28, 36, 44]) {
@@ -978,6 +997,11 @@ export function defaultGuideBox(): DetectedCard {
 
 export function shouldAcceptDetection(prev: DetectedCard | null, next: DetectedCard): boolean {
   if (!prev) return true;
+
+  const prevArea = prev.width * prev.height;
+  const nextArea = next.width * next.height;
+  // Inner artwork → outer card rim is a large size jump; always take the bigger box.
+  if (nextArea > prevArea * 1.35) return true;
 
   const prevCx = prev.left + prev.width / 2;
   const prevCy = prev.top + prev.height / 2;

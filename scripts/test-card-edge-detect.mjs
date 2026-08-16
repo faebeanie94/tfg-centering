@@ -164,6 +164,46 @@ for (const c of cases) {
   }
 }
 
+// Small guide search must still lock the OUTER card, not the inner artwork
+// (the live bug: dashed/green boxes sitting in the middle of a TCG).
+{
+  const outer = { left: 0.18, top: 0.12, width: 0.52, height: 0.52 / CARD_ASPECT };
+  const inner = {
+    left: outer.left + outer.width * 0.12,
+    top: outer.top + outer.height * 0.1,
+    width: outer.width * 0.76,
+    height: outer.height * 0.78,
+  };
+  const data = makeFrame(w, h, [22, 24, 26], {
+    left: outer.left,
+    top: outer.top,
+    width: outer.width,
+    height: outer.height,
+    body: [240, 210, 40],
+  });
+  fillRect(
+    data, w, h,
+    inner.left, inner.top, inner.left + inner.width, inner.top + inner.height,
+    [180, 50, 40],
+  );
+  const found = detectCardFrameFromImageData(data, w, h, {
+    cx: inner.left + inner.width / 2,
+    cy: inner.top + inner.height / 2,
+    expectedWidth: inner.width,
+    expectedHeight: inner.height,
+    cardAspect: CARD_ASPECT,
+  });
+  try {
+    assert(found, 'inner-vs-outer: expected a detection');
+    assert(overlaps(found!.box, outer, 0.55), 'inner-vs-outer: must track the card rim, got ' + JSON.stringify(found!.box));
+    assert(!overlaps(found!.box, inner, 0.85), 'inner-vs-outer: must not collapse to the artwork box');
+    console.log('ok - outer rim over inner artwork', found!.box);
+  } catch (e) {
+    failed++;
+    console.error('FAIL -', (e as Error).message);
+  }
+}
+
 // Empty bright frame should not invent a card.
 {
   const data = makeFrame(w, h, [240, 240, 240], {
