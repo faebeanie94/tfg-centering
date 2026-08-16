@@ -13,6 +13,13 @@ import {
   OUTPUT_PADDING_RATIO,
   perspectiveCorrect,
 } from './perspective';
+import {
+  buildCannyEdgeMap,
+  cornersToPoints,
+  detectedBoxToQuad,
+  findBestCardCandidate,
+  perspectiveAwareCandidateScore,
+} from './card-candidate-score';
 
 export interface CaptureDetectHint {
   /** Normalised axis-aligned box from the live scanner (0–1). */
@@ -149,6 +156,7 @@ function searchCandidates(
 
   for (const distance of [20, 12, 30] as const) {
     const template = guideTemplateForDistance(distance, cardAspect, cardHeightMm);
+    // 0.36 is only a live-guide search seed, not a scoring prior.
     searches.push({
       cx: 0.5,
       cy: 0.36,
@@ -456,6 +464,7 @@ function refineQuadFromSeed(
   h: number,
   seed: DetectedCard,
   cardAspect: number = CARD_ASPECT,
+  edgeMap?: Uint8Array,
 ): CornerDetection | null {
   const cx = (seed.left + seed.width / 2) * w;
   const cy = (seed.top + seed.height / 2) * h;
@@ -509,7 +518,13 @@ function refineQuadFromSeed(
 
   const residualAvg =
     (left.residual + right.residual + top.residual + bottom.residual) / 4;
-  let confidence = scoreQuad(ordered, w, h, residualAvg, cardAspect);
+  const geometry = scoreQuad(ordered, w, h, residualAvg, cardAspect);
+  if (geometry <= 0) return null;
+
+  const image = { data, width: w, height: h };
+  let confidence = perspectiveAwareCandidateScore(image, cornersToPoints(ordered), edgeMap);
+  // Line-fit residual still matters: a jagged rim should not outrank a clean quad.
+  confidence *= 0.75 + 0.25 * (1 - Math.min(1, residualAvg / 6));
   if (confidence < 0.2) return null;
 
   // Prefer colourful card bodies over pale mats / paper pads.
@@ -541,9 +556,7 @@ function findBestSeedBox(
   cardAspect: number,
   cardHeightMm: number,
 ): { box: DetectedCard; rotationDeg: number; score: number } | null {
-  let bestBox: DetectedCard | null = null;
-  let bestRot = 0;
-  let bestScore = -1;
+  const collected: Array<{ box: DetectedCard; rotationDeg: number }> = [];
 
   // Extra search centres from colourful pixels (card body vs pale paper).
   const chromaSeeds: DetectSearchRegion[] = [];
@@ -583,43 +596,57 @@ function findBestSeedBox(
   for (const search of [...chromaSeeds, ...searchCandidates(hint, cardAspect, cardHeightMm)]) {
     const found = detectCardFrameFromImageData(data, w, h, search);
     if (!found) continue;
-
-    const expected =
-      search.expectedWidth != null && search.expectedHeight != null
-        ? { width: search.expectedWidth, height: search.expectedHeight }
-        : undefined;
-
-    const aspectErr = Math.abs(found.box.width / found.box.height - cardAspect);
-    let score = 1 - aspectErr / 0.06;
-    if (expected) {
-      const sizeRatio =
-        (found.box.width / expected.width + found.box.height / expected.height) / 2;
-      if (sizeRatio >= 0.35 && sizeRatio <= 1.7) {
-        score = score * 0.35 + (1 - Math.min(1, Math.abs(1 - sizeRatio))) * 0.65;
-      } else {
-        score *= 0.35;
-      }
-    }
-
-    // Down-rank pale paper pads that happen to look rectangular.
-    const chroma = boxChroma(data, w, h, found.box);
-    if (chroma < 18) score *= 0.45;
-    else if (chroma > 35) score += 0.08;
-
-    // Prefer mid-frame card-sized regions over near-full-frame mats.
-    const area = found.box.width * found.box.height;
-    if (area > 0.55) score *= 0.5;
-    if (area < 0.08) score *= 0.6;
-
-    if (score > bestScore) {
-      bestScore = score;
-      bestBox = found.box;
-      bestRot = found.rotationDeg;
-    }
+    collected.push(found);
   }
 
-  if (!bestBox || bestScore < 0.2) return null;
-  return { box: bestBox, rotationDeg: bestRot, score: bestScore };
+  if (!collected.length) return null;
+
+  const image = { data, width: w, height: h };
+  const unique = dedupeSeedBoxes(collected);
+  const ranked = findBestCardCandidate(
+    image,
+    unique.map((item) => ({
+      ...item,
+      points: detectedBoxToQuad(item.box, w, h),
+    })),
+  );
+
+  if (!ranked || ranked.score < 0.2) return null;
+
+  const winner =
+    unique.find((item) => item.box === ranked.box) ??
+    unique.find((item) => boxIou(item.box, ranked.box) > 0.85) ??
+    unique[0];
+  let score = ranked.score;
+
+  // Pale paper pads can still form a clean rectangle; keep a light chroma prior.
+  const chroma = boxChroma(data, w, h, winner.box);
+  if (chroma < 18) score *= 0.55;
+  else if (chroma > 40) score = Math.min(1, score + 0.05);
+
+  if (score < 0.2) return null;
+  return { box: winner.box, rotationDeg: winner.rotationDeg, score };
+}
+
+function dedupeSeedBoxes(
+  items: Array<{ box: DetectedCard; rotationDeg: number }>,
+): Array<{ box: DetectedCard; rotationDeg: number }> {
+  const unique: Array<{ box: DetectedCard; rotationDeg: number }> = [];
+  for (const item of items) {
+    const duplicate = unique.some((other) => boxIou(item.box, other.box) > 0.85);
+    if (!duplicate) unique.push(item);
+  }
+  return unique;
+}
+
+function boxIou(a: DetectedCard, b: DetectedCard): number {
+  const x0 = Math.max(a.left, b.left);
+  const y0 = Math.max(a.top, b.top);
+  const x1 = Math.min(a.left + a.width, b.left + b.width);
+  const y1 = Math.min(a.top + a.height, b.top + b.height);
+  const inter = Math.max(0, x1 - x0) * Math.max(0, y1 - y0);
+  const union = a.width * a.height + b.width * b.height - inter;
+  return union <= 0 ? 0 : inter / union;
 }
 
 /**
@@ -652,10 +679,11 @@ export async function detectCardCornersFromImage(
   if (seed) seeds.push(seed.box);
   if (hint?.box) seeds.push(hint.box);
 
+  const edgeMap = seeds.length ? buildCannyEdgeMap({ data, width: w, height: h }) : undefined;
   let best: CornerDetection | null = null;
 
   for (const s of seeds) {
-    const refined = refineQuadFromSeed(data, w, h, s, cardAspect);
+    const refined = refineQuadFromSeed(data, w, h, s, cardAspect, edgeMap);
     if (refined && (!best || refined.confidence > best.confidence)) {
       best = refined;
     }
