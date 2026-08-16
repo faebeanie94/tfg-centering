@@ -143,8 +143,9 @@ export function BorderEditor({
       grade: tfgGrade,
       savedAt: Date.now(),
       name: cardName.trim() || undefined,
+      cardFormatId: cardFormat.id,
     };
-  }, [imageSrc, outer, inner, result, tfgGrade, cardName]);
+  }, [imageSrc, outer, inner, result, tfgGrade, cardName, cardFormat.id]);
 
   function resetLines() {
     if (!imageSize) return;
@@ -188,50 +189,68 @@ export function BorderEditor({
 
       const start = dragStartRef.current;
       const rect = containerRef.current?.getBoundingClientRect();
-      const imageScale = rect && imageSize ? rect.width / imageSize.width : displayScale;
+      const imageScale = (rect && imageSize && rect.width > 0) ? rect.width / imageSize.width : displayScale;
       const dx = (e.clientX - start.x) / imageScale;
       const dy = (e.clientY - start.y) / imageScale;
       const r = start.rect;
       let next: Rect = { ...r };
 
+      const isOuter = dragTarget.rect === 'outer';
+      const innerMinX = inner?.x ?? 0;
+      const innerMaxX = inner ? inner.x + inner.width : imageSize.width;
+      const innerMinY = inner?.y ?? 0;
+      const innerMaxY = inner ? inner.y + inner.height : imageSize.height;
+
       if ('edge' in dragTarget) {
         switch (dragTarget.edge) {
           case 'left':
-            next.x = clamp(r.x + dx, 0, r.x + r.width - 20);
+            const leftMax = isOuter ? Math.min(r.x + r.width - 20, innerMinX) : r.x + r.width - 20;
+            next.x = clamp(r.x + dx, 0, leftMax);
             next.width = r.width - (next.x - r.x);
             break;
           case 'right':
-            next.width = clamp(r.width + dx, 20, imageSize.width - r.x);
+            const rightMin = isOuter ? Math.max(20, innerMaxX - r.x) : 20;
+            next.width = clamp(r.width + dx, rightMin, imageSize.width - r.x);
             break;
           case 'top':
-            next.y = clamp(r.y + dy, 0, r.y + r.height - 20);
+            const topMax = isOuter ? Math.min(r.y + r.height - 20, innerMinY) : r.y + r.height - 20;
+            next.y = clamp(r.y + dy, 0, topMax);
             next.height = r.height - (next.y - r.y);
             break;
           case 'bottom':
-            next.height = clamp(r.height + dy, 20, imageSize.height - r.y);
+            const bottomMin = isOuter ? Math.max(20, innerMaxY - r.y) : 20;
+            next.height = clamp(r.height + dy, bottomMin, imageSize.height - r.y);
             break;
         }
       } else if ('corner' in dragTarget) {
         switch (dragTarget.corner) {
           case 'tl':
-            next.x = clamp(r.x + dx, 0, r.x + r.width - 20);
-            next.y = clamp(r.y + dy, 0, r.y + r.height - 20);
+            const tlLeftMax = isOuter ? Math.min(r.x + r.width - 20, innerMinX) : r.x + r.width - 20;
+            const tlTopMax = isOuter ? Math.min(r.y + r.height - 20, innerMinY) : r.y + r.height - 20;
+            next.x = clamp(r.x + dx, 0, tlLeftMax);
+            next.y = clamp(r.y + dy, 0, tlTopMax);
             next.width = r.width - (next.x - r.x);
             next.height = r.height - (next.y - r.y);
             break;
           case 'tr':
-            next.y = clamp(r.y + dy, 0, r.y + r.height - 20);
-            next.width = clamp(r.width + dx, 20, imageSize.width - r.x);
+            const trTopMax = isOuter ? Math.min(r.y + r.height - 20, innerMinY) : r.y + r.height - 20;
+            const trRightMin = isOuter ? Math.max(20, innerMaxX - r.x) : 20;
+            next.y = clamp(r.y + dy, 0, trTopMax);
+            next.width = clamp(r.width + dx, trRightMin, imageSize.width - r.x);
             next.height = r.height - (next.y - r.y);
             break;
           case 'bl':
-            next.x = clamp(r.x + dx, 0, r.x + r.width - 20);
+            const blLeftMax = isOuter ? Math.min(r.x + r.width - 20, innerMinX) : r.x + r.width - 20;
+            const blBottomMin = isOuter ? Math.max(20, innerMaxY - r.y) : 20;
+            next.x = clamp(r.x + dx, 0, blLeftMax);
             next.width = r.width - (next.x - r.x);
-            next.height = clamp(r.height + dy, 20, imageSize.height - r.y);
+            next.height = clamp(r.height + dy, blBottomMin, imageSize.height - r.y);
             break;
           case 'br':
-            next.width = clamp(r.width + dx, 20, imageSize.width - r.x);
-            next.height = clamp(r.height + dy, 20, imageSize.height - r.y);
+            const brRightMin = isOuter ? Math.max(20, innerMaxX - r.x) : 20;
+            const brBottomMin = isOuter ? Math.max(20, innerMaxY - r.y) : 20;
+            next.width = clamp(r.width + dx, brRightMin, imageSize.width - r.x);
+            next.height = clamp(r.height + dy, brBottomMin, imageSize.height - r.y);
             break;
         }
       }

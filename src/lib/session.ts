@@ -9,6 +9,7 @@ export interface SideSnapshot {
   grade: TfgCenteringGrade;
   savedAt: number;
   name?: string;
+  cardFormatId?: string;
 }
 
 export interface GradingSession {

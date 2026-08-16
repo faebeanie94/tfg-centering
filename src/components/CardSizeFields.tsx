@@ -72,7 +72,8 @@ export function CardSizeFields({
               max={CUSTOM_SIZE_MAX_MM}
               step={0.1}
               value={value.customWidthMm}
-              onChange={(e) => onChange({ customWidthMm: clampCardMm(Number(e.target.value)) })}
+              onChange={(e) => onChange({ customWidthMm: Number(e.target.value) })}
+              onBlur={(e) => onChange({ customWidthMm: clampCardMm(Number(e.target.value)) })}
             />
           </label>
           <label className="settings-field card-size-custom-field">
@@ -84,7 +85,8 @@ export function CardSizeFields({
               max={CUSTOM_SIZE_MAX_MM}
               step={0.1}
               value={value.customHeightMm}
-              onChange={(e) => onChange({ customHeightMm: clampCardMm(Number(e.target.value)) })}
+              onChange={(e) => onChange({ customHeightMm: Number(e.target.value) })}
+              onBlur={(e) => onChange({ customHeightMm: clampCardMm(Number(e.target.value)) })}
             />
           </label>
         </div>

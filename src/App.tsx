@@ -19,6 +19,7 @@ import {
   fallbackCardFormatForDetection,
   resolveCardFormat,
   type CardSizeSelection,
+  type CardFormatId,
 } from './lib/card-sizes';
 
 type Phase =
@@ -86,8 +87,19 @@ export default function App() {
       front: record.session.front?.name ?? '',
       back: record.session.back?.name ?? '',
     });
-    const fromSettings = selectionFromSettings(settings);
-    setSessionCardSize(fromSettings);
+    const side = record.session.front || record.session.back;
+    const cardFormatId = side?.cardFormatId;
+    let selection: CardSizeSelection | null = null;
+    if (cardFormatId && cardFormatId !== 'ask') {
+      selection = {
+        cardFormat: cardFormatId as CardFormatId,
+        customWidthMm: settings.customWidthMm,
+        customHeightMm: settings.customHeightMm,
+      };
+    } else {
+      selection = selectionFromSettings(settings);
+    }
+    setSessionCardSize(selection);
     if (record.session.front) {
       setWorkingImage(record.session.front.imageSrc);
       setEditorRects({ outer: record.session.front.outer, inner: record.session.front.inner });

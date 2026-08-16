@@ -115,7 +115,7 @@ export function usePinchZoom(viewportRef: RefObject<HTMLElement | null>, maxZoom
         };
 
         const dist = distance(pts[0], pts[1]);
-        const newZoom = gesture.startZoom * (dist / gesture.startDistance);
+        const newZoom = gesture.startZoom * (dist / Math.max(gesture.startDistance, 1e-9));
 
         const wx = (startMidLocal.x - gesture.startPan.x) / gesture.startZoom;
         const wy = (startMidLocal.y - gesture.startPan.y) / gesture.startZoom;

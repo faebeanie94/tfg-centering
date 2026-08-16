@@ -98,6 +98,13 @@ export function ImageCapture({
     return () => document.body.classList.remove('scanner-mode');
   }, [cameraActive]);
 
+  useEffect(() => {
+    return () => {
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    };
+  }, []);
+
   const takePhoto = useCallback(async () => {
     const video = videoRef.current;
     const canvas = canvasRef.current;

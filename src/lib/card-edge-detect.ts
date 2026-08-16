@@ -98,25 +98,25 @@ function estimateRotationDeg(
   const tilts: number[] = [];
 
   if (leftXs.length >= 2) {
-    const dy = h * 0.36;
+    const dy = h * 0.38;
     const dx = leftXs[leftXs.length - 1] - leftXs[0];
     if (dy > 0) tilts.push((Math.atan2(dx, dy) * 180) / Math.PI);
   }
 
   if (rightXs.length >= 2) {
-    const dy = h * 0.36;
+    const dy = h * 0.38;
     const dx = rightXs[rightXs.length - 1] - rightXs[0];
     if (dy > 0) tilts.push((Math.atan2(dx, dy) * 180) / Math.PI);
   }
 
   if (topYs.length >= 2) {
-    const dx = w * 0.36;
+    const dx = w * 0.38;
     const dy = topYs[topYs.length - 1] - topYs[0];
     if (dx > 0) tilts.push(-(Math.atan2(dy, dx) * 180) / Math.PI);
   }
 
   if (bottomYs.length >= 2) {
-    const dx = w * 0.36;
+    const dx = w * 0.38;
     const dy = bottomYs[bottomYs.length - 1] - bottomYs[0];
     if (dx > 0) tilts.push(-(Math.atan2(dy, dx) * 180) / Math.PI);
   }
@@ -712,9 +712,10 @@ function detectFromGradientBand(
   py: number,
   expectedHalfW: number,
   expectedHalfH: number,
+  cardAspectRatio: number = CARD_ASPECT,
 ): CardFrameDetection | null {
   const edges = collectGradientBandEdges(luma, w, h, px, py, expectedHalfW, expectedHalfH);
-  return boxFromOuterEdges(edges.leftXs, edges.rightXs, edges.topYs, edges.bottomYs, w, h, 'median');
+  return boxFromOuterEdges(edges.leftXs, edges.rightXs, edges.topYs, edges.bottomYs, w, h, 'median', cardAspectRatio);
 }
 
 function collectRefEdges(
@@ -873,7 +874,7 @@ export function detectCardFrameFromImageData(
       }
     }
 
-    consider(detectFromGradientBand(luma, w, h, sx, sy, expectedHalfW, expectedHalfH));
+    consider(detectFromGradientBand(luma, w, h, sx, sy, expectedHalfW, expectedHalfH, cardAspectRatio));
 
     if (bestScore < 0.4) {
       for (const thresh of [22, 28, 36, 44]) {

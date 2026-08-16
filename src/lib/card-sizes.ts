@@ -103,14 +103,15 @@ export function resolveCardFormat(selection: CardSizeSelection): CardFormat {
 
 /**
  * Size used while scanning / auto-cropping when Settings is `ask`
- * (no concrete size yet). Poker-size is the common case.
+ * (no concrete size yet). Uses custom size if provided, otherwise defaults to Poker.
  */
 export function fallbackCardFormatForDetection(
   customWidthMm?: number,
   customHeightMm?: number,
 ): CardFormat {
+  const cardFormat = (customWidthMm != null || customHeightMm != null) ? 'custom' : DEFAULT_CARD_FORMAT_ID;
   return resolveCardFormat({
-    cardFormat: DEFAULT_CARD_FORMAT_ID,
+    cardFormat,
     customWidthMm,
     customHeightMm,
   });

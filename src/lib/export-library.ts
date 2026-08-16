@@ -45,10 +45,14 @@ function extensionForMime(mime: string): string {
 }
 
 function base64ToBytes(base64: string): Uint8Array<ArrayBuffer> {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-  return bytes;
+  try {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  } catch (err) {
+    throw new Error(`Failed to decode base64 image: ${err instanceof Error ? err.message : 'unknown error'}`);
+  }
 }
 
 /**
@@ -305,12 +309,16 @@ export async function buildLibraryArchive(
       const snapshot = record.session[side];
       if (!snapshot) continue;
 
-      const { bytes, extension } = await readImage(snapshot.imageSrc);
-      const imagePath = `${basePath}-${side}.${extension}`;
-      entries.push({ name: imagePath, data: bytes, date: new Date(snapshot.savedAt) });
-      csvLines.push(csvRowForSide(record, side, snapshot, imagePath));
-      sides[side] = manifestSide(snapshot, imagePath);
-      imageCount += 1;
+      try {
+        const { bytes, extension } = await readImage(snapshot.imageSrc);
+        const imagePath = `${basePath}-${side}.${extension}`;
+        entries.push({ name: imagePath, data: bytes, date: new Date(snapshot.savedAt) });
+        csvLines.push(csvRowForSide(record, side, snapshot, imagePath));
+        sides[side] = manifestSide(snapshot, imagePath);
+        imageCount += 1;
+      } catch (err) {
+        console.warn(`Skipping corrupted image for card ${record.label} (${side}):`, err);
+      }
     }
 
     manifestCards.push({
