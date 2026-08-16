@@ -384,11 +384,9 @@ export function ImageCapture({
         ? 'Focusing on card…'
         : detector.isReadyToCapture
           ? 'CAPTURING...'
-          : detector.detectedCorners && detector.confidence >= 0.9 && settings.autoCapture && liveQuality?.valid
-            ? `HOLD STEADY  ${Math.ceil((1 - detector.captureProgress) * detector.requiredFrames)}`
-            : liveQuality && detector.detectedCorners
-              ? liveQuality.message
-              : getScannerHint(level, alignment, showLevel);
+          : liveQuality && detector.detectedCorners
+            ? liveQuality.message
+            : getScannerHint(level, alignment, showLevel);
 
   if (cameraActive) {
     return (
