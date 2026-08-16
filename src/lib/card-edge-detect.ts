@@ -174,8 +174,10 @@ function estimateBackgroundLum(
   cx: number,
   cy: number,
   span: number,
+  maxBottom = 1,
 ): number {
   const samples: number[] = [];
+  const yLimit = Math.max(0.2, maxBottom - 0.02);
   // Frame edges/corners — not ±span from centre, which lands on the card
   // (and then the detector treats the yellow print box as the "rim").
   const border: Array<[number, number]> = [
@@ -193,6 +195,7 @@ function estimateBackgroundLum(
     [0.8, 0.96],
   ];
   for (const [nx, ny] of border) {
+    if (ny > yLimit) continue;
     const x = clamp(Math.round(nx * w), 1, w - 2);
     const y = clamp(Math.round(ny * h), 1, h - 2);
     samples.push(lum(data, y * w + x));
@@ -206,6 +209,7 @@ function estimateBackgroundLum(
   ] as Array<[number, number]>) {
     const x = clamp(Math.round(cx * w + ox * w), 1, w - 2);
     const y = clamp(Math.round(cy * h + oy * h), 1, h - 2);
+    if (y / h > yLimit) continue;
     samples.push(lum(data, y * w + x));
   }
 
@@ -391,6 +395,8 @@ export interface DetectSearchRegion {
   expectedHeight?: number;
   /** Portrait width/height for the card format being scanned. */
   cardAspect?: number;
+  /** Ignore / reject boxes that extend into the stand (0–1 from top). */
+  maxBottom?: number;
 }
 
 function collectBackgroundEdges(
@@ -783,7 +789,8 @@ export function detectCardFrameFromImageData(
       : { width: cardAspectRatio * 0.4, height: 0.4 };
 
   const span = expected.height / 2;
-  const bgLum = estimateBackgroundLum(data, w, h, cx, cy, span);
+  const maxBottom = search?.maxBottom != null && Number.isFinite(search.maxBottom) ? search.maxBottom : 1;
+  const bgLum = estimateBackgroundLum(data, w, h, cx, cy, span, maxBottom);
   const lightBackground = bgLum >= 110;
   const luma = buildBlurredLuma(data, w, h);
 
@@ -791,12 +798,13 @@ export function detectCardFrameFromImageData(
   const expectedHalfH = (expected.height * h) / 2;
 
   // Multiple seeds so a glare streak on the exact guide centre can't wipe detection.
+  const seedCyMax = Math.max(0.08, maxBottom - 0.08);
   const seeds: Array<[number, number]> = [
-    [Math.floor(cx * w), Math.floor(cy * h)],
-    [Math.floor(cx * w), Math.floor((cy - 0.04) * h)],
-    [Math.floor(cx * w), Math.floor((cy + 0.04) * h)],
-    [Math.floor((cx - 0.04) * w), Math.floor(cy * h)],
-    [Math.floor((cx + 0.04) * w), Math.floor(cy * h)],
+    [Math.floor(cx * w), Math.floor(Math.min(cy, seedCyMax) * h)],
+    [Math.floor(cx * w), Math.floor(Math.min(cy - 0.04, seedCyMax) * h)],
+    [Math.floor(cx * w), Math.floor(Math.min(cy + 0.04, seedCyMax) * h)],
+    [Math.floor((cx - 0.04) * w), Math.floor(Math.min(cy, seedCyMax) * h)],
+    [Math.floor((cx + 0.04) * w), Math.floor(Math.min(cy, seedCyMax) * h)],
   ];
 
   let best: CardFrameDetection | null = null;
@@ -804,9 +812,17 @@ export function detectCardFrameFromImageData(
 
   const consider = (found: CardFrameDetection | null) => {
     if (!found) return;
-    let score = scoreCardBox(found.box, expected, cardAspectRatio, w, h);
+    let box = found.box;
+    const boxBottom = box.top + box.height;
+    if (boxBottom > maxBottom + 0.02) {
+      const clippedH = maxBottom - box.top;
+      if (clippedH < box.height * 0.72 || clippedH < 0.16) return;
+      box = { ...box, height: clippedH };
+      found = { ...found, box };
+    }
+    let score = scoreCardBox(box, expected, cardAspectRatio, w, h);
     if (score < 0) return;
-    score += boxPrintScore(data, w, h, found.box) * 0.18;
+    score += boxPrintScore(data, w, h, box) * 0.18;
     if (score > bestScore) {
       bestScore = score;
       best = found;
@@ -918,11 +934,18 @@ export function detectCardBox(video: HTMLVideoElement, canvas: HTMLCanvasElement
 export const SCAN_DISTANCE_OPTIONS = [12, 20, 30] as const;
 export type ScanDistanceCm = (typeof SCAN_DISTANCE_OPTIONS)[number];
 
-/** Fraction of the unobstructed frame the card silhouette should fill. */
+/** Fraction of the *full* preview the dashed card should fill (no stand). */
 const GUIDE_FILL: Record<ScanDistanceCm, number> = {
   12: 0.9,
   20: 0.86,
   30: 0.78,
+};
+
+/** With a box stand, the card is a silhouette in the clear band — not 86% of that band. */
+const GUIDE_FILL_WITH_STAND: Record<ScanDistanceCm, number> = {
+  12: 0.56,
+  20: 0.5,
+  30: 0.42,
 };
 
 /** Guide frame sized for a card at the given phone-to-card distance (cm). */
@@ -958,9 +981,12 @@ export function guideTemplateForDistance(
   obstructionBottom = 0,
 ): { width: number; height: number } {
   const fa = frameAspect > 0.15 && Number.isFinite(frameAspect) ? frameAspect : 1;
-  const fill = GUIDE_FILL[distanceCm] ?? 0.86;
-  const availableH = Math.max(0.55, 1 - Math.max(0, obstructionBottom) - 0.02);
-  let height = Math.min(availableH, fill);
+  const stand = obstructionBottom > 0.05;
+  const fill = stand
+    ? (GUIDE_FILL_WITH_STAND[distanceCm] ?? 0.5)
+    : (GUIDE_FILL[distanceCm] ?? 0.86);
+  const availableH = Math.max(stand ? 0.38 : 0.55, 1 - Math.max(0, obstructionBottom) - 0.02);
+  let height = Math.min(availableH * (stand ? 0.92 : 1), fill);
 
   let width = height * (cardAspectRatio / fa);
   const maxW = 0.94;

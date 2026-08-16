@@ -25,6 +25,8 @@ import {
   detectCardFrameFromImageData,
   guideTemplateForDistance,
 } from '${join(root, 'src/lib/card-edge-detect.ts').replace(/\\\\/g, '/')}';
+import { evaluateCardAlignment } from '${join(root, 'src/lib/card-alignment.ts').replace(/\\\\/g, '/')}';
+import { getCardAlignmentHint } from '${join(root, 'src/lib/level-hint.ts').replace(/\\\\/g, '/')}';
 
 function fillRect(
   data: Uint8ClampedArray,
@@ -106,6 +108,12 @@ assert(
   'portrait frame guide should match poker aspect',
 );
 assert(portraitGuide.width > template.width, 'portrait video makes the dashed card wider');
+const standGuide = guideTemplateForDistance(20, CARD_ASPECT, 88.9, 3 / 4, 0.32);
+assert(
+  standGuide.height >= 0.38 && standGuide.height <= 0.56,
+  'phone-on-box 20cm guide should be a card silhouette, got ' + standGuide.height,
+);
+assert(standGuide.height < template.height - 0.15, 'stand crop must shrink the dashes vs full frame');
 const card = {
   left: 0.5 - template.width / 2,
   top: Math.max(0.02, 0.5 - template.height / 2),
@@ -242,6 +250,45 @@ for (const c of cases) {
   }
 }
 
+// Phone-on-box stand: cardboard in the bottom third must not become the orange box.
+{
+  const sitting = { left: 0.28, top: 0.08, width: 0.38, height: 0.38 / CARD_ASPECT };
+  const data = new Uint8ClampedArray(w * h * 4);
+  fillRect(data, w, h, 0, 0, 1, 1, [24, 26, 28]);
+  fillRect(data, w, h, 0, 0.68, 1, 1, [186, 142, 78]);
+  fillRect(
+    data, w, h,
+    sitting.left, sitting.top, sitting.left + sitting.width, sitting.top + sitting.height,
+    [236, 200, 50],
+  );
+  fillRect(
+    data, w, h,
+    sitting.left + sitting.width * 0.1,
+    sitting.top + sitting.height * 0.1,
+    sitting.left + sitting.width * 0.9,
+    sitting.top + sitting.height * 0.9,
+    [200, 60, 40],
+  );
+  const found = detectCardFrameFromImageData(data, w, h, {
+    cx: sitting.left + sitting.width / 2,
+    cy: sitting.top + sitting.height / 2,
+    expectedWidth: sitting.width,
+    expectedHeight: sitting.height,
+    cardAspect: CARD_ASPECT,
+    maxBottom: 0.68,
+  });
+  try {
+    assert(found, 'box-stand: expected a detection');
+    assert(overlaps(found!.box, sitting, 0.45), 'box-stand: should track the card, got ' + JSON.stringify(found!.box));
+    const bottom = found!.box.top + found!.box.height;
+    assert(bottom <= 0.7, 'box-stand: orange must stay above the box (bottom=' + bottom + ')');
+    console.log('ok - ignores box stand below card', found!.box);
+  } catch (e) {
+    failed++;
+    console.error('FAIL -', (e as Error).message);
+  }
+}
+
 // Empty bright frame should not invent a card.
 {
   const data = makeFrame(w, h, [240, 240, 240], {
@@ -289,6 +336,33 @@ for (const c of cases) {
     assert(found, 'padded still: expected a detection');
     assert(overlaps(found!.box, still, 0.55), 'padded still: box IoU too low (' + JSON.stringify(found!.box) + ')');
     console.log('ok - padded card-aspect still', found!.box);
+  } catch (e) {
+    failed++;
+    console.error('FAIL -', (e as Error).message);
+  }
+}
+
+{
+  const guide = { left: 0.22, top: 0.08, width: 0.5, height: 0.48 };
+  const orangeOnBox = { left: 0.18, top: 0.38, width: 0.62, height: 0.5 };
+  const hintUp = getCardAlignmentHint(evaluateCardAlignment(orangeOnBox, 0, guide));
+  try {
+    assert(!/move up/i.test(hintUp), 'orange on box must not say move up, got: ' + hintUp);
+    console.log('ok - hint ignores orange-on-box', hintUp);
+  } catch (e) {
+    failed++;
+    console.error('FAIL -', (e as Error).message);
+  }
+
+  const cardInDashes = { left: 0.28, top: 0.14, width: 0.38, height: 0.36 };
+  const oversizedGuide = { left: 0.12, top: 0.06, width: 0.72, height: 0.7 };
+  const hintFill = getCardAlignmentHint(evaluateCardAlignment(cardInDashes, 0, oversizedGuide));
+  try {
+    assert(
+      /in the frame|hold steady/i.test(hintFill) && !/Move closer|Move back|sit inside|move (up|down)/i.test(hintFill),
+      'card already in dashes must not nag fill/sit, got: ' + hintFill,
+    );
+    console.log('ok - hint when card is already in dashes', hintFill);
   } catch (e) {
     failed++;
     console.error('FAIL -', (e as Error).message);

@@ -160,7 +160,8 @@ export function SettingsPanel({ open, settings, onChange, onClose }: SettingsPan
             </select>
           </label>
           <p className="settings-hint">
-            Keeps the guide above your phone stand. The guide also follows your card once detected.
+            Phone on a box as a stand: keep “Phone on box (~32%)” so the dashed frame sits in the
+            clear upper two-thirds. Detection ignores the blocked bottom band (the box itself).
           </p>
           <label className="toggle-row">
             <span>Level indicators</span>
