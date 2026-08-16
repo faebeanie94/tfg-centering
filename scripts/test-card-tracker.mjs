@@ -1,5 +1,5 @@
 /**
- * CardDetector Commit 7: 90% confidence, ≤8px movement, 8-frame auto-capture.
+ * CardDetector: 90% confidence, size/perspective/sharpness gates, 8-frame auto-capture.
  * Run: node scripts/test-card-tracker.mjs
  */
 import { spawnSync } from 'node:child_process';
@@ -78,6 +78,35 @@ assert(lost.stableFrameCount >= 4, 'pre-miss streak');
 lost.updateDetection({ corners: [] as unknown as CardCorners, confidence: 0 });
 assert(lost.detectedCorners?.length === 4, 'a miss keeps overlay corners');
 assert(lost.stableFrameCount === 0, 'a miss resets the stable streak');
+
+const tiny = new CardDetector({ onAutoCapture: () => { captures++; } });
+const tinyCard = cornersToOverlaySpace(
+  [
+    { x: 100, y: 100 },
+    { x: 112, y: 100 },
+    { x: 112, y: 116 },
+    { x: 100, y: 116 },
+  ],
+  240,
+  320,
+);
+for (let i = 0; i < 10; i++) {
+  tiny.updateDetection({ corners: tinyCard, confidence: 0.99 });
+}
+assert(tiny.stableFrameCount === 0, 'undersized quads never start the stable streak');
+
+const blurry = new CardDetector({ onAutoCapture: () => { captures++; } });
+for (let i = 0; i < 10; i++) {
+  blurry.updateDetection({ corners: card(), confidence: 0.99, blur: 4 });
+}
+assert(blurry.stableFrameCount === 0, 'soft frames (low Laplacian) do not auto-capture');
+
+const gated = new CardDetector({ onAutoCapture: () => { captures++; } });
+for (let i = 0; i < 10; i++) {
+  gated.updateDetection({ corners: card(), confidence: 0.99, blur: 40, allowCapture: false });
+}
+assert(gated.detectedCorners?.length === 4, 'quality fail still shows overlay corners');
+assert(gated.stableFrameCount === 0, 'allowCapture false does not count stable frames');
 
 console.log('ok - stable auto-capture', captures);
 console.log('ok - movement and lost-frame handling');

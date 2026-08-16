@@ -12,9 +12,9 @@ import { SettingsPanel } from './components/SettingsPanel';
 import { CardSizePickerScreen, selectionFromSettings } from './components/CardSizeFields';
 import { useSavedCards } from './hooks/useSavedCards';
 import type { SavedCardRecord } from './lib/saved-cards';
+import { estimateRectsFromImage } from './card/centering/estimateRectsFromImage';
 import {
   tryAutoCrop,
-  defaultRectsAfterCrop,
   DETECT_CONFIRM_CONFIDENCE,
   type CaptureDetectHint,
 } from './lib/auto-crop';
@@ -113,13 +113,7 @@ export default function App() {
       setPhase('autocrop');
       if (hint?.preCorrected) {
         try {
-          const img = new Image();
-          await new Promise<void>((resolve, reject) => {
-            img.onload = () => resolve();
-            img.onerror = reject;
-            img.src = dataUrl;
-          });
-          const rects = defaultRectsAfterCrop(img.naturalWidth, img.naturalHeight);
+          const rects = await estimateRectsFromImage(dataUrl, { padded: false });
           setWorkingImage(dataUrl);
           setEditorRects({ outer: rects.outer, inner: rects.inner });
           setPhase('editor');
@@ -181,13 +175,7 @@ export default function App() {
   const handlePerspectiveComplete = useCallback(async (corrected: string) => {
     setWorkingImage(corrected);
     try {
-      const img = new Image();
-      await new Promise<void>((resolve, reject) => {
-        img.onload = () => resolve();
-        img.onerror = reject;
-        img.src = corrected;
-      });
-      const rects = defaultRectsAfterCrop(img.naturalWidth, img.naturalHeight);
+      const rects = await estimateRectsFromImage(corrected, { padded: true });
       setEditorRects({ outer: rects.outer, inner: rects.inner });
     } catch {
       setEditorRects({});

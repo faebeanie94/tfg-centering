@@ -21,7 +21,10 @@ import {
 import { getScannerHint } from '../lib/level-hint';
 import { ScannerOverlay } from './ScannerOverlay';
 import { CardDebugOverlay } from './CardDetector';
-import { CardImageProcessor, overlayCornersToImagePixels } from '../utils/cardImageProcessor';
+import { overlayCornersToImagePixels } from '../utils/cardImageProcessor';
+import { captureVideoFrame } from '../lib/cardCapture';
+import { captureAndRectifyCardAsync } from '../card/captureCardFrame';
+import { evaluateCardQuality } from '../card/LiveCardQuality';
 import type { CaptureDetectHint } from '../lib/auto-crop';
 import {
   cardAspect,
@@ -91,7 +94,7 @@ export function ImageCapture({
   }, [settings.cardFormat, settings.customWidthMm, settings.customHeightMm]);
   const takePhotoRef = useRef<() => void>(() => {});
 
-  const { guideBox, detectedBox, alignment, detector, detectorTick } = useCardEdgeDetector(
+  const { guideBox, detectedBox, alignment, detector, detectorTick, liveQuality } = useCardEdgeDetector(
     cameraActive,
     videoRef,
     {
@@ -125,8 +128,7 @@ export function ImageCapture({
 
   const takePhoto = useCallback(async () => {
     const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas || capturing) return;
+    if (!video || capturing) return;
 
     setCapturing(true);
     setQualityMessage(null);
@@ -136,36 +138,26 @@ export function ImageCapture({
       const focusPoint = cardCenterFromBox(box);
       if (track) await focusOnCard(track, focusPoint);
 
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        detector.resetAutoCapture();
-        setQualityMessage('Unable to process image');
-        return;
-      }
-      ctx.drawImage(video, 0, 0);
-
-      const imageBytes = await new Promise<Blob | null>((resolve) => {
-        canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.95);
-      });
-      if (!imageBytes) {
-        detector.resetAutoCapture();
-        setQualityMessage('Unable to process image');
-        return;
-      }
-
       const overlayCorners = detector.detectedCorners;
       if (overlayCorners) {
-        const corners = overlayCornersToImagePixels(overlayCorners, canvas.width, canvas.height);
-        const result = await CardImageProcessor.validateAndCorrect(imageBytes, corners);
-        setQualityMessage(result.message);
-        if (!result.isGoodQuality) {
+        const corners = overlayCornersToImagePixels(overlayCorners, video.videoWidth, video.videoHeight);
+        const captureQuality = evaluateCardQuality(
+          corners,
+          video.videoWidth,
+          video.videoHeight,
+          liveQuality?.blurScore ?? detector.blurScore,
+        );
+        if (!captureQuality.valid) {
           detector.resetAutoCapture();
+          setQualityMessage(captureQuality.message);
           return;
         }
 
-        const correctedSrc = await blobToDataUrl(result.imageBytes);
+        const blob = await captureAndRectifyCardAsync(video, corners, {
+          outputWidth: 750,
+          aspectRatio: cardAspect(scanFormat),
+        });
+        const correctedSrc = await blobToDataUrl(blob);
         onCapture(correctedSrc, {
           box: detectedBoxRef.current,
           rotationDeg: alignmentRef.current.rotationDeg,
@@ -173,7 +165,14 @@ export function ImageCapture({
           preCorrected: true,
         });
       } else {
-        onCapture(canvas.toDataURL('image/jpeg', 0.95), {
+        const imageBytes = await captureVideoFrame(video);
+        if (!imageBytes) {
+          detector.resetAutoCapture();
+          setQualityMessage('Unable to process image');
+          return;
+        }
+        const rawSrc = await blobToDataUrl(imageBytes);
+        onCapture(rawSrc, {
           box: detectedBoxRef.current,
           rotationDeg: alignmentRef.current.rotationDeg,
           liveReady: alignmentRef.current.fitsGuide,
@@ -192,7 +191,7 @@ export function ImageCapture({
     } finally {
       setCapturing(false);
     }
-  }, [onCapture, capturing, detector]);
+  }, [onCapture, capturing, detector, liveQuality, scanFormat]);
   takePhotoRef.current = takePhoto;
 
   const scanReady =
@@ -379,15 +378,17 @@ export function ImageCapture({
 
   const statusHint = capturing
     ? 'Focusing…'
-    : qualityMessage && qualityMessage !== 'Good scan'
+    : qualityMessage
       ? qualityMessage
       : scanReady && !focusReady
         ? 'Focusing on card…'
         : detector.isReadyToCapture
           ? 'CAPTURING...'
-          : detector.detectedCorners && detector.confidence >= 0.9 && settings.autoCapture
+          : detector.detectedCorners && detector.confidence >= 0.9 && settings.autoCapture && liveQuality?.valid
             ? `HOLD STEADY  ${Math.ceil((1 - detector.captureProgress) * detector.requiredFrames)}`
-            : getScannerHint(level, alignment, showLevel);
+            : liveQuality && detector.detectedCorners
+              ? liveQuality.message
+              : getScannerHint(level, alignment, showLevel);
 
   if (cameraActive) {
     return (

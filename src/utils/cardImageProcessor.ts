@@ -1,3 +1,6 @@
+import { CARD_ASPECT } from '../lib/card-edge-detect';
+import { rectifyCard } from '../lib/cardCapture';
+
 export interface Point {
   x: number;
   y: number;
@@ -102,11 +105,19 @@ export class CardImageProcessor {
       };
     }
 
-    const corrected = await this.perspectiveCorrect(image, corners);
-    const output = await this.canvasToBlob(corrected, 'image/jpeg', 0.95);
+    const blob = await this.toBlob(imageBytes);
+    const corrected = await rectifyCard(blob, corners, 1200);
+    if (!corrected) {
+      return {
+        imageBytes: blob,
+        qualityScore: this.clamp01(quality),
+        isGoodQuality: false,
+        message: 'Unable to flatten the card',
+      };
+    }
 
     return {
-      imageBytes: output,
+      imageBytes: corrected,
       qualityScore: this.clamp01(quality),
       isGoodQuality: true,
       message: 'Good scan',
@@ -142,16 +153,6 @@ export class CardImageProcessor {
     return new Blob([copy]);
   }
 
-  private static imageToCanvas(image: HTMLImageElement): HTMLCanvasElement {
-    const canvas = document.createElement('canvas');
-    canvas.width = image.naturalWidth;
-    canvas.height = image.naturalHeight;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    if (!ctx) throw new Error('Unable to create canvas context');
-    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-    return canvas;
-  }
-
   private static calculateSizeScore(
     width: number,
     height: number,
@@ -169,8 +170,9 @@ export class CardImageProcessor {
   }
 
   private static calculateAspectRatioScore(ratio: number): number {
-    const target = 1.586;
-    const difference = Math.abs(ratio - target);
+    const portrait = CARD_ASPECT;
+    const landscape = 1 / Math.max(portrait, 0.01);
+    const difference = Math.min(Math.abs(ratio - portrait), Math.abs(ratio - landscape));
     if (difference <= 0.12) return 1;
     if (difference >= 0.65) return 0;
     return this.clamp01(1 - (difference - 0.12) / 0.53);
@@ -273,212 +275,6 @@ export class CardImageProcessor {
       }
     }
     return true;
-  }
-
-  private static async perspectiveCorrect(
-    image: HTMLImageElement,
-    corners: Point[],
-  ): Promise<HTMLCanvasElement> {
-    const topLeft = corners[0];
-    const topRight = corners[1];
-    const bottomRight = corners[2];
-    const bottomLeft = corners[3];
-
-    const outputWidth = Math.min(
-      2400,
-      Math.max(300, Math.round(Math.max(this.distance(topLeft, topRight), this.distance(bottomLeft, bottomRight)))),
-    );
-    const outputHeight = Math.min(
-      1600,
-      Math.max(180, Math.round(Math.max(this.distance(topLeft, bottomLeft), this.distance(topRight, bottomRight)))),
-    );
-
-    const destinationCorners: Point[] = [
-      { x: 0, y: 0 },
-      { x: outputWidth - 1, y: 0 },
-      { x: outputWidth - 1, y: outputHeight - 1 },
-      { x: 0, y: outputHeight - 1 },
-    ];
-
-    const homography = this.calculateHomography(
-      [topLeft, topRight, bottomRight, bottomLeft],
-      destinationCorners,
-    );
-    const inverse = this.invert3x3(homography);
-
-    const sourceCanvas = this.imageToCanvas(image);
-    const sourceContext = sourceCanvas.getContext('2d', { willReadFrequently: true });
-    if (!sourceContext) throw new Error('Unable to create source canvas');
-    const sourceData = sourceContext.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height);
-
-    const outputCanvas = document.createElement('canvas');
-    outputCanvas.width = outputWidth;
-    outputCanvas.height = outputHeight;
-    const outputContext = outputCanvas.getContext('2d', { willReadFrequently: true });
-    if (!outputContext) throw new Error('Unable to create output canvas');
-    const outputData = outputContext.createImageData(outputWidth, outputHeight);
-
-    const src = sourceData.data;
-    const dst = outputData.data;
-
-    for (let y = 0; y < outputHeight; y++) {
-      for (let x = 0; x < outputWidth; x++) {
-        const denominator = inverse[6] * x + inverse[7] * y + inverse[8];
-        if (Math.abs(denominator) < 1e-6) continue;
-
-        const sourceX = (inverse[0] * x + inverse[1] * y + inverse[2]) / denominator;
-        const sourceY = (inverse[3] * x + inverse[4] * y + inverse[5]) / denominator;
-        if (
-          sourceX < 0 ||
-          sourceY < 0 ||
-          sourceX >= sourceCanvas.width - 1 ||
-          sourceY >= sourceCanvas.height - 1
-        ) {
-          continue;
-        }
-
-        const pixel = this.bilinearSample(src, sourceCanvas.width, sourceCanvas.height, sourceX, sourceY);
-        const outputIndex = (y * outputWidth + x) * 4;
-        dst[outputIndex] = pixel[0];
-        dst[outputIndex + 1] = pixel[1];
-        dst[outputIndex + 2] = pixel[2];
-        dst[outputIndex + 3] = 255;
-      }
-    }
-
-    outputContext.putImageData(outputData, 0, 0);
-    return outputCanvas;
-  }
-
-  private static calculateHomography(source: Point[], destination: Point[]): number[] {
-    const matrix: number[][] = Array.from({ length: 8 }, () => Array(9).fill(0));
-    for (let i = 0; i < 4; i++) {
-      const x = source[i].x;
-      const y = source[i].y;
-      const u = destination[i].x;
-      const v = destination[i].y;
-      const row = i * 2;
-      matrix[row][0] = x;
-      matrix[row][1] = y;
-      matrix[row][2] = 1;
-      matrix[row][6] = -u * x;
-      matrix[row][7] = -u * y;
-      matrix[row][8] = u;
-      matrix[row + 1][3] = x;
-      matrix[row + 1][4] = y;
-      matrix[row + 1][5] = 1;
-      matrix[row + 1][6] = -v * x;
-      matrix[row + 1][7] = -v * y;
-      matrix[row + 1][8] = v;
-    }
-    return this.solveHomography(matrix);
-  }
-
-  private static solveHomography(matrix: number[][]): number[] {
-    const a = matrix.map((row) => [...row]);
-    for (let column = 0; column < 8; column++) {
-      let pivot = column;
-      for (let row = column + 1; row < 8; row++) {
-        if (Math.abs(a[row][column]) > Math.abs(a[pivot][column])) pivot = row;
-      }
-      [a[column], a[pivot]] = [a[pivot], a[column]];
-      const divisor = a[column][column];
-      if (Math.abs(divisor) < 1e-7) {
-        return [1, 0, 0, 0, 1, 0, 0, 0, 1];
-      }
-      for (let j = column; j < 9; j++) a[column][j] /= divisor;
-      for (let row = 0; row < 8; row++) {
-        if (row === column) continue;
-        const factor = a[row][column];
-        for (let j = column; j < 9; j++) a[row][j] -= factor * a[column][j];
-      }
-    }
-    return [a[0][8], a[1][8], a[2][8], a[3][8], a[4][8], a[5][8], a[6][8], a[7][8], 1];
-  }
-
-  private static invert3x3(m: number[]): number[] {
-    const [a, b, c, d, e, f, g, h, i] = m;
-    const A = e * i - f * h;
-    const B = c * h - b * i;
-    const C = b * f - c * e;
-    const D = f * g - d * i;
-    const E = a * i - c * g;
-    const F = c * d - a * f;
-    const G = d * h - e * g;
-    const H = b * g - a * h;
-    const I = a * e - b * d;
-    const determinant = a * A + b * D + c * G;
-    if (Math.abs(determinant) < 1e-7) {
-      return [1, 0, 0, 0, 1, 0, 0, 0, 1];
-    }
-    return [
-      A / determinant,
-      B / determinant,
-      C / determinant,
-      D / determinant,
-      E / determinant,
-      F / determinant,
-      G / determinant,
-      H / determinant,
-      I / determinant,
-    ];
-  }
-
-  private static bilinearSample(
-    data: Uint8ClampedArray,
-    width: number,
-    height: number,
-    x: number,
-    y: number,
-  ): [number, number, number] {
-    const x0 = Math.floor(x);
-    const y0 = Math.floor(y);
-    const x1 = Math.min(x0 + 1, width - 1);
-    const y1 = Math.min(y0 + 1, height - 1);
-    const dx = x - x0;
-    const dy = y - y0;
-    const index00 = (y0 * width + x0) * 4;
-    const index10 = (y0 * width + x1) * 4;
-    const index01 = (y1 * width + x0) * 4;
-    const index11 = (y1 * width + x1) * 4;
-    return [
-      Math.round(this.interpolate(data[index00], data[index10], data[index01], data[index11], dx, dy)),
-      Math.round(
-        this.interpolate(data[index00 + 1], data[index10 + 1], data[index01 + 1], data[index11 + 1], dx, dy),
-      ),
-      Math.round(
-        this.interpolate(data[index00 + 2], data[index10 + 2], data[index01 + 2], data[index11 + 2], dx, dy),
-      ),
-    ];
-  }
-
-  private static interpolate(
-    p00: number,
-    p10: number,
-    p01: number,
-    p11: number,
-    dx: number,
-    dy: number,
-  ): number {
-    const top = p00 + (p10 - p00) * dx;
-    const bottom = p01 + (p11 - p01) * dx;
-    return top + (bottom - top) * dy;
-  }
-
-  private static canvasToBlob(
-    canvas: HTMLCanvasElement,
-    type: string,
-    quality: number,
-  ): Promise<Blob> {
-    return new Promise((resolve, reject) => {
-      canvas.toBlob((blob) => {
-        if (!blob) {
-          reject(new Error('Unable to create image'));
-          return;
-        }
-        resolve(blob);
-      }, type, quality);
-    });
   }
 
   private static distance(a: Point, b: Point): number {

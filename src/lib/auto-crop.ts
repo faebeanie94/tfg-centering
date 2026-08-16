@@ -6,6 +6,7 @@ import {
 } from './card-detector';
 import type { Rect } from './centering';
 import { defaultInnerRect } from './centering';
+import { CenteringGrader } from '../card/centering/CenteringGrader';
 import {
   type Point,
   type QuadCorners,
@@ -228,11 +229,23 @@ export async function tryAutoCrop(
     const corrected = await perspectiveCorrect(imageSrc, detected.corners, cardAspect);
     const img = await loadImage(corrected);
     const rects = defaultRectsAfterCrop(img.naturalWidth, img.naturalHeight);
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    let inner = rects.inner;
+    if (ctx) {
+      ctx.drawImage(img, 0, 0);
+      const estimated = CenteringGrader.estimateRects(ctx.getImageData(0, 0, canvas.width, canvas.height), {
+        cardRect: rects.outer,
+      });
+      inner = estimated.inner;
+    }
     return {
       result: {
         imageSrc: corrected,
         outer: rects.outer,
-        inner: rects.inner,
+        inner,
         corners: detected.corners,
         confidence: detected.confidence,
       },
