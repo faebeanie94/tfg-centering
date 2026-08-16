@@ -7,7 +7,7 @@ import {
 } from './card-edge-detect';
 import type { Rect } from './centering';
 import { defaultInnerRect } from './centering';
-import { seedInnerFromImage } from './inner-artwork';
+import { seedInnerRect, refineOuterRect, pixelBufferFromImage } from './inner-artwork';
 import {
   type Point,
   type QuadCorners,
@@ -121,14 +121,102 @@ export function defaultRectsAfterCrop(imgWidth: number, imgHeight: number): {
   return { outer, inner: defaultInnerRect(outer) };
 }
 
+export function rectFromQuad(q: QuadCorners): Rect {
+  const x = (q.tl.x + q.bl.x) / 2;
+  const right = (q.tr.x + q.br.x) / 2;
+  const y = (q.tl.y + q.tr.y) / 2;
+  const bottom = (q.bl.y + q.br.y) / 2;
+  if (right - x >= 8 && bottom - y >= 8) {
+    return { x, y, width: right - x, height: bottom - y };
+  }
+  const xs = [q.tl.x, q.tr.x, q.br.x, q.bl.x];
+  const ys = [q.tl.y, q.tr.y, q.br.y, q.bl.y];
+  const minX = Math.min(...xs);
+  const minY = Math.min(...ys);
+  return { x: minX, y: minY, width: Math.max(...xs) - minX, height: Math.max(...ys) - minY };
+}
+
+function clampRectToImage(rect: Rect, w: number, h: number): Rect {
+  const x = clamp(rect.x, 0, Math.max(0, w - 2));
+  const y = clamp(rect.y, 0, Math.max(0, h - 2));
+  return {
+    x,
+    y,
+    width: clamp(rect.width, 2, w - x),
+    height: clamp(rect.height, 2, h - y),
+  };
+}
+
+function detectOuterRectFromElement(
+  img: HTMLImageElement,
+  hint: CaptureDetectHint | undefined,
+  options: AutoCropOptions,
+): Rect | null {
+  const cardAspect = options.cardAspect ?? CARD_ASPECT;
+  const cardHeightMm = options.cardHeightMm ?? 88.9;
+  const imgW = img.naturalWidth;
+  const imgH = img.naturalHeight;
+  const { w, h, scale } = analysisSize(imgW, imgH);
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return null;
+  ctx.drawImage(img, 0, 0, w, h);
+  const { data } = ctx.getImageData(0, 0, w, h);
+  const seed = findBestSeedBox(data, w, h, hint, cardAspect, cardHeightMm);
+  if (!seed) return null;
+
+  let corners = boxToCorners(seed.box, w, h, seed.rotationDeg);
+  const refined = refineQuadFromSeed(data, w, h, seed.box, cardAspect);
+  if (refined) corners = refined.corners;
+  return clampRectToImage(rectFromQuad(scaleCorners(corners, scale, imgW, imgH)), imgW, imgH);
+}
+
+/** Detect green outer + yellow inner on a still (upload, skip, or flattened crop). */
+export function seedRectsFromLoadedImage(
+  image: HTMLImageElement,
+  options: AutoCropOptions = {},
+  knownCorners?: QuadCorners | null,
+  hint?: CaptureDetectHint,
+): { outer: Rect; inner: Rect } {
+  const w = image.naturalWidth;
+  const h = image.naturalHeight;
+  const padded = defaultRectsAfterCrop(w, h);
+  let outer: Rect | null = knownCorners
+    ? clampRectToImage(rectFromQuad(knownCorners), w, h)
+    : detectOuterRectFromElement(image, hint, options);
+
+  if (outer) {
+    const area = (outer.width * outer.height) / (w * h);
+    if (area < 0.05 || area > 0.97) outer = null;
+  }
+  if (!outer) outer = padded.outer;
+
+  const buffer = pixelBufferFromImage(image);
+  if (buffer.width > 0) {
+    outer = refineOuterRect(buffer, outer);
+    return { outer, inner: seedInnerRect(buffer, outer).inner };
+  }
+  return { outer, inner: padded.inner };
+}
+
+export async function seedEditorRectsFromImage(
+  imageSrc: string,
+  options: AutoCropOptions = {},
+  knownCorners?: QuadCorners | null,
+  hint?: CaptureDetectHint,
+): Promise<{ outer: Rect; inner: Rect }> {
+  const img = await loadImage(imageSrc);
+  return seedRectsFromLoadedImage(img, options, knownCorners, hint);
+}
+
 /** Padded outer box plus yellow-handle seed from the inner-artwork detector. */
 export function rectsAfterCropWithInnerSeed(image: HTMLImageElement): { outer: Rect; inner: Rect } {
-  const rects = defaultRectsAfterCrop(image.naturalWidth, image.naturalHeight);
   try {
-    const seeded = seedInnerFromImage(image, rects.outer);
-    return { outer: rects.outer, inner: seeded.inner };
+    return seedRectsFromLoadedImage(image);
   } catch {
-    return rects;
+    return defaultRectsAfterCrop(image.naturalWidth, image.naturalHeight);
   }
 }
 
@@ -148,6 +236,22 @@ function searchCandidates(
   cardHeightMm: number,
 ): DetectSearchRegion[] {
   const searches: DetectSearchRegion[] = [];
+
+  const paddedFrac = 1 / (1 + 2 * OUTPUT_PADDING_RATIO);
+  searches.push({
+    cx: 0.5,
+    cy: 0.5,
+    expectedWidth: paddedFrac * cardAspect,
+    expectedHeight: paddedFrac,
+    cardAspect,
+  });
+  searches.push({
+    cx: 0.5,
+    cy: 0.5,
+    expectedWidth: paddedFrac,
+    expectedHeight: paddedFrac,
+    cardAspect,
+  });
 
   if (hint?.box) {
     searches.push({
@@ -601,8 +705,11 @@ function findBestSeedBox(
         ? { width: search.expectedWidth, height: search.expectedHeight }
         : undefined;
 
-    const aspectErr = Math.abs(found.box.width / found.box.height - cardAspect);
-    let score = 1 - aspectErr / 0.06;
+    const aspectErr = Math.min(
+      Math.abs(found.box.width / found.box.height - cardAspect),
+      Math.abs((found.box.width * w) / (found.box.height * h) - cardAspect),
+    );
+    let score = 1 - aspectErr / 0.12;
     if (expected) {
       const sizeRatio =
         (found.box.width / expected.width + found.box.height / expected.height) / 2;
@@ -618,9 +725,10 @@ function findBestSeedBox(
     if (chroma < 18) score *= 0.45;
     else if (chroma > 35) score += 0.08;
 
-    // Prefer mid-frame card-sized regions over near-full-frame mats.
+    // Prefer mid-frame cards, but flattened/close-up stills fill most of the frame.
     const area = found.box.width * found.box.height;
-    if (area > 0.55) score *= 0.5;
+    if (area > 0.9) score *= 0.45;
+    else if (area > 0.8) score *= 0.85;
     if (area < 0.08) score *= 0.6;
 
     if (score > bestScore) {

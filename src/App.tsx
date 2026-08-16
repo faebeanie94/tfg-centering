@@ -12,7 +12,7 @@ import { SettingsPanel } from './components/SettingsPanel';
 import { CardSizePickerScreen, selectionFromSettings } from './components/CardSizeFields';
 import { useSavedCards } from './hooks/useSavedCards';
 import type { SavedCardRecord } from './lib/saved-cards';
-import { tryAutoCrop, rectsAfterCropWithInnerSeed, type CaptureDetectHint } from './lib/auto-crop';
+import { tryAutoCrop, seedEditorRectsFromImage, rectsAfterCropWithInnerSeed, type CaptureDetectHint } from './lib/auto-crop';
 import type { QuadCorners } from './lib/perspective';
 import {
   cardAspect,
@@ -168,19 +168,34 @@ export default function App() {
     setPhase(returnPhaseAfterEdit === 'crop' ? 'crop' : 'editor');
   }, [returnPhaseAfterEdit]);
 
-  const handlePerspectiveSkip = useCallback(() => {
-    if (rawImage) {
-      setWorkingImage(rawImage);
+  const handlePerspectiveSkip = useCallback(async () => {
+    if (!rawImage) return;
+    setWorkingImage(rawImage);
+    setPhase('autocrop');
+    try {
+      const rects = await seedEditorRectsFromImage(
+        rawImage,
+        autoCropOptions,
+        perspectiveCorners,
+        pendingHint,
+      );
+      setEditorRects({ outer: rects.outer, inner: rects.inner });
+    } catch {
       setEditorRects({});
-      setPhase(returnPhaseAfterEdit === 'crop' ? 'crop' : 'editor');
     }
-  }, [rawImage, returnPhaseAfterEdit]);
+    setPhase(returnPhaseAfterEdit === 'crop' ? 'crop' : 'editor');
+  }, [rawImage, returnPhaseAfterEdit, autoCropOptions, perspectiveCorners, pendingHint]);
 
-  const handleCropComplete = useCallback((cropped: string) => {
+  const handleCropComplete = useCallback(async (cropped: string) => {
     setWorkingImage(cropped);
-    setEditorRects({});
+    try {
+      const rects = await seedEditorRectsFromImage(cropped, autoCropOptions);
+      setEditorRects({ outer: rects.outer, inner: rects.inner });
+    } catch {
+      setEditorRects({});
+    }
     setPhase('editor');
-  }, []);
+  }, [autoCropOptions]);
 
   const handleSaveSide = useCallback(
     (snapshot: SideSnapshot) => {

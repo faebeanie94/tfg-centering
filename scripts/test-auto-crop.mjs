@@ -21,6 +21,7 @@ import {
   defaultRectsAfterCrop,
   AUTO_CROP_CONFIDENCE,
   isNearlyFrontal,
+  rectFromQuad,
 } from '${join(root, 'src/lib/auto-crop.ts').replace(/\\\\/g, '/')}';
 import {
   CARD_ASPECT,
@@ -109,6 +110,15 @@ const tilted = boxToCorners(
   18,
 );
 assert(!isNearlyFrontal(tilted), 'rotated AABB must fail frontal gate');
+
+const mid = rectFromQuad({
+  tl: { x: 100, y: 80 },
+  tr: { x: 500, y: 80 },
+  br: { x: 500, y: 640 },
+  bl: { x: 100, y: 640 },
+});
+assert(Math.abs(mid.x - 100) < 0.5 && Math.abs(mid.width - 400) < 0.5, 'rectFromQuad width');
+assert(Math.abs(mid.y - 80) < 0.5 && Math.abs(mid.height - 560) < 0.5, 'rectFromQuad height');
 
 console.log('ok - boxToCorners', corners);
 console.log('ok - defaultRectsAfterCrop', rects);

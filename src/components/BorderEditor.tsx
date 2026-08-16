@@ -104,11 +104,21 @@ export function BorderEditor({
   }, [imageSrc, resetZoom]);
 
   useEffect(() => {
+    if (initialOuter && initialInner) {
+      setOuter(initialOuter);
+      setInner(initialInner);
+    }
+  }, [initialOuter, initialInner]);
+
+  useEffect(() => {
     const img = new Image();
     img.onload = () => {
       const size = { width: img.naturalWidth, height: img.naturalHeight };
       setImageSize(size);
-      if (!initialOuter || !initialInner) {
+      if (initialOuter && initialInner) {
+        setOuter(initialOuter);
+        setInner(initialInner);
+      } else {
         const o = defaultOuterRect(size.width, size.height);
         setOuter(o);
         setInner(defaultInnerRect(o));
