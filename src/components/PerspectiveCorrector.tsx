@@ -1,11 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import {
-  type CornerKey,
-  type QuadCorners,
-  defaultCorners,
-  perspectiveCorrect,
-} from '../lib/perspective';
-import { detectCardCornersFromImage } from '../lib/auto-crop';
+import { type CornerKey, type QuadCorners, defaultCorners } from '../lib/perspective';
+import { detectCardCornersFromImage, perspectiveCorrectRefined } from '../lib/auto-crop';
 import { useFitScale, useAppShellMode } from '../hooks/useFitScale';
 
 interface PerspectiveCorrectorProps {
@@ -252,7 +247,7 @@ export function PerspectiveCorrector({
     if (!corners) return;
     setProcessing(true);
     try {
-      const corrected = await perspectiveCorrect(imageSrc, corners, cardAspect);
+      const corrected = await perspectiveCorrectRefined(imageSrc, corners, cardAspect);
       onComplete(corrected);
     } catch {
       onComplete(imageSrc);

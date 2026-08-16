@@ -911,6 +911,32 @@ export function isNearlyFrontal(q: QuadCorners): boolean {
 }
 
 /**
+ * Warp to a rectangle, then re-detect on the result and apply a second small
+ * corrective warp. A single ray-cast detection pass leaves a few pixels of
+ * corner error, which reads as a small but real leftover tilt once warped.
+ * The warped output is a much easier target for the same detector — card
+ * fills a known, consistently-padded rectangle — so re-running it there
+ * squeezes out most of what's left. Falls back to the first-pass result if
+ * the second pass doesn't find a confident, frontal quad.
+ */
+export async function perspectiveCorrectRefined(
+  imageSrc: string,
+  corners: QuadCorners,
+  cardAspectRatio: number = CARD_ASPECT,
+): Promise<string> {
+  const firstPass = await perspectiveCorrect(imageSrc, corners, cardAspectRatio);
+  try {
+    const refined = await detectCardCornersFromImage(firstPass, undefined, { cardAspect: cardAspectRatio });
+    if (refined && refined.confidence >= 0.5 && isNearlyFrontal(refined.corners)) {
+      return await perspectiveCorrect(firstPass, refined.corners, cardAspectRatio);
+    }
+  } catch {
+    // fall through to the first-pass result
+  }
+  return firstPass;
+}
+
+/**
  * Detect corners and auto-crop when confidence is high enough.
  * Always returns best-effort corners so Perspective Fix can be pre-seeded.
  *
@@ -940,7 +966,7 @@ export async function tryAutoCrop(
   }
 
   try {
-    const corrected = await perspectiveCorrect(imageSrc, detected.corners, cardAspect);
+    const corrected = await perspectiveCorrectRefined(imageSrc, detected.corners, cardAspect);
     const img = await loadImage(corrected);
     const rects = rectsAfterCropWithInnerSeed(img);
     return {
