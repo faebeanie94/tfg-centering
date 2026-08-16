@@ -102,28 +102,31 @@ function overlaps(a: { left: number; top: number; width: number; height: number 
 const w = 240;
 const h = 426;
 const template = guideTemplateForDistance(20);
-assert(template.height > 0.7, 'default 20cm guide should fill most of the frame, got ' + template.height);
+assert(template.height >= 0.36 && template.height <= 0.44, 'default 20cm guide should be card-sized, got ' + template.height);
+assert(template.width < 0.5, 'default 20cm dashes must not fill the screen width, got ' + template.width);
 const portraitGuide = guideTemplateForDistance(20, CARD_ASPECT, 88.9, 3 / 4, 0);
 assert(
   Math.abs(portraitGuide.width / portraitGuide.height - CARD_ASPECT / (3 / 4)) < 0.03,
   'portrait frame guide should match poker aspect',
 );
 assert(portraitGuide.width > template.width, 'portrait video makes the dashed card wider');
+assert(portraitGuide.width < 0.5, 'portrait 20cm dashes must still be card-sized, got ' + portraitGuide.width);
 const standGuide = guideTemplateForDistance(20, CARD_ASPECT, 88.9, 3 / 4, 0.32);
 assert(
   Math.abs(standGuide.width / standGuide.height - CARD_ASPECT / (3 / 4)) < 0.03,
   'stand guide must keep poker aspect, got ' + standGuide.width / standGuide.height,
 );
 assert(
-  standGuide.height <= 0.68 && standGuide.height >= 0.5,
-  'phone-on-box guide must fit above the stand without shrinking to a postage stamp, got ' + standGuide.height,
+  standGuide.height >= 0.36 && standGuide.height <= 0.44,
+  'phone-on-box 20cm guide should be card-sized, got ' + standGuide.height,
 );
+assert(standGuide.width < 0.55, 'phone-on-box dashes must not span most of the screen width, got ' + standGuide.width);
 const tallPhoneGuide = guideTemplateForDistance(20, CARD_ASPECT, 88.9, 9 / 16, 0.32);
 assert(
   Math.abs(tallPhoneGuide.width / tallPhoneGuide.height - CARD_ASPECT / (9 / 16)) < 0.03,
   '9:16 stand guide must not be taller than a poker card',
 );
-assert(standGuide.height < template.height - 0.15, 'stand crop must shrink the dashes vs full frame');
+assert(standGuide.height < template.height + 0.05, 'stand crop must not enlarge the dashes');
 {
   const fa = 3 / 4;
   const height = 0.36;

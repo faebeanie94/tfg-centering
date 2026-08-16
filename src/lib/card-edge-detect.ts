@@ -950,18 +950,11 @@ export function detectCardBox(video: HTMLVideoElement, canvas: HTMLCanvasElement
 export const SCAN_DISTANCE_OPTIONS = [12, 20, 30] as const;
 export type ScanDistanceCm = (typeof SCAN_DISTANCE_OPTIONS)[number];
 
-/** Fraction of preview *width* a poker card should fill (height follows aspect). */
-const GUIDE_WIDTH_FILL: Record<ScanDistanceCm, number> = {
-  12: 0.9,
-  20: 0.84,
-  30: 0.72,
-};
-
-/** Phone-on-box: still a full-width card silhouette, then clamp above the stand. */
-const GUIDE_WIDTH_FILL_STAND: Record<ScanDistanceCm, number> = {
-  12: 0.82,
-  20: 0.76,
-  30: 0.64,
+/** Card silhouette height as a fraction of the full preview (20 cm ≈ a poker card at arm length). */
+const GUIDE_HEIGHT_FILL: Record<ScanDistanceCm, number> = {
+  12: 0.52,
+  20: 0.4,
+  30: 0.3,
 };
 
 /** Guide frame sized for a card at the given phone-to-card distance (cm). */
@@ -997,17 +990,16 @@ export function guideTemplateForDistance(
   obstructionBottom = 0,
 ): { width: number; height: number } {
   const fa = frameAspect > 0.15 && Number.isFinite(frameAspect) ? frameAspect : 1;
-  const stand = obstructionBottom > 0.05;
-  const availableH = Math.max(stand ? 0.4 : 0.55, 1 - Math.max(0, obstructionBottom) - 0.02);
-  const maxH = stand ? availableH : Math.min(availableH, 0.88);
-  const fillW = stand
-    ? (GUIDE_WIDTH_FILL_STAND[distanceCm] ?? 0.76)
-    : (GUIDE_WIDTH_FILL[distanceCm] ?? 0.84);
-  let width = Math.min(0.94, fillW);
-  let height = width * (fa / cardAspectRatio);
-  if (height > maxH) {
-    height = maxH;
-    width = height * (cardAspectRatio / fa);
+  const availableH = Math.max(0.38, 1 - Math.max(0, obstructionBottom) - 0.02);
+  let height = Math.min(availableH, GUIDE_HEIGHT_FILL[distanceCm] ?? 0.4);
+  let width = height * (cardAspectRatio / fa);
+  if (width > 0.92) {
+    width = 0.92;
+    height = width * (fa / cardAspectRatio);
+    if (height > availableH) {
+      height = availableH;
+      width = height * (cardAspectRatio / fa);
+    }
   }
   return { width, height };
 }
