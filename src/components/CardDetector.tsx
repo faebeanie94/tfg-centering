@@ -15,9 +15,11 @@ export type CardCorners = [
 type UpdateDetectionArgs = {
   corners: CardCorners;
   confidence: number;
-  /** Mean Laplacian sharpness from the RAF analysis canvas (omit in unit tests). */
+  /** Mean Laplacian sharpness from the live quality canvas (omit in unit tests). */
   blur?: number;
   imageSize?: { width: number; height: number };
+  /** Live video-pixel size/blur gate. False keeps the overlay but resets the stable streak. */
+  allowCapture?: boolean;
 };
 
 type CardDetectorOptions = {
@@ -41,7 +43,7 @@ export class CardDetector {
     this.auto.onCapture = () => options.onAutoCapture?.();
   }
 
-  updateDetection({ corners, confidence, blur, imageSize }: UpdateDetectionArgs): void {
+  updateDetection({ corners, confidence, blur, imageSize, allowCapture }: UpdateDetectionArgs): void {
     if (!corners || corners.length !== 4) {
       this.auto.resetStability();
       return;
@@ -56,6 +58,15 @@ export class CardDetector {
       { ...corners[3] },
     ];
     this.confidence = cleanConfidence;
+
+    if (blur !== undefined) {
+      this.auto.blurScore = blur;
+    }
+
+    if (allowCapture === false) {
+      this.auto.resetStability();
+      return;
+    }
 
     this.auto.processDetection({
       corners: this.detectedCorners,

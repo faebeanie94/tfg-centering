@@ -101,6 +101,13 @@ for (let i = 0; i < 10; i++) {
 }
 assert(blurry.stableFrameCount === 0, 'soft frames (low Laplacian) do not auto-capture');
 
+const gated = new CardDetector({ onAutoCapture: () => { captures++; } });
+for (let i = 0; i < 10; i++) {
+  gated.updateDetection({ corners: card(), confidence: 0.99, blur: 40, allowCapture: false });
+}
+assert(gated.detectedCorners?.length === 4, 'quality fail still shows overlay corners');
+assert(gated.stableFrameCount === 0, 'allowCapture false does not count stable frames');
+
 console.log('ok - stable auto-capture', captures);
 console.log('ok - movement and lost-frame handling');
 console.log('All card-detector tracking checks passed.');
