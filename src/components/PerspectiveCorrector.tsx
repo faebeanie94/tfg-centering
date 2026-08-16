@@ -28,7 +28,7 @@ const CORNERS: Array<{ key: CornerKey; label: string; arrow: string }> = [
 ];
 
 const LOUPE_SIZE = 112;
-const LOUPE_ZOOM = 1.25;
+const LOUPE_ZOOM = 3;
 
 /** Convert desired on-screen pixels to SVG/image coordinate units. */
 function screenPx(px: number, displayScale: number) {
@@ -36,11 +36,17 @@ function screenPx(px: number, displayScale: number) {
 }
 
 function cornerAtPoint(corners: QuadCorners, x: number, y: number, hitRadius: number): CornerKey | null {
+  let closest: CornerKey | null = null;
+  let closestDist = hitRadius;
   for (const { key } of CORNERS) {
     const p = corners[key];
-    if (Math.hypot(p.x - x, p.y - y) <= hitRadius) return key;
+    const dist = Math.hypot(p.x - x, p.y - y);
+    if (dist <= closestDist) {
+      closest = key;
+      closestDist = dist;
+    }
   }
-  return null;
+  return closest;
 }
 
 export function PerspectiveCorrector({
