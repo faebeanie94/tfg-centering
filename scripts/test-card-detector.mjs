@@ -149,20 +149,26 @@ check('fourEdgeValidation accepts a full ring and rejects a gap', () => {
   assert(!fourEdgeValidation(full, w, h, null, 20), 'null center should fail');
 });
 
-check('colorScore prefers bright disks; chroma is weak', () => {
+check('colorScore is mostly brightness, with weak chroma', () => {
   const bright = makeImage(64, 64, [0, 0, 0]);
   fillCircle(bright, 32, 32, 16, [250, 250, 250]);
   const dark = makeImage(64, 64, [0, 0, 0]);
   fillCircle(dark, 32, 32, 16, [12, 12, 12]);
+  const gray = makeImage(64, 64, [0, 0, 0]);
+  fillCircle(gray, 32, 32, 16, [180, 180, 180]);
   const red = makeImage(64, 64, [0, 0, 0]);
-  fillCircle(red, 32, 32, 16, [220, 20, 20]);
+  fillCircle(red, 32, 32, 16, [180, 20, 20]);
 
   const b = colorScore(bright, { x: 32, y: 32 }, 16);
   const d = colorScore(dark, { x: 32, y: 32 }, 16);
+  const g = colorScore(gray, { x: 32, y: 32 }, 16);
   const r = colorScore(red, { x: 32, y: 32 }, 16);
   assert(b > 0.7, \`bright score \${b}\`);
   assert(d < 0.2, \`dark score \${d}\`);
-  assert(b > r, \`brightness should beat saturated red (\${b} vs \${r})\`);
+  assert(b > d, 'bright disk should outscore a dark one');
+  // Same value: saturation adds only 0.20, so red is a little above gray, not dominant.
+  assert(r > g && r - g < 0.25, \`chroma lift should be small (\${r} vs \${g})\`);
+  assert(colorScore(bright, { x: -80, y: -80 }, 4) === 0, 'disk outside the frame should score 0');
 });
 
 if (failed) {
