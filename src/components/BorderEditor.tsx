@@ -104,28 +104,24 @@ export function BorderEditor({
   }, [imageSrc, resetZoom]);
 
   useEffect(() => {
+    const img = new Image();
+    img.onload = () => {
+      setImageSize({ width: img.naturalWidth, height: img.naturalHeight });
+    };
+    img.src = imageSrc;
+  }, [imageSrc]);
+
+  useEffect(() => {
+    if (!imageSize) return;
     if (initialOuter && initialInner) {
       setOuter(initialOuter);
       setInner(initialInner);
+      return;
     }
-  }, [initialOuter, initialInner]);
-
-  useEffect(() => {
-    const img = new Image();
-    img.onload = () => {
-      const size = { width: img.naturalWidth, height: img.naturalHeight };
-      setImageSize(size);
-      if (initialOuter && initialInner) {
-        setOuter(initialOuter);
-        setInner(initialInner);
-      } else {
-        const o = defaultOuterRect(size.width, size.height);
-        setOuter(o);
-        setInner(defaultInnerRect(o));
-      }
-    };
-    img.src = imageSrc;
-  }, [imageSrc, initialOuter, initialInner]);
+    const o = defaultOuterRect(imageSize.width, imageSize.height);
+    setOuter(o);
+    setInner(defaultInnerRect(o));
+  }, [imageSize, initialOuter, initialInner]);
 
   const result = useMemo(() => {
     if (!outer || !inner) return null;

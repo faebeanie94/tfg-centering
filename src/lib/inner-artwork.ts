@@ -174,10 +174,10 @@ function findFirstEdge(
   const floor = percentileOf(smooth.slice(0, rimCount), 0.6);
   const threshold = Math.max(8, floor + 6, floor * 1.65);
 
-  for (let i = 0; i < smooth.length; i++) {
+  for (let i = 0; i < smooth.length - 1; i++) {
     const inset = Math.abs(positions[i] - origin);
     if (inset < minInset) continue;
-    if (smooth[i] >= threshold) {
+    if (smooth[i] >= threshold && smooth[i + 1] >= threshold * 0.85) {
       return { found: true, position: positions[i] };
     }
   }
@@ -186,7 +186,7 @@ function findFirstEdge(
   let best = threshold * 0.92;
   for (let i = 0; i < smooth.length; i++) {
     const inset = Math.abs(positions[i] - origin);
-    if (inset < minInset) continue;
+    if (inset < minInset || inset > sideLength * 0.14) continue;
     if (smooth[i] > best) {
       best = smooth[i];
       bestI = i;
@@ -236,7 +236,7 @@ function percentileOf(values: number[], p: number): number {
 function buildSamples(origin: number, length: number, count: number): number[] {
   const result: number[] = [];
   const center = origin + length / 2;
-  const spread = length * 0.3;
+  const spread = length * 0.55;
   for (let i = 0; i < count; i++) {
     const t = count <= 1 ? 0.5 : i / (count - 1);
     const value = Math.round(center + (t - 0.5) * spread);
