@@ -550,9 +550,12 @@ function scoreCardBox(
   if (area < 0.04 || area > 0.82) return -1;
 
   const matchExpected = 1 - Math.min(1, Math.abs(1 - sizeRatio) / 0.9);
-  const outerBias = Math.max(0, Math.min(1, (area - 0.1) / 0.45));
+  const outerBias = Math.max(0, Math.min(1, (area - 0.08) / 0.4));
   const aspectScore = 1 - Math.min(1, aspectErr / 0.12);
-  return aspectScore * 0.32 + matchExpected * 0.48 + outerBias * 0.2;
+  let score = aspectScore * 0.28 + matchExpected * 0.4 + outerBias * 0.32;
+  // Inner artwork is ~70% of the outer card — do not let it beat the rim.
+  if (sizeRatio < 0.72) score *= 0.65;
+  return score;
 }
 
 function boxPrintScore(
@@ -947,18 +950,18 @@ export function detectCardBox(video: HTMLVideoElement, canvas: HTMLCanvasElement
 export const SCAN_DISTANCE_OPTIONS = [12, 20, 30] as const;
 export type ScanDistanceCm = (typeof SCAN_DISTANCE_OPTIONS)[number];
 
-/** Fraction of the *full* preview the dashed card should fill (no stand). */
-const GUIDE_FILL: Record<ScanDistanceCm, number> = {
+/** Fraction of preview *width* a poker card should fill (height follows aspect). */
+const GUIDE_WIDTH_FILL: Record<ScanDistanceCm, number> = {
   12: 0.9,
-  20: 0.86,
-  30: 0.78,
+  20: 0.84,
+  30: 0.72,
 };
 
-/** With a box stand, phone is ~20 cm up: card is ~1/3 of the preview, not half. */
-const GUIDE_FILL_WITH_STAND: Record<ScanDistanceCm, number> = {
-  12: 0.5,
-  20: 0.36,
-  30: 0.26,
+/** Phone-on-box: still a full-width card silhouette, then clamp above the stand. */
+const GUIDE_WIDTH_FILL_STAND: Record<ScanDistanceCm, number> = {
+  12: 0.82,
+  20: 0.76,
+  30: 0.64,
 };
 
 /** Guide frame sized for a card at the given phone-to-card distance (cm). */
@@ -995,21 +998,16 @@ export function guideTemplateForDistance(
 ): { width: number; height: number } {
   const fa = frameAspect > 0.15 && Number.isFinite(frameAspect) ? frameAspect : 1;
   const stand = obstructionBottom > 0.05;
-  const fill = stand
-    ? (GUIDE_FILL_WITH_STAND[distanceCm] ?? 0.5)
-    : (GUIDE_FILL[distanceCm] ?? 0.86);
-  const availableH = Math.max(stand ? 0.38 : 0.55, 1 - Math.max(0, obstructionBottom) - 0.02);
-  let height = Math.min(availableH * (stand ? 0.92 : 1), fill);
-
-  let width = height * (cardAspectRatio / fa);
-  const maxW = 0.94;
-  if (width > maxW) {
-    width = maxW;
-    height = width * (fa / cardAspectRatio);
-    if (height > availableH) {
-      height = availableH;
-      width = height * (cardAspectRatio / fa);
-    }
+  const availableH = Math.max(stand ? 0.4 : 0.55, 1 - Math.max(0, obstructionBottom) - 0.02);
+  const maxH = stand ? availableH : Math.min(availableH, 0.88);
+  const fillW = stand
+    ? (GUIDE_WIDTH_FILL_STAND[distanceCm] ?? 0.76)
+    : (GUIDE_WIDTH_FILL[distanceCm] ?? 0.84);
+  let width = Math.min(0.94, fillW);
+  let height = width * (fa / cardAspectRatio);
+  if (height > maxH) {
+    height = maxH;
+    width = height * (cardAspectRatio / fa);
   }
   return { width, height };
 }
@@ -1043,6 +1041,14 @@ export function positionGuideBox(
   top = clamp(top, 0, Math.max(0, maxBottom - template.height));
 
   return { left, top, width: template.width, height: template.height };
+}
+
+export function clipBoxToMaxBottom(box: DetectedCard, maxBottom: number): DetectedCard | null {
+  if (box.top >= maxBottom - 0.08) return null;
+  if (box.top + box.height <= maxBottom + 0.02) return box;
+  const height = maxBottom - box.top;
+  if (height < box.height * 0.82 || height < 0.18) return null;
+  return { ...box, height };
 }
 
 export function defaultGuideBox(): DetectedCard {

@@ -63,21 +63,11 @@ export function getCardAlignmentHint(alignment: CardAlignmentState): string {
   if (fitsGuide) return 'Card aligned — hold steady…';
 
   const { guide } = alignment;
-  const overlap = intersectionRatio(detected, guide);
   const extraBottom = detected.top + detected.height - (guide.top + guide.height);
+  const overlap = intersectionRatio(detected, guide);
 
-  // Orange locked onto the stand/table below the dashes — not "move the card up".
   if (overlap.ofA < 0.42 || (extraBottom > 0.1 && overlap.ofA < 0.7)) {
     return 'Keep the card inside the dashed frame';
-  }
-
-  // Card already sits in the dashes; a slightly large/small guide should not nag.
-  if (overlap.ofA > 0.7 && overlap.ofB > 0.2) {
-    if (offsetX > 0.12) return 'Centre card in guide — move left ←';
-    if (offsetX < -0.12) return 'Centre card in guide — move right →';
-    if (offsetY > 0.12) return 'Centre card in guide — move up ↑';
-    if (offsetY < -0.12) return 'Centre card in guide — move down ↓';
-    return 'Card is in the frame — hold steady…';
   }
 
   if (sizeRatio < SIZE_MIN) return 'Move closer — fill the dashed frame with the card';

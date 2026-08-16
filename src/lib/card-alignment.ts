@@ -14,11 +14,25 @@ export interface CardAlignmentState {
   sizeRatio: number;
 }
 
-const CENTER_TOLERANCE = 0.06;
-const SIZE_MIN = 0.5;
-const SIZE_MAX = 1.55;
+  const CENTER_TOLERANCE = 0.05;
+const SIZE_MIN = 0.82;
+const SIZE_MAX = 1.18;
 const ROTATION_TOLERANCE_DEG = 5;
-const GUIDE_INSET = 0.05;
+const GUIDE_INSET = 0.04;
+const FIT_IOU = 0.7;
+
+function rectIou(
+  a: DetectedCard,
+  b: DetectedCard,
+): number {
+  const x0 = Math.max(a.left, b.left);
+  const y0 = Math.max(a.top, b.top);
+  const x1 = Math.min(a.left + a.width, b.left + b.width);
+  const y1 = Math.min(a.top + a.height, b.top + b.height);
+  const inter = Math.max(0, x1 - x0) * Math.max(0, y1 - y0);
+  const union = a.width * a.height + b.width * b.height - inter;
+  return union > 0 ? inter / union : 0;
+}
 
 export function getGuideBox(distanceCm: ScanDistanceCm = 20): DetectedCard {
   return guideBoxForDistance(distanceCm);
@@ -30,6 +44,7 @@ export function evaluateCardAlignment(
   guide: DetectedCard = getGuideBox(),
   cardAspectRatio: number = CARD_ASPECT,
   frameAspect = 1,
+  maxBottom = 1,
 ): CardAlignmentState {
   if (!detected) {
     return {
@@ -67,9 +82,13 @@ export function evaluateCardAlignment(
   const sized = sizeRatio >= SIZE_MIN && sizeRatio <= SIZE_MAX;
 
   const expectedNormAspect = cardAspectRatio / (frameAspect > 0.15 ? frameAspect : 1);
-  const aspectOk = Math.abs(detected.width / detected.height - expectedNormAspect) <= 0.06;
+  const aspectOk = Math.abs(detected.width / detected.height - expectedNormAspect) <= 0.08;
 
-  const fitsGuide = insideGuide && centered && sized && aspectOk && isCardLevel;
+  const aboveStand = detected.top + detected.height <= maxBottom + 0.02;
+  const overlapped = rectIou(detected, guide) >= FIT_IOU;
+
+  const fitsGuide =
+    insideGuide && centered && sized && aspectOk && isCardLevel && aboveStand && overlapped;
 
   return {
     guide,
