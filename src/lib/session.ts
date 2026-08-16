@@ -1,5 +1,6 @@
-import type { Rect, CenteringResult } from './centering';
-import type { TfgCenteringGrade, CardSide } from './tfg-standards';
+import { computeCentering, type Rect, type CenteringResult } from './centering';
+import { getTfgGrade, type TfgCenteringGrade, type CardSide } from './tfg-standards';
+import type { CardFormat } from './card-sizes';
 
 export interface SideSnapshot {
   imageSrc: string;
@@ -14,6 +15,27 @@ export interface SideSnapshot {
 export interface GradingSession {
   front: SideSnapshot | null;
   back: SideSnapshot | null;
+}
+
+/** Build a side snapshot with existing centering math + TFG thresholds. */
+export function snapshotFromRects(
+  imageSrc: string,
+  outer: Rect,
+  inner: Rect,
+  side: CardSide,
+  cardFormat: CardFormat,
+  name?: string,
+): SideSnapshot {
+  const result = computeCentering(outer, inner, cardFormat.widthMm, cardFormat.heightMm);
+  return {
+    imageSrc,
+    outer,
+    inner,
+    result,
+    grade: getTfgGrade(result.bordersPx, side),
+    savedAt: Date.now(),
+    name: name?.trim() || undefined,
+  };
 }
 
 export function emptySession(): GradingSession {
