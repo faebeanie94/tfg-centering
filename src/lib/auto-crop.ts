@@ -957,6 +957,9 @@ export async function perspectiveCorrectRefined(
   return firstPass;
 }
 
+/** Why auto-crop didn't apply on its own — shown to the user on the Perspective Fix screen. */
+export type AutoCropSkipReason = 'no_detection' | 'low_confidence' | 'not_frontal' | 'rotation';
+
 /**
  * Detect corners and auto-crop when confidence is high enough.
  * Always returns best-effort corners so Perspective Fix can be pre-seeded.
@@ -969,21 +972,30 @@ export async function tryAutoCrop(
   imageSrc: string,
   hint?: CaptureDetectHint,
   options: AutoCropOptions = {},
-): Promise<{ result: AutoCropResult | null; corners: QuadCorners | null; confidence: number }> {
+): Promise<{
+  result: AutoCropResult | null;
+  corners: QuadCorners | null;
+  confidence: number;
+  skipReason?: AutoCropSkipReason;
+}> {
   const cardAspect = options.cardAspect ?? CARD_ASPECT;
   const detected = await detectCardCornersFromImage(imageSrc, hint, options);
   if (!detected) {
-    return { result: null, corners: null, confidence: 0 };
+    return { result: null, corners: null, confidence: 0, skipReason: 'no_detection' };
   }
 
   const liveRotationOk = Math.abs(hint?.rotationDeg ?? 0) <= 8;
-  const canAutoApply =
-    detected.confidence >= AUTO_CROP_CONFIDENCE &&
-    isNearlyFrontal(detected.corners) &&
-    liveRotationOk;
+  const frontal = isNearlyFrontal(detected.corners);
+  const confidenceOk = detected.confidence >= AUTO_CROP_CONFIDENCE;
+  const canAutoApply = confidenceOk && frontal && liveRotationOk;
 
   if (!canAutoApply) {
-    return { result: null, corners: detected.corners, confidence: detected.confidence };
+    const skipReason: AutoCropSkipReason = !confidenceOk
+      ? 'low_confidence'
+      : !frontal
+        ? 'not_frontal'
+        : 'rotation';
+    return { result: null, corners: detected.corners, confidence: detected.confidence, skipReason };
   }
 
   try {
@@ -1002,7 +1014,7 @@ export async function tryAutoCrop(
       confidence: detected.confidence,
     };
   } catch {
-    return { result: null, corners: detected.corners, confidence: detected.confidence };
+    return { result: null, corners: detected.corners, confidence: detected.confidence, skipReason: 'low_confidence' };
   }
 }
 

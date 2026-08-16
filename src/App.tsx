@@ -12,7 +12,13 @@ import { SettingsPanel } from './components/SettingsPanel';
 import { CardSizePickerScreen, selectionFromSettings } from './components/CardSizeFields';
 import { useSavedCards } from './hooks/useSavedCards';
 import type { SavedCardRecord } from './lib/saved-cards';
-import { tryAutoCrop, seedEditorRectsFromImage, rectsAfterCropWithInnerSeed, type CaptureDetectHint } from './lib/auto-crop';
+import {
+  tryAutoCrop,
+  seedEditorRectsFromImage,
+  rectsAfterCropWithInnerSeed,
+  type CaptureDetectHint,
+  type AutoCropSkipReason,
+} from './lib/auto-crop';
 import type { QuadCorners } from './lib/perspective';
 import {
   cardAspect,
@@ -47,6 +53,11 @@ export default function App() {
   const [libraryReturnPhase, setLibraryReturnPhase] = useState<Phase>('capture');
   const [libraryMessage, setLibraryMessage] = useState<string | null>(null);
   const [perspectiveCorners, setPerspectiveCorners] = useState<QuadCorners | null>(null);
+  /** Why auto-crop fell back to manual review — cleared when Perspective Fix is opened by hand. */
+  const [autoCropInfo, setAutoCropInfo] = useState<{
+    confidence: number;
+    reason: AutoCropSkipReason;
+  } | null>(null);
   /** Concrete size for this capture — set from Settings or post-capture picker. */
   const [sessionCardSize, setSessionCardSize] = useState<CardSizeSelection | null>(null);
   const [pendingHint, setPendingHint] = useState<CaptureDetectHint | undefined>(undefined);
@@ -117,16 +128,18 @@ export default function App() {
       setSessionCardSize(selection);
       setPhase('autocrop');
       const format = resolveCardFormat(selection);
-      const { result, corners } = await tryAutoCrop(dataUrl, hint, {
+      const { result, corners, confidence, skipReason } = await tryAutoCrop(dataUrl, hint, {
         cardAspect: cardAspect(format),
       });
       if (result) {
         setWorkingImage(result.imageSrc);
         setEditorRects({ outer: result.outer, inner: result.inner });
+        setAutoCropInfo(null);
         setPhase('editor');
         return;
       }
       setPerspectiveCorners(corners);
+      setAutoCropInfo(skipReason ? { confidence, reason: skipReason } : null);
       setPhase('perspective');
     },
     [],
@@ -265,6 +278,7 @@ export default function App() {
     if (!workingImage) return;
     setRawImage(workingImage);
     setPerspectiveCorners(null);
+    setAutoCropInfo(null);
     setReturnPhaseAfterEdit('editor');
     setPhase('perspective');
   }, [workingImage]);
@@ -355,6 +369,7 @@ export default function App() {
         invertColors={settings.invertColors}
         initialCorners={perspectiveCorners}
         cardAspect={autoCropOptions.cardAspect}
+        autoCropInfo={autoCropInfo}
         onComplete={handlePerspectiveComplete}
         onSkip={handlePerspectiveSkip}
         onCancel={() => setPhase(workingImage ? 'editor' : 'capture')}
