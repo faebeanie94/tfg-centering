@@ -17,7 +17,7 @@ import {
   type Point,
   type QuadCorners,
   OUTPUT_PADDING_RATIO,
-  perspectiveCorrect,
+  cropToQuadBounds,
 } from './perspective';
 
 export interface CaptureDetectHint {
@@ -912,25 +912,9 @@ export function isNearlyFrontal(q: QuadCorners): boolean {
 }
 
 /**
- * The card fills a known fraction of a freshly-warped image — the inverse of
- * the padding baked into computeOutputSize (perspective.ts). Busy, edge-to-
- * edge holo/full-art cards can have internal contrast just as strong as the
- * true rim (and no clean "border" band the way a printed frame gives), so a
- * blind re-detection pass can confidently lock onto an inner artwork feature
- * instead — producing a small, wrong quad nowhere near the real corners.
- * Reject anything far smaller than expected rather than trust it blindly.
- */
-function quadMatchesExpectedCardArea(q: QuadCorners, imgW: number, imgH: number, paddingRatio: number): boolean {
-  const expectedFrac = 1 / (1 + 2 * paddingRatio) ** 2;
-  const frac = quadArea(q) / (imgW * imgH);
-  return frac >= expectedFrac * 0.65;
-}
-
-/**
  * A ray-cast detection that locks onto an inner feature (rather than the
- * true rim) undersizes the quad — but since padding extrapolates the same
- * homography outward, a wider margin can recover real card content that an
- * undersized quad excluded, not just add empty background. Scale it up when
+ * true rim) undersizes the quad — a wider crop margin is more likely to
+ * still include the real card edge rather than clip it. Scale it up when
  * confidence is lower and we're less sure the quad's size is right; keep it
  * tight (the normal 8%) when confident, so good crops stay clean.
  */
@@ -940,37 +924,17 @@ function safetyPaddingRatio(confidence: number): number {
 }
 
 /**
- * Warp to a rectangle, then re-detect on the result and apply a second small
- * corrective warp. A single ray-cast detection pass leaves a few pixels of
- * corner error, which reads as a small but real leftover tilt once warped.
- * The warped output is a much easier target for the same detector — card
- * fills a known, consistently-padded rectangle — so re-running it there
- * squeezes out most of what's left. Falls back to the first-pass result if
- * the second pass doesn't find a confident, frontal, plausibly-sized quad.
+ * Crop to the detected quad's bounds — no perspective/rotation correction,
+ * so a photo that wasn't taken dead-on stays exactly as tilted as it was.
+ * Padding scales with confidence so an uncertain detection is less likely
+ * to clip real card content.
  */
-export async function perspectiveCorrectRefined(
+export async function applyCardCrop(
   imageSrc: string,
   corners: QuadCorners,
-  cardAspectRatio: number = CARD_ASPECT,
   confidence: number = 1,
 ): Promise<string> {
-  const paddingRatio = safetyPaddingRatio(confidence);
-  const firstPass = await perspectiveCorrect(imageSrc, corners, cardAspectRatio, paddingRatio);
-  try {
-    const img = await loadImage(firstPass);
-    const refined = await detectCardCornersFromImage(firstPass, undefined, { cardAspect: cardAspectRatio });
-    if (
-      refined &&
-      refined.confidence >= 0.5 &&
-      isNearlyFrontal(refined.corners) &&
-      quadMatchesExpectedCardArea(refined.corners, img.naturalWidth, img.naturalHeight, paddingRatio)
-    ) {
-      return await perspectiveCorrect(firstPass, refined.corners, cardAspectRatio, paddingRatio);
-    }
-  } catch {
-    // fall through to the first-pass result
-  }
-  return firstPass;
+  return cropToQuadBounds(imageSrc, corners, safetyPaddingRatio(confidence));
 }
 
 /** Flags a lower-confidence auto-crop for an optional "review this" note — never blocks it. */
@@ -994,7 +958,6 @@ export async function tryAutoCrop(
   confidence: number;
   skipReason?: AutoCropSkipReason;
 }> {
-  const cardAspect = options.cardAspect ?? CARD_ASPECT;
   const detected = await detectCardCornersFromImage(imageSrc, hint, options);
   if (!detected) {
     return { result: null, corners: null, confidence: 0, skipReason: 'no_detection' };
@@ -1012,7 +975,7 @@ export async function tryAutoCrop(
         : undefined;
 
   try {
-    const corrected = await perspectiveCorrectRefined(imageSrc, detected.corners, cardAspect, detected.confidence);
+    const corrected = await applyCardCrop(imageSrc, detected.corners, detected.confidence);
     const img = await loadImage(corrected);
     const rects = rectsAfterCropWithInnerSeed(img);
     return {
