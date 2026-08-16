@@ -39,6 +39,13 @@ export interface AutoCropResult {
   confidence: number;
 }
 
+export interface AutoCropOptions {
+  /** Portrait width/height for the card format. */
+  cardAspect?: number;
+  /** Physical card height (mm) for distance-based search templates. */
+  cardHeightMm?: number;
+}
+
 /**
  * Minimum confidence required to skip Perspective Fix and open the editor.
  * Kept high on purpose — a bad auto-crop is worse than one tap on Apply.
@@ -123,7 +130,11 @@ function analysisSize(naturalWidth: number, naturalHeight: number): { w: number;
   };
 }
 
-function searchCandidates(hint?: CaptureDetectHint): DetectSearchRegion[] {
+function searchCandidates(
+  hint: CaptureDetectHint | undefined,
+  cardAspect: number,
+  cardHeightMm: number,
+): DetectSearchRegion[] {
   const searches: DetectSearchRegion[] = [];
 
   if (hint?.box) {
@@ -132,22 +143,25 @@ function searchCandidates(hint?: CaptureDetectHint): DetectSearchRegion[] {
       cy: hint.box.top + hint.box.height / 2,
       expectedWidth: hint.box.width,
       expectedHeight: hint.box.height,
+      cardAspect,
     });
   }
 
   for (const distance of [20, 12, 30] as const) {
-    const template = guideTemplateForDistance(distance);
+    const template = guideTemplateForDistance(distance, cardAspect, cardHeightMm);
     searches.push({
       cx: 0.5,
       cy: 0.36,
       expectedWidth: template.width,
       expectedHeight: template.height,
+      cardAspect,
     });
     searches.push({
       cx: 0.5,
       cy: 0.5,
       expectedWidth: template.width,
       expectedHeight: template.height,
+      cardAspect,
     });
   }
 
@@ -155,8 +169,9 @@ function searchCandidates(hint?: CaptureDetectHint): DetectSearchRegion[] {
     searches.push({
       cx: 0.5,
       cy: 0.5,
-      expectedWidth: height * CARD_ASPECT,
+      expectedWidth: height * cardAspect,
       expectedHeight: height,
+      cardAspect,
     });
   }
 
@@ -304,7 +319,13 @@ function estimateQuadAspect(q: QuadCorners): number {
   return width / height;
 }
 
-function scoreQuad(q: QuadCorners, imgW: number, imgH: number, residualAvg: number): number {
+function scoreQuad(
+  q: QuadCorners,
+  imgW: number,
+  imgH: number,
+  residualAvg: number,
+  cardAspect: number = CARD_ASPECT,
+): number {
   if (!isConvexQuad(q)) return 0;
 
   const area = quadArea(q);
@@ -321,8 +342,8 @@ function scoreQuad(q: QuadCorners, imgW: number, imgH: number, residualAvg: numb
   const aspect = estimateQuadAspect(q);
   // Allow perspective foreshortening: portrait cards often look wider when tilted.
   const aspectErr = Math.min(
-    Math.abs(aspect - CARD_ASPECT),
-    Math.abs(aspect - 1 / CARD_ASPECT),
+    Math.abs(aspect - cardAspect),
+    Math.abs(aspect - 1 / cardAspect),
   );
   if (aspectErr > 0.35) return 0;
 
@@ -434,6 +455,7 @@ function refineQuadFromSeed(
   w: number,
   h: number,
   seed: DetectedCard,
+  cardAspect: number = CARD_ASPECT,
 ): CornerDetection | null {
   const cx = (seed.left + seed.width / 2) * w;
   const cy = (seed.top + seed.height / 2) * h;
@@ -487,7 +509,7 @@ function refineQuadFromSeed(
 
   const residualAvg =
     (left.residual + right.residual + top.residual + bottom.residual) / 4;
-  let confidence = scoreQuad(ordered, w, h, residualAvg);
+  let confidence = scoreQuad(ordered, w, h, residualAvg, cardAspect);
   if (confidence < 0.2) return null;
 
   // Prefer colourful card bodies over pale mats / paper pads.
@@ -515,7 +537,9 @@ function findBestSeedBox(
   data: Uint8ClampedArray,
   w: number,
   h: number,
-  hint?: CaptureDetectHint,
+  hint: CaptureDetectHint | undefined,
+  cardAspect: number,
+  cardHeightMm: number,
 ): { box: DetectedCard; rotationDeg: number; score: number } | null {
   let bestBox: DetectedCard | null = null;
   let bestRot = 0;
@@ -542,19 +566,21 @@ function findBestSeedBox(
       chromaSeeds.push({
         cx: sx / sw / w,
         cy: sy / sw / h,
-        expectedWidth: CARD_ASPECT * 0.45,
+        expectedWidth: cardAspect * 0.45,
         expectedHeight: 0.45,
+        cardAspect,
       });
       chromaSeeds.push({
         cx: sx / sw / w,
         cy: sy / sw / h,
-        expectedWidth: CARD_ASPECT * 0.6,
+        expectedWidth: cardAspect * 0.6,
         expectedHeight: 0.6,
+        cardAspect,
       });
     }
   }
 
-  for (const search of [...chromaSeeds, ...searchCandidates(hint)]) {
+  for (const search of [...chromaSeeds, ...searchCandidates(hint, cardAspect, cardHeightMm)]) {
     const found = detectCardFrameFromImageData(data, w, h, search);
     if (!found) continue;
 
@@ -563,7 +589,7 @@ function findBestSeedBox(
         ? { width: search.expectedWidth, height: search.expectedHeight }
         : undefined;
 
-    const aspectErr = Math.abs(found.box.width / found.box.height - CARD_ASPECT);
+    const aspectErr = Math.abs(found.box.width / found.box.height - cardAspect);
     let score = 1 - aspectErr / 0.06;
     if (expected) {
       const sizeRatio =
@@ -603,7 +629,10 @@ function findBestSeedBox(
 export async function detectCardCornersFromImage(
   imageSrc: string,
   hint?: CaptureDetectHint,
+  options: AutoCropOptions = {},
 ): Promise<CornerDetection | null> {
+  const cardAspect = options.cardAspect ?? CARD_ASPECT;
+  const cardHeightMm = options.cardHeightMm ?? 88.9;
   const img = await loadImage(imageSrc);
   const { naturalWidth: imgW, naturalHeight: imgH } = img;
 
@@ -617,7 +646,7 @@ export async function detectCardCornersFromImage(
   ctx.drawImage(img, 0, 0, w, h);
   const { data } = ctx.getImageData(0, 0, w, h);
 
-  const seed = findBestSeedBox(data, w, h, hint);
+  const seed = findBestSeedBox(data, w, h, hint, cardAspect, cardHeightMm);
   // Also try the live hint box directly as a seed region.
   const seeds: DetectedCard[] = [];
   if (seed) seeds.push(seed.box);
@@ -626,7 +655,7 @@ export async function detectCardCornersFromImage(
   let best: CornerDetection | null = null;
 
   for (const s of seeds) {
-    const refined = refineQuadFromSeed(data, w, h, s);
+    const refined = refineQuadFromSeed(data, w, h, s, cardAspect);
     if (refined && (!best || refined.confidence > best.confidence)) {
       best = refined;
     }
@@ -677,8 +706,10 @@ export function isNearlyFrontal(q: QuadCorners): boolean {
 export async function tryAutoCrop(
   imageSrc: string,
   hint?: CaptureDetectHint,
+  options: AutoCropOptions = {},
 ): Promise<{ result: AutoCropResult | null; corners: QuadCorners | null; confidence: number }> {
-  const detected = await detectCardCornersFromImage(imageSrc, hint);
+  const cardAspect = options.cardAspect ?? CARD_ASPECT;
+  const detected = await detectCardCornersFromImage(imageSrc, hint, options);
   if (!detected) {
     return { result: null, corners: null, confidence: 0 };
   }
@@ -694,7 +725,7 @@ export async function tryAutoCrop(
   }
 
   try {
-    const corrected = await perspectiveCorrect(imageSrc, detected.corners);
+    const corrected = await perspectiveCorrect(imageSrc, detected.corners, cardAspect);
     const img = await loadImage(corrected);
     const rects = defaultRectsAfterCrop(img.naturalWidth, img.naturalHeight);
     return {
@@ -717,7 +748,8 @@ export async function tryAutoCrop(
 export async function autoCropCard(
   imageSrc: string,
   hint?: CaptureDetectHint,
+  options: AutoCropOptions = {},
 ): Promise<AutoCropResult | null> {
-  const { result } = await tryAutoCrop(imageSrc, hint);
+  const { result } = await tryAutoCrop(imageSrc, hint, options);
   return result;
 }

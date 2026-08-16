@@ -16,11 +16,15 @@ import { usePinchZoom } from '../hooks/usePinchZoom';
 import { StandardsPanel } from './StandardsPanel';
 import { CardMenu } from './CardMenu';
 import { EdgeArrowHandle, edgeHandleStyle } from './EdgeArrowHandle';
+import type { CardFormat } from '../lib/card-sizes';
+import { formatCardSizeMm } from '../lib/card-sizes';
 
 interface BorderEditorProps {
   imageSrc: string;
   side: CardSide;
   settings: AppSettings;
+  /** Physical card size for absolute mm (from Settings or post-capture pick). */
+  cardFormat: CardFormat;
   session: GradingSession;
   cardName: string;
   initialOuter?: Rect;
@@ -59,6 +63,7 @@ export function BorderEditor({
   imageSrc,
   side,
   settings,
+  cardFormat,
   session,
   initialOuter,
   initialInner,
@@ -114,8 +119,8 @@ export function BorderEditor({
 
   const result = useMemo(() => {
     if (!outer || !inner) return null;
-    return computeCentering(outer, inner);
-  }, [outer, inner]);
+    return computeCentering(outer, inner, cardFormat.widthMm, cardFormat.heightMm);
+  }, [outer, inner, cardFormat.widthMm, cardFormat.heightMm]);
 
   const tfgGrade = useMemo(() => {
     if (!result) return null;
@@ -341,6 +346,10 @@ export function BorderEditor({
           </div>
         ))}
       </div>
+      <p className="mm-scale-hint">
+        mm from {cardFormat.shortLabel} size ({formatCardSizeMm(cardFormat)}) — keep the green box on
+        the card edges
+      </p>
 
       <div ref={viewportRef} className="editor-viewport" {...viewportHandlers}>
       <div className="editor-zoom-layer" style={layerStyle}>

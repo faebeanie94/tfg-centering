@@ -1,5 +1,8 @@
-/** Trading card width / height in portrait orientation. */
-export const CARD_ASPECT = 63.5 / 88.9;
+import { cardAspect, resolveCardFormat, DEFAULT_CARD_FORMAT_ID } from './card-sizes';
+
+/** Default trading-card width / height (portrait) — Pokémon / sports poker size. */
+export const CARD_ASPECT = cardAspect(resolveCardFormat({ cardFormat: DEFAULT_CARD_FORMAT_ID }));
+export const DEFAULT_CARD_HEIGHT_MM = resolveCardFormat({ cardFormat: DEFAULT_CARD_FORMAT_ID }).heightMm;
 
 export interface DetectedCard {
   left: number;
@@ -43,7 +46,7 @@ function sampleRay(
 }
 
 /** Force axis-aligned rectangle with trading-card aspect ratio. */
-export function enforceCardRect(box: DetectedCard): DetectedCard {
+export function enforceCardRect(box: DetectedCard, cardAspectRatio: number = CARD_ASPECT): DetectedCard {
   const cx = box.left + box.width / 2;
   const cy = box.top + box.height / 2;
 
@@ -51,10 +54,10 @@ export function enforceCardRect(box: DetectedCard): DetectedCard {
   let height = box.height;
   const ratio = width / height;
 
-  if (ratio > CARD_ASPECT) {
-    width = height * CARD_ASPECT;
+  if (ratio > cardAspectRatio) {
+    width = height * cardAspectRatio;
   } else {
-    height = width / CARD_ASPECT;
+    height = width / cardAspectRatio;
   }
 
   let left = cx - width / 2;
@@ -372,6 +375,8 @@ export interface DetectSearchRegion {
   /** Expected card size (normalised) for scoring stable detections. */
   expectedWidth?: number;
   expectedHeight?: number;
+  /** Portrait width/height for the card format being scanned. */
+  cardAspect?: number;
 }
 
 function collectBackgroundEdges(
@@ -418,6 +423,7 @@ function boxFromOuterEdges(
   h: number,
   /** Prefer outer extent (dark desks) or median (noisy / light desks). */
   mode: 'outer' | 'median' = 'outer',
+  cardAspectRatio: number = CARD_ASPECT,
 ): CardFrameDetection | null {
   if (leftXs.length < 2 || rightXs.length < 2 || topYs.length < 2 || bottomYs.length < 2) {
     return null;
@@ -447,10 +453,10 @@ function boxFromOuterEdges(
   if (raw.width < 0.08 || raw.height < 0.08) return null;
 
   const aspect = raw.width / raw.height;
-  if (aspect < CARD_ASPECT * 0.75 || aspect > CARD_ASPECT * 1.35) return null;
+  if (aspect < cardAspectRatio * 0.75 || aspect > cardAspectRatio * 1.35) return null;
 
   return {
-    box: enforceCardRect(raw),
+    box: enforceCardRect(raw, cardAspectRatio),
     rotationDeg: estimateRotationDeg(leftXs, rightXs, topYs, bottomYs, w, h),
   };
 }
@@ -458,8 +464,9 @@ function boxFromOuterEdges(
 function scoreCardBox(
   box: DetectedCard,
   expected?: { width: number; height: number },
+  cardAspectRatio: number = CARD_ASPECT,
 ): number {
-  const aspectErr = Math.abs(box.width / box.height - CARD_ASPECT);
+  const aspectErr = Math.abs(box.width / box.height - cardAspectRatio);
   if (aspectErr > 0.06) return -1;
 
   if (!expected) return 1 - aspectErr;
@@ -479,9 +486,10 @@ function detectFromBackground(
   px: number,
   py: number,
   bgCutoff: number,
+  cardAspectRatio: number = CARD_ASPECT,
 ): CardFrameDetection | null {
   const edges = collectBackgroundEdges(data, w, h, px, py, bgCutoff);
-  return boxFromOuterEdges(edges.leftXs, edges.rightXs, edges.topYs, edges.bottomYs, w, h, 'outer');
+  return boxFromOuterEdges(edges.leftXs, edges.rightXs, edges.topYs, edges.bottomYs, w, h, 'outer', cardAspectRatio);
 }
 
 function collectLightBackgroundEdges(
@@ -526,9 +534,19 @@ function detectFromLightBackground(
   px: number,
   py: number,
   bgFloor: number,
+  cardAspectRatio: number = CARD_ASPECT,
 ): CardFrameDetection | null {
   const edges = collectLightBackgroundEdges(luma, w, h, px, py, bgFloor);
-  return boxFromOuterEdges(edges.leftXs, edges.rightXs, edges.topYs, edges.bottomYs, w, h, 'median');
+  return boxFromOuterEdges(
+    edges.leftXs,
+    edges.rightXs,
+    edges.topYs,
+    edges.bottomYs,
+    w,
+    h,
+    'median',
+    cardAspectRatio,
+  );
 }
 
 function collectGradientBandEdges(
@@ -628,6 +646,7 @@ function boxFromRefEdges(
   bottomYs: number[],
   w: number,
   h: number,
+  cardAspectRatio: number = CARD_ASPECT,
 ): CardFrameDetection | null {
   if (leftXs.length < 2 || rightXs.length < 2 || topYs.length < 2 || bottomYs.length < 2) {
     return null;
@@ -648,10 +667,10 @@ function boxFromRefEdges(
   if (raw.width < 0.08 || raw.height < 0.08) return null;
 
   const aspect = raw.width / raw.height;
-  if (aspect < CARD_ASPECT * 0.75 || aspect > CARD_ASPECT * 1.35) return null;
+  if (aspect < cardAspectRatio * 0.75 || aspect > cardAspectRatio * 1.35) return null;
 
   return {
-    box: enforceCardRect(raw),
+    box: enforceCardRect(raw, cardAspectRatio),
     rotationDeg: estimateRotationDeg(leftXs, rightXs, topYs, bottomYs, w, h),
   };
 }
@@ -663,9 +682,10 @@ function detectFromPointRefOnly(
   px: number,
   py: number,
   thresh: number,
+  cardAspectRatio: number = CARD_ASPECT,
 ): CardFrameDetection | null {
   const edges = collectRefEdges(data, w, h, px, py, thresh);
-  return boxFromRefEdges(edges.leftXs, edges.rightXs, edges.topYs, edges.bottomYs, w, h);
+  return boxFromRefEdges(edges.leftXs, edges.rightXs, edges.topYs, edges.bottomYs, w, h, cardAspectRatio);
 }
 
 /** Core detector that works on raw RGBA frames (also used by unit tests). */
@@ -675,12 +695,13 @@ export function detectCardFrameFromImageData(
   h: number,
   search?: DetectSearchRegion,
 ): CardFrameDetection | null {
+  const cardAspectRatio = search?.cardAspect ?? CARD_ASPECT;
   const cx = search?.cx ?? 0.5;
   const cy = search?.cy ?? 0.36;
   const expected =
     search?.expectedWidth != null && search?.expectedHeight != null
       ? { width: search.expectedWidth, height: search.expectedHeight }
-      : { width: CARD_ASPECT * 0.4, height: 0.4 };
+      : { width: cardAspectRatio * 0.4, height: 0.4 };
 
   const span = expected.height / 2;
   const bgLum = estimateBackgroundLum(data, w, h, cx, cy, span);
@@ -704,7 +725,7 @@ export function detectCardFrameFromImageData(
 
   const consider = (found: CardFrameDetection | null) => {
     if (!found) return;
-    const score = scoreCardBox(found.box, expected);
+    const score = scoreCardBox(found.box, expected, cardAspectRatio);
     if (score > bestScore) {
       bestScore = score;
       best = found;
@@ -717,13 +738,13 @@ export function detectCardFrameFromImageData(
 
     if (!lightBackground) {
       for (const margin of [28, 32, 38, 45]) {
-        consider(detectFromBackground(data, w, h, sx, sy, bgLum + margin));
+        consider(detectFromBackground(data, w, h, sx, sy, bgLum + margin, cardAspectRatio));
       }
     }
 
     if (lightBackground || bestScore < 0.45) {
       for (const drop of [18, 28, 40, 55]) {
-        consider(detectFromLightBackground(luma, w, h, sx, sy, bgLum - drop));
+        consider(detectFromLightBackground(luma, w, h, sx, sy, bgLum - drop, cardAspectRatio));
       }
     }
 
@@ -731,7 +752,7 @@ export function detectCardFrameFromImageData(
 
     if (bestScore < 0.4) {
       for (const thresh of [22, 28, 36, 44]) {
-        consider(detectFromPointRefOnly(data, w, h, sx, sy, thresh));
+        consider(detectFromPointRefOnly(data, w, h, sx, sy, thresh, cardAspectRatio));
       }
     }
 
@@ -743,7 +764,9 @@ export function detectCardFrameFromImageData(
     const sx = clamp(Math.floor(cx * w), 2, w - 3);
     const sy = clamp(Math.floor(cy * h), 2, h - 3);
     for (const margin of [28, 32, 38, 45]) {
-      consider(detectFromBackground(data, w, h, sx, sy, Math.min(bgLum, 80) + margin));
+      consider(
+        detectFromBackground(data, w, h, sx, sy, Math.min(bgLum, 80) + margin, cardAspectRatio),
+      );
     }
   }
 
@@ -813,23 +836,30 @@ export function detectCardBox(video: HTMLVideoElement, canvas: HTMLCanvasElement
 
 /** Typical phone vertical FOV when scanning flat (~50°). Used to size the guide from distance. */
 const SCAN_FOV_DEG = 50;
-const CARD_HEIGHT_MM = 88.9;
 
 export const SCAN_DISTANCE_OPTIONS = [12, 20, 30] as const;
 export type ScanDistanceCm = (typeof SCAN_DISTANCE_OPTIONS)[number];
 
 /** Guide frame sized for a card at the given phone-to-card distance (cm). */
-export function guideBoxForDistance(distanceCm: ScanDistanceCm = 20): DetectedCard {
-  const template = guideTemplateForDistance(distanceCm);
+export function guideBoxForDistance(
+  distanceCm: ScanDistanceCm = 20,
+  cardAspectRatio: number = CARD_ASPECT,
+  cardHeightMm: number = DEFAULT_CARD_HEIGHT_MM,
+): DetectedCard {
+  const template = guideTemplateForDistance(distanceCm, cardAspectRatio, cardHeightMm);
   return positionGuideBox(template, 0.5, defaultGuideAnchorY(template.height, 0.32));
 }
 
-export function guideTemplateForDistance(distanceCm: ScanDistanceCm = 20): { width: number; height: number } {
+export function guideTemplateForDistance(
+  distanceCm: ScanDistanceCm = 20,
+  cardAspectRatio: number = CARD_ASPECT,
+  cardHeightMm: number = DEFAULT_CARD_HEIGHT_MM,
+): { width: number; height: number } {
   const distanceMm = distanceCm * 10;
-  const angularHeightRad = 2 * Math.atan(CARD_HEIGHT_MM / (2 * distanceMm));
+  const angularHeightRad = 2 * Math.atan(cardHeightMm / (2 * distanceMm));
   const fovRad = (SCAN_FOV_DEG * Math.PI) / 180;
   const height = Math.max(0.22, Math.min(0.65, angularHeightRad / fovRad));
-  return { width: height * CARD_ASPECT, height };
+  return { width: height * cardAspectRatio, height };
 }
 
 /** Vertical centre for the guide when no card is detected yet. */
@@ -881,7 +911,12 @@ export function shouldAcceptDetection(prev: DetectedCard | null, next: DetectedC
   return centerJump <= 0.06 && sizeJump <= 0.2;
 }
 
-export function smoothBox(prev: DetectedCard | null, next: DetectedCard, alpha = 0.2): DetectedCard {
+export function smoothBox(
+  prev: DetectedCard | null,
+  next: DetectedCard,
+  alpha = 0.2,
+  cardAspectRatio: number = CARD_ASPECT,
+): DetectedCard {
   const blended = !prev
     ? next
     : {
@@ -890,5 +925,5 @@ export function smoothBox(prev: DetectedCard | null, next: DetectedCard, alpha =
         width: prev.width + (next.width - prev.width) * alpha,
         height: prev.height + (next.height - prev.height) * alpha,
       };
-  return enforceCardRect(blended);
+  return enforceCardRect(blended, cardAspectRatio);
 }

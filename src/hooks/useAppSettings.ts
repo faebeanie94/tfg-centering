@@ -1,4 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
+import {
+  clampCardMm,
+  DEFAULT_CARD_FORMAT_SETTING,
+  DEFAULT_CUSTOM_HEIGHT_MM,
+  DEFAULT_CUSTOM_WIDTH_MM,
+  isCardFormatSetting,
+  type CardFormatSetting,
+} from '../lib/card-sizes';
 
 export interface AppSettings {
   handleColor: string;
@@ -15,6 +23,14 @@ export interface AppSettings {
   scanObstructionBottom: number;
   /** Display-only negative view while aligning borders. */
   invertColors: boolean;
+  /**
+   * Physical card size for mm / warp / scanner guide.
+   * `ask` = not selected → show post-capture picker only.
+   */
+  cardFormat: CardFormatSetting;
+  /** Used when cardFormat is `custom`. */
+  customWidthMm: number;
+  customHeightMm: number;
 }
 
 const STORAGE_KEY = 'tfg-centering-settings';
@@ -38,6 +54,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   scanDistanceCm: 20,
   scanObstructionBottom: 0.32,
   invertColors: false,
+  cardFormat: DEFAULT_CARD_FORMAT_SETTING,
+  customWidthMm: DEFAULT_CUSTOM_WIDTH_MM,
+  customHeightMm: DEFAULT_CUSTOM_HEIGHT_MM,
 };
 
 function loadSettings(): AppSettings {
@@ -48,6 +67,9 @@ function loadSettings(): AppSettings {
     if (![12, 20, 30].includes(parsed.scanDistanceCm)) parsed.scanDistanceCm = 20;
     if (typeof parsed.scanObstructionBottom !== 'number') parsed.scanObstructionBottom = 0.32;
     parsed.scanObstructionBottom = Math.max(0, Math.min(0.5, parsed.scanObstructionBottom));
+    if (!isCardFormatSetting(parsed.cardFormat)) parsed.cardFormat = DEFAULT_CARD_FORMAT_SETTING;
+    parsed.customWidthMm = clampCardMm(Number(parsed.customWidthMm));
+    parsed.customHeightMm = clampCardMm(Number(parsed.customHeightMm));
     return parsed;
   } catch {
     return DEFAULT_SETTINGS;

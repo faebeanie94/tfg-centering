@@ -13,6 +13,8 @@ interface PerspectiveCorrectorProps {
   invertColors?: boolean;
   /** Pre-detected corners from auto-crop (pixel coords). */
   initialCorners?: QuadCorners | null;
+  /** Portrait width/height for the selected card format. */
+  cardAspect?: number;
   onComplete: (correctedSrc: string) => void;
   onSkip: () => void;
   onCancel: () => void;
@@ -45,6 +47,7 @@ export function PerspectiveCorrector({
   imageSrc,
   invertColors = false,
   initialCorners = null,
+  cardAspect,
   onComplete,
   onSkip,
   onCancel,
@@ -78,7 +81,9 @@ export function PerspectiveCorrector({
 
       if (!initialCorners) {
         try {
-          const detected = await detectCardCornersFromImage(imageSrc);
+          const detected = await detectCardCornersFromImage(imageSrc, undefined, {
+            cardAspect,
+          });
           if (!cancelled && detected) setCorners(detected.corners);
         } catch {
           // keep fallback corners
@@ -241,7 +246,7 @@ export function PerspectiveCorrector({
     if (!corners) return;
     setProcessing(true);
     try {
-      const corrected = await perspectiveCorrect(imageSrc, corners);
+      const corrected = await perspectiveCorrect(imageSrc, corners, cardAspect);
       onComplete(corrected);
     } catch {
       onComplete(imageSrc);
