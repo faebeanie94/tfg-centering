@@ -853,6 +853,16 @@ body.editor-mode #root {
   line-height: 1.3;
 }
 
+.mm-scale-hint {
+  margin: -2px 0 0;
+  padding: 0 4px;
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.3;
+}
+
 .editor-canvas {
   position: relative;
   border-radius: var(--radius);

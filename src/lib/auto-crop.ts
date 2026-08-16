@@ -6,11 +6,10 @@ import {
   type DetectSearchRegion,
 } from './card-edge-detect';
 import type { Rect } from './centering';
-import { defaultInnerRect } from './centering';
+import { defaultCardRects } from './centering';
 import {
   type Point,
   type QuadCorners,
-  OUTPUT_PADDING_RATIO,
   perspectiveCorrect,
 } from './perspective';
 
@@ -100,17 +99,7 @@ export function defaultRectsAfterCrop(imgWidth: number, imgHeight: number): {
   outer: Rect;
   inner: Rect;
 } {
-  const cardHeight = imgHeight / (1 + 2 * OUTPUT_PADDING_RATIO);
-  const cardWidth = imgWidth / (1 + 2 * OUTPUT_PADDING_RATIO);
-  const padX = (imgWidth - cardWidth) / 2;
-  const padY = (imgHeight - cardHeight) / 2;
-  const outer: Rect = {
-    x: padX,
-    y: padY,
-    width: cardWidth,
-    height: cardHeight,
-  };
-  return { outer, inner: defaultInnerRect(outer) };
+  return defaultCardRects(imgWidth, imgHeight);
 }
 
 function analysisSize(naturalWidth: number, naturalHeight: number): { w: number; h: number; scale: number } {

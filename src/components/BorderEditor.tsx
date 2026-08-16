@@ -341,6 +341,9 @@ export function BorderEditor({
           </div>
         ))}
       </div>
+      <p className="mm-scale-hint">
+        mm from standard card size (63.5×88.9) — keep the green box on the card edges
+      </p>
 
       <div ref={viewportRef} className="editor-viewport" {...viewportHandlers}>
       <div className="editor-zoom-layer" style={layerStyle}>
