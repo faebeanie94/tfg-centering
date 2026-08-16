@@ -20,6 +20,7 @@ import {
   boxToCorners,
   defaultRectsAfterCrop,
   AUTO_CROP_CONFIDENCE,
+  DETECT_CONFIRM_CONFIDENCE,
   isNearlyFrontal,
 } from '${join(root, 'src/lib/auto-crop.ts').replace(/\\\\/g, '/')}';
 import {
@@ -100,6 +101,7 @@ assert(Math.abs(rects.outer.x - expectedPadX) < 1, 'outer pad x');
 assert(rects.inner.x > rects.outer.x, 'inner inset');
 assert(rects.inner.width < rects.outer.width, 'inner narrower');
 assert(AUTO_CROP_CONFIDENCE > 0.5 && AUTO_CROP_CONFIDENCE < 0.95, 'confidence gate sane');
+assert(DETECT_CONFIRM_CONFIDENCE < AUTO_CROP_CONFIDENCE, 'confirm threshold below auto-crop');
 
 // Live scanner AABB for a tilted card must not look "frontal".
 const tilted = boxToCorners(

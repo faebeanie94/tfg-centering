@@ -6,20 +6,34 @@ import {
   detectCardFrame,
   guideTemplateForDistance,
   positionGuideBox,
-  shouldAcceptDetection,
-  smoothBox,
   type DetectedCard,
   type ScanDistanceCm,
 } from '../lib/card-edge-detect';
 import { evaluateCardAlignment, type CardAlignmentState } from '../lib/card-alignment';
+import { boxToCorners } from '../lib/auto-crop';
+import {
+  CardDetector,
+  cornersToOverlaySpace,
+  overlayCornersToBox,
+  type CardCorners,
+} from '../components/CardDetector';
+
+function clearLiveLock(detector: CardDetector | null) {
+  detector?.resetAutoCapture();
+  if (detector) {
+    detector.detectedCorners = null;
+    detector.confidence = 0;
+  }
+}
 
 interface CardEdgeDetectorOptions {
   scanDistanceCm: ScanDistanceCm;
   obstructionBottom: number;
-  /** Portrait width/height for the selected card format. */
   cardAspect?: number;
-  /** Physical card height (mm) for distance-based guide sizing. */
   cardHeightMm?: number;
+  onAutoCapture?: () => void;
+  autoCaptureEnabled?: boolean;
+  canAutoCapture?: () => boolean;
 }
 
 export function useCardEdgeDetector(
@@ -30,12 +44,31 @@ export function useCardEdgeDetector(
     obstructionBottom,
     cardAspect = CARD_ASPECT,
     cardHeightMm = DEFAULT_CARD_HEIGHT_MM,
+    onAutoCapture,
+    autoCaptureEnabled = false,
+    canAutoCapture,
   }: CardEdgeDetectorOptions,
 ) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const smoothRef = useRef<DetectedCard | null>(null);
-  const rotationRef = useRef(0);
-  const missFramesRef = useRef(0);
+  const onAutoCaptureRef = useRef(onAutoCapture);
+  onAutoCaptureRef.current = onAutoCapture;
+  const autoEnabledRef = useRef(autoCaptureEnabled);
+  autoEnabledRef.current = autoCaptureEnabled;
+  const canAutoCaptureRef = useRef(canAutoCapture);
+  canAutoCaptureRef.current = canAutoCapture;
+
+  const detectorRef = useRef<CardDetector | null>(null);
+  if (!detectorRef.current) {
+    detectorRef.current = new CardDetector({
+      onAutoCapture: () => {
+        if (!autoEnabledRef.current || canAutoCaptureRef.current?.() === false) {
+          detectorRef.current?.resetAutoCapture();
+          return;
+        }
+        onAutoCaptureRef.current?.();
+      },
+    });
+  }
 
   const template = useMemo(
     () => guideTemplateForDistance(scanDistanceCm, cardAspect, cardHeightMm),
@@ -57,26 +90,25 @@ export function useCardEdgeDetector(
   const [alignment, setAlignment] = useState<CardAlignmentState>(() =>
     evaluateCardAlignment(null, 0, guideBox, cardAspect),
   );
+  const [detectorTick, setDetectorTick] = useState(0);
 
   useEffect(() => {
-    smoothRef.current = null;
-    rotationRef.current = 0;
-    missFramesRef.current = 0;
+    clearLiveLock(detectorRef.current);
     const guide = positionGuideBox(template, guideAnchor.x, guideAnchor.y, { obstructionBottom });
     setGuideBox(guide);
     setDetectedBox(null);
     setAlignment(evaluateCardAlignment(null, 0, guide, cardAspect));
+    setDetectorTick((n) => n + 1);
   }, [scanDistanceCm, obstructionBottom, template, guideAnchor, cardAspect]);
 
   useEffect(() => {
     if (!active) {
-      smoothRef.current = null;
-      rotationRef.current = 0;
-      missFramesRef.current = 0;
+      clearLiveLock(detectorRef.current);
       const guide = positionGuideBox(template, guideAnchor.x, guideAnchor.y, { obstructionBottom });
       setGuideBox(guide);
       setDetectedBox(null);
       setAlignment(evaluateCardAlignment(null, 0, guide, cardAspect));
+      setDetectorTick((n) => n + 1);
       return;
     }
 
@@ -87,7 +119,8 @@ export function useCardEdgeDetector(
     function tick() {
       const video = videoRef.current;
       const canvas = canvasRef.current;
-      if (video && canvas && video.readyState >= 2) {
+      const detector = detectorRef.current;
+      if (video && canvas && detector && video.readyState >= 2) {
         if (frame % 3 === 0) {
           const guide = positionGuideBox(template, guideAnchor.x, guideAnchor.y, { obstructionBottom });
           const search = {
@@ -98,32 +131,41 @@ export function useCardEdgeDetector(
             cardAspect,
           };
           const found = detectCardFrame(video, canvas, search);
+          const frameWidth = canvas.width || 240;
+          const frameHeight = canvas.height || Math.round(frameWidth * 1.77);
 
           if (found) {
-            const candidate = found.box;
-            if (shouldAcceptDetection(smoothRef.current, candidate)) {
-              missFramesRef.current = 0;
-              smoothRef.current = smoothBox(smoothRef.current, candidate, 0.2, cardAspect);
-              rotationRef.current = rotationRef.current * 0.7 + found.rotationDeg * 0.3;
-            } else {
-              missFramesRef.current = 0;
-            }
-            const box = smoothRef.current;
-            if (box) {
-              const next = evaluateCardAlignment(box, rotationRef.current, guide, cardAspect);
-              setGuideBox(guide);
-              setDetectedBox({ ...box });
-              setAlignment(next);
-            }
+            const quad = boxToCorners(found.box, frameWidth, frameHeight, found.rotationDeg);
+            const preview = evaluateCardAlignment(found.box, found.rotationDeg, guide, cardAspect);
+            const confidence = preview.fitsGuide
+              ? Math.max(found.score ?? 0.5, 0.9)
+              : (found.score ?? 0.4);
+
+            detector.updateDetection({
+              corners: cornersToOverlaySpace(
+                [quad.tl, quad.tr, quad.br, quad.bl],
+                frameWidth,
+                frameHeight,
+              ),
+              confidence,
+            });
           } else {
-            missFramesRef.current++;
-            setGuideBox(guide);
-            if (missFramesRef.current > 15) {
-              smoothRef.current = null;
-              setDetectedBox(null);
-              setAlignment(evaluateCardAlignment(null, 0, guide, cardAspect));
-            }
+            detector.updateDetection({
+              corners: [] as unknown as CardCorners,
+              confidence: 0,
+            });
           }
+
+          const tracked = detector.detectedCorners
+            ? overlayCornersToBox(detector.detectedCorners)
+            : null;
+          const box = tracked ?? (found ? found.box : null);
+          const rotation = found?.rotationDeg ?? 0;
+
+          setGuideBox(guide);
+          setDetectedBox(box);
+          setAlignment(evaluateCardAlignment(box, rotation, guide, cardAspect));
+          setDetectorTick((n) => n + 1);
         }
         frame++;
       }
@@ -139,5 +181,7 @@ export function useCardEdgeDetector(
     detectedBox,
     alignment,
     detected: detectedBox !== null,
+    detector: detectorRef.current,
+    detectorTick,
   };
 }

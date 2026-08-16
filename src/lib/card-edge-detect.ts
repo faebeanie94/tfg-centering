@@ -74,6 +74,8 @@ export function enforceCardRect(box: DetectedCard, cardAspectRatio: number = CAR
 export interface CardFrameDetection {
   box: DetectedCard;
   rotationDeg: number;
+  /** 0–1 box score from the live AABB detector (when available). */
+  score?: number;
 }
 
 function estimateRotationDeg(
@@ -200,7 +202,7 @@ function estimateBackgroundLum(
 }
 
 /** Build a blurred luminance plane so holographic glare spikes don't fake edges. */
-function buildBlurredLuma(data: Uint8ClampedArray, w: number, h: number): Float32Array {
+export function buildBlurredLuma(data: Uint8ClampedArray, w: number, h: number): Float32Array {
   const raw = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) raw[i] = lum(data, i);
 
@@ -770,7 +772,9 @@ export function detectCardFrameFromImageData(
     }
   }
 
-  return bestScore >= 0.25 ? best : null;
+  if (bestScore < 0.25 || best == null) return null;
+  const winner: CardFrameDetection = best;
+  return { box: winner.box, rotationDeg: winner.rotationDeg, score: bestScore };
 }
 
 export function detectCardFrame(

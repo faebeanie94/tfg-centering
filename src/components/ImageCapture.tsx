@@ -1,7 +1,6 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { useDeviceLevel } from '../hooks/useDeviceLevel';
 import { useCardEdgeDetector } from '../hooks/useCardEdgeDetector';
-import { useAutoCapture } from '../hooks/useAutoCapture';
 import type { AppSettings } from '../hooks/useAppSettings';
 import type { CardSide } from '../lib/tfg-standards';
 import {
@@ -21,12 +20,26 @@ import {
 } from '../lib/permissions';
 import { getScannerHint } from '../lib/level-hint';
 import { ScannerOverlay } from './ScannerOverlay';
+import { CardDebugOverlay } from './CardDetector';
+import { CardImageProcessor, overlayCornersToImagePixels } from '../utils/cardImageProcessor';
 import type { CaptureDetectHint } from '../lib/auto-crop';
 import {
   cardAspect,
   fallbackCardFormatForDetection,
   resolveCardFormat,
 } from '../lib/card-sizes';
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') resolve(reader.result);
+      else reject(new Error('Unable to read image'));
+    };
+    reader.onerror = () => reject(new Error('Unable to read image'));
+    reader.readAsDataURL(blob);
+  });
+}
 
 interface ImageCaptureProps {
   side: CardSide;
@@ -61,6 +74,7 @@ export function ImageCapture({
   const [cameraCaps, setCameraCaps] = useState<CameraCapabilities>({ torch: false, macro: false, focus: false });
   const [focusReady, setFocusReady] = useState(true);
   const [capturing, setCapturing] = useState(false);
+  const [qualityMessage, setQualityMessage] = useState<string | null>(null);
   const scanReadyRef = useRef(false);
 
   const showLevel = settings.levelIndicators;
@@ -75,12 +89,24 @@ export function ImageCapture({
       customHeightMm: settings.customHeightMm,
     });
   }, [settings.cardFormat, settings.customWidthMm, settings.customHeightMm]);
-  const { guideBox, detectedBox, alignment } = useCardEdgeDetector(cameraActive, videoRef, {
-    scanDistanceCm: settings.scanDistanceCm,
-    obstructionBottom: settings.scanObstructionBottom,
-    cardAspect: cardAspect(scanFormat),
-    cardHeightMm: scanFormat.heightMm,
-  });
+  const takePhotoRef = useRef<() => void>(() => {});
+
+  const { guideBox, detectedBox, alignment, detector, detectorTick } = useCardEdgeDetector(
+    cameraActive,
+    videoRef,
+    {
+      scanDistanceCm: settings.scanDistanceCm,
+      obstructionBottom: settings.scanObstructionBottom,
+      cardAspect: cardAspect(scanFormat),
+      cardHeightMm: scanFormat.heightMm,
+      autoCaptureEnabled: settings.autoCapture,
+      canAutoCapture: () => {
+        if (showLevel && motionGranted && level.supported && !level.isLevel) return false;
+        return true;
+      },
+      onAutoCapture: () => takePhotoRef.current(),
+    },
+  );
   const detectedBoxRef = useRef(detectedBox);
   const guideBoxRef = useRef(guideBox);
   const alignmentRef = useRef(alignment);
@@ -103,6 +129,7 @@ export function ImageCapture({
     if (!video || !canvas || capturing) return;
 
     setCapturing(true);
+    setQualityMessage(null);
     try {
       const track = streamRef.current?.getVideoTracks()[0];
       const box = detectedBoxRef.current ?? guideBoxRef.current;
@@ -111,24 +138,62 @@ export function ImageCapture({
 
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d')!;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        detector.resetAutoCapture();
+        setQualityMessage('Unable to process image');
+        return;
+      }
       ctx.drawImage(video, 0, 0);
-      const liveBox = detectedBoxRef.current;
-      onCapture(canvas.toDataURL('image/jpeg', 0.95), {
-        box: liveBox,
-        rotationDeg: alignmentRef.current.rotationDeg,
-        // fitsGuide already requires card level + in-guide; AABB alone is unsafe for tilt.
-        liveReady: alignmentRef.current.fitsGuide,
+
+      const imageBytes = await new Promise<Blob | null>((resolve) => {
+        canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.95);
       });
+      if (!imageBytes) {
+        detector.resetAutoCapture();
+        setQualityMessage('Unable to process image');
+        return;
+      }
+
+      const overlayCorners = detector.detectedCorners;
+      if (overlayCorners) {
+        const corners = overlayCornersToImagePixels(overlayCorners, canvas.width, canvas.height);
+        const result = await CardImageProcessor.validateAndCorrect(imageBytes, corners);
+        setQualityMessage(result.message);
+        if (!result.isGoodQuality) {
+          detector.resetAutoCapture();
+          return;
+        }
+
+        const correctedSrc = await blobToDataUrl(result.imageBytes);
+        onCapture(correctedSrc, {
+          box: detectedBoxRef.current,
+          rotationDeg: alignmentRef.current.rotationDeg,
+          liveReady: true,
+          preCorrected: true,
+        });
+      } else {
+        onCapture(canvas.toDataURL('image/jpeg', 0.95), {
+          box: detectedBoxRef.current,
+          rotationDeg: alignmentRef.current.rotationDeg,
+          liveReady: alignmentRef.current.fitsGuide,
+        });
+      }
+
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
       setCameraActive(false);
       setTorchOn(false);
       setMacroOn(false);
+      detector.resetAutoCapture();
+    } catch {
+      detector.resetAutoCapture();
+      setQualityMessage('Unable to process image');
     } finally {
       setCapturing(false);
     }
-  }, [onCapture, capturing]);
+  }, [onCapture, capturing, detector]);
+  takePhotoRef.current = takePhoto;
 
   const scanReady =
     !showLevel ||
@@ -144,7 +209,6 @@ export function ImageCapture({
     !motionGranted ||
     level.isLevel;
 
-  const captureReady = scanReady && !capturing && (focusReady || !showLevel);
   const manualCaptureReady = manualScanReady && !capturing && (focusReady || !scanReady);
 
   useEffect(() => {
@@ -177,13 +241,6 @@ export function ImageCapture({
       window.clearTimeout(fallbackTimer);
     };
   }, [cameraActive, scanReady]);
-
-  const { progress, isCountingDown } = useAutoCapture({
-    enabled: cameraActive && settings.autoCapture && showLevel && motionGranted,
-    isLevel: captureReady,
-    delayMs: settings.autoCaptureDelayMs,
-    onCapture: takePhoto,
-  });
 
   useEffect(() => {
     const video = videoRef.current;
@@ -322,11 +379,15 @@ export function ImageCapture({
 
   const statusHint = capturing
     ? 'Focusing…'
-    : scanReady && !focusReady
-      ? 'Focusing on card…'
-      : isCountingDown
-        ? `Auto-capturing in ${((1 - progress) * settings.autoCaptureDelayMs / 1000).toFixed(1)}s…`
-        : getScannerHint(level, alignment, showLevel);
+    : qualityMessage && qualityMessage !== 'Good scan'
+      ? qualityMessage
+      : scanReady && !focusReady
+        ? 'Focusing on card…'
+        : detector.isReadyToCapture
+          ? 'CAPTURING...'
+          : detector.detectedCorners && detector.confidence >= 0.9 && settings.autoCapture
+            ? `HOLD STEADY  ${Math.ceil((1 - detector.captureProgress) * detector.requiredFrames)}`
+            : getScannerHint(level, alignment, showLevel);
 
   if (cameraActive) {
     return (
@@ -362,8 +423,8 @@ export function ImageCapture({
               detectedBox={detectedBox}
               alignment={alignment}
               showLevel={showLevel}
-              progress={isCountingDown ? progress : 0}
             />
+            <CardDebugOverlay key={detectorTick} detector={detector} />
           </div>
           <canvas ref={canvasRef} hidden />
         </div>
