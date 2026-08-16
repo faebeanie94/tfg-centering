@@ -452,22 +452,61 @@ function boxFromOuterEdges(
 
   if (raw.width < 0.08 || raw.height < 0.08) return null;
 
-  const aspect = raw.width / raw.height;
-  if (aspect < cardAspectRatio * 0.75 || aspect > cardAspectRatio * 1.35) return null;
+  if (!rawBoxLooksLikeCard(raw, w, h, cardAspectRatio)) return null;
 
   return {
-    box: enforceCardRect(raw, cardAspectRatio),
+    box: maybeEnforceCardRect(raw, w, h, cardAspectRatio),
     rotationDeg: estimateRotationDeg(leftXs, rightXs, topYs, bottomYs, w, h),
   };
+}
+
+/** Normalized aspect (camera overlay) or pixel aspect (card-shaped stills). */
+function boxAspectError(
+  box: DetectedCard,
+  cardAspectRatio: number,
+  frameW?: number,
+  frameH?: number,
+): number {
+  const normErr = Math.abs(box.width / box.height - cardAspectRatio);
+  if (!frameW || !frameH || frameH <= 0) return normErr;
+  const pixErr = Math.abs((box.width * frameW) / (box.height * frameH) - cardAspectRatio);
+  return Math.min(normErr, pixErr);
+}
+
+function rawBoxLooksLikeCard(
+  raw: DetectedCard,
+  w: number,
+  h: number,
+  cardAspectRatio: number,
+): boolean {
+  const minA = cardAspectRatio * 0.75;
+  const maxA = cardAspectRatio * 1.35;
+  const norm = raw.width / raw.height;
+  const pix = (raw.width * w) / (raw.height * h);
+  return (norm >= minA && norm <= maxA) || (pix >= minA && pix <= maxA);
+}
+
+function maybeEnforceCardRect(
+  raw: DetectedCard,
+  w: number,
+  h: number,
+  cardAspectRatio: number,
+): DetectedCard {
+  const normErr = Math.abs(raw.width / raw.height - cardAspectRatio);
+  const pixErr = Math.abs((raw.width * w) / (raw.height * h) - cardAspectRatio);
+  if (pixErr <= normErr) return raw;
+  return enforceCardRect(raw, cardAspectRatio);
 }
 
 function scoreCardBox(
   box: DetectedCard,
   expected?: { width: number; height: number },
   cardAspectRatio: number = CARD_ASPECT,
+  frameW?: number,
+  frameH?: number,
 ): number {
-  const aspectErr = Math.abs(box.width / box.height - cardAspectRatio);
-  if (aspectErr > 0.06) return -1;
+  const aspectErr = boxAspectError(box, cardAspectRatio, frameW, frameH);
+  if (aspectErr > 0.12) return -1;
 
   if (!expected) return 1 - aspectErr;
 
@@ -475,7 +514,7 @@ function scoreCardBox(
   if (sizeRatio < 0.4 || sizeRatio > 1.6) return -1;
 
   const sizeScore = 1 - Math.min(1, Math.abs(1 - sizeRatio));
-  const aspectScore = 1 - aspectErr / 0.06;
+  const aspectScore = 1 - Math.min(1, aspectErr / 0.12);
   return sizeScore * 0.65 + aspectScore * 0.35;
 }
 
@@ -666,11 +705,10 @@ function boxFromRefEdges(
 
   if (raw.width < 0.08 || raw.height < 0.08) return null;
 
-  const aspect = raw.width / raw.height;
-  if (aspect < cardAspectRatio * 0.75 || aspect > cardAspectRatio * 1.35) return null;
+  if (!rawBoxLooksLikeCard(raw, w, h, cardAspectRatio)) return null;
 
   return {
-    box: enforceCardRect(raw, cardAspectRatio),
+    box: maybeEnforceCardRect(raw, w, h, cardAspectRatio),
     rotationDeg: estimateRotationDeg(leftXs, rightXs, topYs, bottomYs, w, h),
   };
 }
@@ -725,7 +763,7 @@ export function detectCardFrameFromImageData(
 
   const consider = (found: CardFrameDetection | null) => {
     if (!found) return;
-    const score = scoreCardBox(found.box, expected, cardAspectRatio);
+    const score = scoreCardBox(found.box, expected, cardAspectRatio, w, h);
     if (score > bestScore) {
       bestScore = score;
       best = found;

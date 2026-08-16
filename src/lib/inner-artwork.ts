@@ -62,13 +62,36 @@ export function detectInnerArtwork(image: PixelBuffer, outer: Rect): InnerArtwor
   };
 }
 
-/** Use the measured inner box when at least two opposite-ish sides locked; otherwise the 8% inset. */
+/** Use the measured inner box when at least two sides locked; otherwise the 8% inset. */
 export function seedInnerRect(image: PixelBuffer, outer: Rect): { inner: Rect; confidence: number } {
   const detected = detectInnerArtwork(image, outer);
   if (detected.confidence < 0.5) {
     return { inner: defaultInnerRect(outer), confidence: detected.confidence };
   }
   return { inner: detected.inner, confidence: detected.confidence };
+}
+
+/**
+ * Snap a seed outer box to nearby rims. Search a small window around each
+ * edge so padding vs card (or a loose AABB vs the true rim) can lock.
+ */
+export function refineOuterRect(image: PixelBuffer, seed: Rect): Rect {
+  const ySamples = buildSamples(seed.y, seed.height, SAMPLE_COUNT);
+  const xSamples = buildSamples(seed.x, seed.width, SAMPLE_COUNT);
+  const left = snapEdge(image, ySamples, seed.x, seed.width, false, seed.x + seed.width / 2);
+  const right = snapEdge(image, ySamples, seed.x + seed.width, seed.width, false, seed.x + seed.width / 2);
+  const top = snapEdge(image, xSamples, seed.y, seed.height, true, seed.y + seed.height / 2);
+  const bottom = snapEdge(image, xSamples, seed.y + seed.height, seed.height, true, seed.y + seed.height / 2);
+
+  const x = left;
+  const y = top;
+  const width = Math.max(8, right - left);
+  const height = Math.max(8, bottom - top);
+  return clampInner(
+    { x: 0, y: 0, width: image.width, height: image.height },
+    { x, y, width, height },
+    seed,
+  );
 }
 
 export function pixelBufferFromImage(image: HTMLImageElement): PixelBuffer {
@@ -97,6 +120,33 @@ export function seedInnerFromImage(
   return seedInnerRect(buffer, outer);
 }
 
+function snapEdge(
+  image: PixelBuffer,
+  samples: number[],
+  origin: number,
+  sideLength: number,
+  vertical: boolean,
+  center: number,
+): number {
+  const window = Math.max(5, Math.round(sideLength * 0.04));
+  let bestPos = origin;
+  let bestScore = 8;
+  let bestDist = 0;
+  for (let delta = -window; delta <= window; delta++) {
+    const pos = origin + delta;
+    const score = edgeScore(image, pos, samples, vertical);
+    const dist = Math.abs(pos - center);
+    if (score > bestScore + 1.5 || (score >= bestScore * 0.9 && dist > bestDist && score >= 8)) {
+      if (score >= 8) {
+        bestScore = Math.max(bestScore, score);
+        bestPos = pos;
+        bestDist = dist;
+      }
+    }
+  }
+  return bestPos;
+}
+
 function findFirstEdge(
   image: PixelBuffer,
   samples: number[],
@@ -109,24 +159,41 @@ function findFirstEdge(
 ): { found: boolean; position: number } {
   const minInset = Math.max(3, Math.round(sideLength * minRatio));
   const maxInset = Math.max(minInset + 2, Math.round(sideLength * maxRatio));
+  const step = Math.max(1, Math.round(sideLength / 420));
   const scores: number[] = [];
   const positions: number[] = [];
 
-  for (let inset = 2; inset <= maxInset; inset++) {
+  for (let inset = 2; inset <= maxInset; inset += step) {
     const pos = origin + direction * inset;
     scores.push(edgeScore(image, pos, samples, vertical));
     positions.push(pos);
   }
 
-  const median = medianOf(scores);
-  const threshold = Math.max(14, median * 1.7);
+  const smooth = smoothScores(scores);
+  const rimCount = Math.max(2, Math.floor(smooth.length * 0.22));
+  const floor = percentileOf(smooth.slice(0, rimCount), 0.6);
+  const threshold = Math.max(8, floor + 6, floor * 1.65);
 
-  for (let i = 0; i < scores.length; i++) {
-    const inset = 2 + i;
+  for (let i = 0; i < smooth.length; i++) {
+    const inset = Math.abs(positions[i] - origin);
     if (inset < minInset) continue;
-    if (scores[i] >= threshold) {
+    if (smooth[i] >= threshold) {
       return { found: true, position: positions[i] };
     }
+  }
+
+  let bestI = -1;
+  let best = threshold * 0.92;
+  for (let i = 0; i < smooth.length; i++) {
+    const inset = Math.abs(positions[i] - origin);
+    if (inset < minInset) continue;
+    if (smooth[i] > best) {
+      best = smooth[i];
+      bestI = i;
+    }
+  }
+  if (bestI >= 0) {
+    return { found: true, position: positions[bestI] };
   }
 
   return { found: false, position: origin + direction * Math.round(sideLength * 0.08) };
@@ -137,13 +204,33 @@ function edgeScore(image: PixelBuffer, pos: number, samples: number[], vertical:
   let count = 0;
   for (const sample of samples) {
     if (vertical) {
-      total += Math.abs(luminance(image, sample, pos + 1) - luminance(image, sample, pos - 1));
+      total +=
+        Math.abs(luminance(image, sample, pos + 1) - luminance(image, sample, pos - 1)) +
+        0.5 * Math.abs(chromaAt(image, sample, pos + 1) - chromaAt(image, sample, pos - 1));
     } else {
-      total += Math.abs(luminance(image, pos + 1, sample) - luminance(image, pos - 1, sample));
+      total +=
+        Math.abs(luminance(image, pos + 1, sample) - luminance(image, pos - 1, sample)) +
+        0.5 * Math.abs(chromaAt(image, pos + 1, sample) - chromaAt(image, pos - 1, sample));
     }
     count++;
   }
   return count === 0 ? 0 : total / count;
+}
+
+function smoothScores(values: number[]): number[] {
+  if (values.length < 3) return values;
+  const out = values.map((v) => v);
+  for (let i = 1; i < values.length - 1; i++) {
+    out[i] = (values[i - 1] + values[i] * 2 + values[i + 1]) / 4;
+  }
+  return out;
+}
+
+function percentileOf(values: number[], p: number): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const idx = Math.max(0, Math.min(sorted.length - 1, Math.round((sorted.length - 1) * p)));
+  return sorted[idx];
 }
 
 function buildSamples(origin: number, length: number, count: number): number[] {
@@ -166,11 +253,15 @@ function luminance(image: PixelBuffer, x: number, y: number): number {
   return 0.299 * image.data[offset] + 0.587 * image.data[offset + 1] + 0.114 * image.data[offset + 2];
 }
 
-function medianOf(values: number[]): number {
-  if (values.length === 0) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+function chromaAt(image: PixelBuffer, x: number, y: number): number {
+  const xi = Math.round(x);
+  const yi = Math.round(y);
+  if (xi < 0 || yi < 0 || xi >= image.width || yi >= image.height) return 0;
+  const offset = (yi * image.width + xi) * 4;
+  const r = image.data[offset];
+  const g = image.data[offset + 1];
+  const b = image.data[offset + 2];
+  return Math.max(r, g, b) - Math.min(r, g, b);
 }
 
 function clampInner(outer: Rect, inner: Rect, fallback: Rect): Rect {

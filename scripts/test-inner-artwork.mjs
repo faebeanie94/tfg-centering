@@ -96,9 +96,27 @@ const noArt = seedInnerRect({ width: w, height: h, data: flat }, outer);
 assert(noArt.confidence < 0.5, 'uniform card should not claim an inner box');
 assert(Math.abs(noArt.inner.x - fallback.x) < 0.5, 'uniform card falls back to 8% inset');
 
+const textured = new Uint8ClampedArray(w * h * 4);
+fillRectPx(textured, w, 0, 0, w, h, [12, 12, 14]);
+fillRectPx(textured, w, outer.x, outer.y, outer.x + outer.width, outer.y + outer.height, [230, 228, 220]);
+for (let y = trueInner.y; y < trueInner.y + trueInner.height; y++) {
+  for (let x = trueInner.x; x < trueInner.x + trueInner.width; x++) {
+    const i = (y * w + x) * 4;
+    const v = ((x + y) % 6 < 3) ? 50 : 110;
+    textured[i] = v;
+    textured[i + 1] = v + 20;
+    textured[i + 2] = 160;
+    textured[i + 3] = 255;
+  }
+}
+const noisy = seedInnerRect({ width: w, height: h, data: textured }, outer);
+assert(noisy.confidence >= 0.5, 'textured artwork should still lock an inner box');
+assert(Math.abs(noisy.inner.x - trueInner.x) <= 6, 'textured left, got ' + noisy.inner.x);
+
 console.log('ok - detectInnerArtwork', detected);
 console.log('ok - seedInnerRect', seeded.inner);
 console.log('ok - uniform fallback', noArt.inner);
+console.log('ok - textured artwork', noisy.inner);
 console.log('All inner-artwork checks passed.');
 `,
 );

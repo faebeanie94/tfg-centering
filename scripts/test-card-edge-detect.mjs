@@ -175,6 +175,41 @@ for (const c of cases) {
   }
 }
 
+// Flattened / close-up still: card-aspect canvas with ~8% pad (normalized box is ~square).
+{
+  const cw = 400;
+  const ch = Math.round(cw / CARD_ASPECT);
+  const pad = 0.08;
+  const still = {
+    left: pad,
+    top: pad,
+    width: 1 - pad * 2,
+    height: 1 - pad * 2,
+  };
+  const data = makeFrame(cw, ch, [18, 18, 22], {
+    left: still.left,
+    top: still.top,
+    width: still.width,
+    height: still.height,
+    body: [210, 200, 190],
+  });
+  const found = detectCardFrameFromImageData(data, cw, ch, {
+    cx: 0.5,
+    cy: 0.5,
+    expectedWidth: still.width,
+    expectedHeight: still.height,
+    cardAspect: CARD_ASPECT,
+  });
+  try {
+    assert(found, 'padded still: expected a detection');
+    assert(overlaps(found!.box, still, 0.55), 'padded still: box IoU too low (' + JSON.stringify(found!.box) + ')');
+    console.log('ok - padded card-aspect still', found!.box);
+  } catch (e) {
+    failed++;
+    console.error('FAIL -', (e as Error).message);
+  }
+}
+
 if (failed) {
   console.error(failed, 'failure(s)');
   process.exit(1);
