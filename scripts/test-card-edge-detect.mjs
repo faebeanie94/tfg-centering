@@ -115,9 +115,10 @@ assert(
   'stand guide must keep poker aspect, got ' + standGuide.width / standGuide.height,
 );
 assert(
-  standGuide.height <= 0.68 && standGuide.height >= 0.5,
-  'phone-on-box guide must fit above the stand without shrinking to a postage stamp, got ' + standGuide.height,
+  standGuide.height >= 0.36 && standGuide.height <= 0.44,
+  'phone-on-box 20cm guide should be card-sized, got ' + standGuide.height,
 );
+assert(standGuide.width < 0.55, 'phone-on-box dashes must not span most of the screen width, got ' + standGuide.width);
 const tallPhoneGuide = guideTemplateForDistance(20, CARD_ASPECT, 88.9, 9 / 16, 0.32);
 assert(
   Math.abs(tallPhoneGuide.width / tallPhoneGuide.height - CARD_ASPECT / (9 / 16)) < 0.03,
