@@ -34,10 +34,29 @@ export function detectInnerArtwork(image: PixelBuffer, outer: Rect): InnerArtwor
   const top = findFirstEdge(image, xSamples, outer.y, 1, outer.height, MIN_INSET_RATIO, MAX_INSET_RATIO, true);
   const bottom = findFirstEdge(image, xSamples, outer.y + outer.height - 1, -1, outer.height, MIN_INSET_RATIO, MAX_INSET_RATIO, true);
 
-  const leftX = left.found ? left.position : fallback.x;
-  const rightX = right.found ? right.position : fallback.x + fallback.width;
-  const topY = top.found ? top.position : fallback.y;
-  const bottomY = bottom.found ? bottom.position : fallback.y + fallback.height;
+  // Printed cards use a roughly consistent border width all the way around.
+  // Full-art/borderless designs can lack any detectable inner edge on some
+  // sides (art bleeding straight into a dark frame with no real contrast
+  // step) while others are found cleanly. When a side isn't found, the
+  // border width measured on the sides that *were* found is a far better
+  // estimate than an unrelated generic percentage — and keeps opposite
+  // sides from defaulting to an artificial exact 50/50 split.
+  const insets = [
+    left.found ? left.position - outer.x : null,
+    right.found ? outer.x + outer.width - right.position : null,
+    top.found ? top.position - outer.y : null,
+    bottom.found ? outer.y + outer.height - bottom.position : null,
+  ].filter((v): v is number => v != null);
+  const measuredInset = insets.length > 0 ? insets.reduce((a, b) => a + b, 0) / insets.length : null;
+
+  const leftX = left.found ? left.position : outer.x + (measuredInset ?? fallback.x - outer.x);
+  const rightX = right.found
+    ? right.position
+    : outer.x + outer.width - (measuredInset ?? outer.x + outer.width - (fallback.x + fallback.width));
+  const topY = top.found ? top.position : outer.y + (measuredInset ?? fallback.y - outer.y);
+  const bottomY = bottom.found
+    ? bottom.position
+    : outer.y + outer.height - (measuredInset ?? outer.y + outer.height - (fallback.y + fallback.height));
 
   const inner: Rect = {
     x: leftX,

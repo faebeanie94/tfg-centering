@@ -1303,8 +1303,8 @@ body.editor-mode #root {
 }
 
 .perspective-guide-line {
-  stroke: rgba(231, 125, 49, 0.7);
-  stroke-dasharray: 6 6;
+  stroke: rgba(231, 125, 49, 0.9);
+  stroke-dasharray: 8 4;
   pointer-events: none;
 }
 

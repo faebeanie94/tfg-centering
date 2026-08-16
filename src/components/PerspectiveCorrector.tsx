@@ -330,10 +330,10 @@ export function PerspectiveCorrector({
           >
             <polygon
               points={linePoints}
-              fill="rgba(59,130,246,0.12)"
+              fill="rgba(59,130,246,0.22)"
               stroke="#49a3e1"
-              strokeWidth={2}
-              strokeDasharray="8 4"
+              strokeWidth={3}
+              strokeDasharray="10 5"
             />
 
             <line
