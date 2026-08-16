@@ -404,6 +404,7 @@ export function ImageCapture({
               alignment={alignment}
               showLevel={showLevel}
               progress={isCountingDown ? progress : 0}
+              frameAspect={previewSize ? previewSize.width / previewSize.height : undefined}
             />
           </div>
           <canvas ref={canvasRef} hidden />

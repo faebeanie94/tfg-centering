@@ -233,6 +233,34 @@ for (const c of cases) {
   }
 }
 
+// A guide-sized search must still lock the full card, not a patch shifted to the right.
+{
+  const outer = { left: 0.26, top: 0.1, width: 0.48, height: 0.48 / CARD_ASPECT };
+  const data = makeFrame(w, h, [30, 32, 34], {
+    left: outer.left,
+    top: outer.top,
+    width: outer.width,
+    height: outer.height,
+    body: [220, 80, 50],
+  });
+  const found = detectCardFrameFromImageData(data, w, h, {
+    cx: 0.5,
+    cy: outer.top + outer.height / 2,
+    expectedWidth: outer.width * 0.7,
+    expectedHeight: outer.height * 0.7,
+    cardAspect: CARD_ASPECT,
+  });
+  try {
+    assert(found, 'offset-patch: expected a detection');
+    assert(overlaps(found!.box, outer, 0.5), 'offset-patch: must track the card, got ' + JSON.stringify(found!.box));
+    assert(found!.box.left < 0.4, 'offset-patch: must not sit to the right of the card, left=' + found!.box.left);
+    console.log('ok - does not lock a right-shifted inner patch', found!.box);
+  } catch (e) {
+    failed++;
+    console.error('FAIL -', (e as Error).message);
+  }
+}
+
 // Light table below the card must not be swallowed into the detection box.
 {
   const sitting = { left: 0.24, top: 0.06, width: 0.42, height: 0.42 / CARD_ASPECT };
