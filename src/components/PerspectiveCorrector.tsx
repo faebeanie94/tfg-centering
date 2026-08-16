@@ -3,8 +3,7 @@ import {
   type CornerKey,
   type QuadCorners,
   defaultCorners,
-  cropToQuadBounds,
-  MANUAL_CROP_PADDING_RATIO,
+  perspectiveCorrect,
 } from '../lib/perspective';
 import { detectCardCornersFromImage } from '../lib/auto-crop';
 import { useFitScale, useAppShellMode } from '../hooks/useFitScale';
@@ -271,7 +270,7 @@ export function PerspectiveCorrector({
     if (!corners) return;
     setProcessing(true);
     try {
-      const corrected = await cropToQuadBounds(imageSrc, corners, MANUAL_CROP_PADDING_RATIO);
+      const corrected = await perspectiveCorrect(imageSrc, corners, cardAspect);
       onComplete(corrected);
     } catch {
       onComplete(imageSrc);
