@@ -22,6 +22,7 @@ import { getScannerHint } from '../lib/level-hint';
 import { ScannerOverlay } from './ScannerOverlay';
 import { CardDebugOverlay } from './CardDetector';
 import { CardImageProcessor, overlayCornersToImagePixels } from '../utils/cardImageProcessor';
+import { captureVideoFrame } from '../lib/cardCapture';
 import type { CaptureDetectHint } from '../lib/auto-crop';
 import {
   cardAspect,
@@ -125,8 +126,7 @@ export function ImageCapture({
 
   const takePhoto = useCallback(async () => {
     const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas || capturing) return;
+    if (!video || capturing) return;
 
     setCapturing(true);
     setQualityMessage(null);
@@ -136,19 +136,7 @@ export function ImageCapture({
       const focusPoint = cardCenterFromBox(box);
       if (track) await focusOnCard(track, focusPoint);
 
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        detector.resetAutoCapture();
-        setQualityMessage('Unable to process image');
-        return;
-      }
-      ctx.drawImage(video, 0, 0);
-
-      const imageBytes = await new Promise<Blob | null>((resolve) => {
-        canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.95);
-      });
+      const imageBytes = await captureVideoFrame(video);
       if (!imageBytes) {
         detector.resetAutoCapture();
         setQualityMessage('Unable to process image');
@@ -157,7 +145,7 @@ export function ImageCapture({
 
       const overlayCorners = detector.detectedCorners;
       if (overlayCorners) {
-        const corners = overlayCornersToImagePixels(overlayCorners, canvas.width, canvas.height);
+        const corners = overlayCornersToImagePixels(overlayCorners, video.videoWidth, video.videoHeight);
         const result = await CardImageProcessor.validateAndCorrect(imageBytes, corners);
         setQualityMessage(result.message);
         if (!result.isGoodQuality) {
@@ -173,7 +161,8 @@ export function ImageCapture({
           preCorrected: true,
         });
       } else {
-        onCapture(canvas.toDataURL('image/jpeg', 0.95), {
+        const rawSrc = await blobToDataUrl(imageBytes);
+        onCapture(rawSrc, {
           box: detectedBoxRef.current,
           rotationDeg: alignmentRef.current.rotationDeg,
           liveReady: alignmentRef.current.fitsGuide,

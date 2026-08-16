@@ -17,6 +17,7 @@ import {
   overlayCornersToBox,
   type CardCorners,
 } from '../components/CardDetector';
+import { calculateBlurScore, OVERLAY_SPACE } from '../lib/cardCapture';
 
 function clearLiveLock(detector: CardDetector | null) {
   detector?.resetAutoCapture();
@@ -148,6 +149,8 @@ export function useCardEdgeDetector(
                 frameHeight,
               ),
               confidence,
+              blur: calculateBlurScore(canvas),
+              imageSize: { width: OVERLAY_SPACE, height: OVERLAY_SPACE },
             });
           } else {
             detector.updateDetection({
