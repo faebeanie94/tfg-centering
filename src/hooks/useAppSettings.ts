@@ -52,7 +52,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   torchEnabled: false,
   macroMode: false,
   scanDistanceCm: 20,
-  scanObstructionBottom: 0.32,
+  scanObstructionBottom: 0,
   invertColors: false,
   cardFormat: DEFAULT_CARD_FORMAT_SETTING,
   customWidthMm: DEFAULT_CUSTOM_WIDTH_MM,
@@ -65,8 +65,18 @@ function loadSettings(): AppSettings {
     if (!raw) return DEFAULT_SETTINGS;
     const parsed = { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
     if (![12, 20, 30].includes(parsed.scanDistanceCm)) parsed.scanDistanceCm = 20;
-    if (typeof parsed.scanObstructionBottom !== 'number') parsed.scanObstructionBottom = 0.32;
+    if (typeof parsed.scanObstructionBottom !== 'number') parsed.scanObstructionBottom = 0;
     parsed.scanObstructionBottom = Math.max(0, Math.min(0.5, parsed.scanObstructionBottom));
+    // Old default reserved the bottom third for a phone stand, which parked a
+    // tiny dashed guide on the card. One-time reset of that shipped default.
+    try {
+      if (localStorage.getItem('tfg-guide-obstruction-v2') !== '1') {
+        if (parsed.scanObstructionBottom === 0.32) parsed.scanObstructionBottom = 0;
+        localStorage.setItem('tfg-guide-obstruction-v2', '1');
+      }
+    } catch {
+      /* ignore */
+    }
     if (!isCardFormatSetting(parsed.cardFormat)) parsed.cardFormat = DEFAULT_CARD_FORMAT_SETTING;
     parsed.customWidthMm = clampCardMm(Number(parsed.customWidthMm));
     parsed.customHeightMm = clampCardMm(Number(parsed.customHeightMm));

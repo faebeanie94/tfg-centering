@@ -352,8 +352,8 @@ function rayEdgeByGradientBand(
       }
     }
     const flatBonus = aheadN >= 4 && aheadFlat / Math.max(1, aheadN - 1) < 10 ? 8 : 0;
-    // Prefer farther candidates so inner artwork / glare loses to the outer rim.
-    const distBias = ((s - minDist) / Math.max(1, maxDist - minDist)) * 14;
+    // Mild distance bias: prefer the card rim over inner art, not the table beyond it.
+    const distBias = ((s - minDist) / Math.max(1, maxDist - minDist)) * 5;
     const score = grad + flatBonus + distBias;
 
     if (s >= minDist && score > bestScore) {
@@ -525,15 +525,38 @@ function scoreCardBox(
   if (!expected) return 1 - aspectErr;
 
   const sizeRatio = (box.width / expected.width + box.height / expected.height) / 2;
-  if (sizeRatio < 0.35 || sizeRatio > 2.8) return -1;
+  if (sizeRatio < 0.4 || sizeRatio > 1.85) return -1;
 
   const area = box.width * box.height;
-  if (area < 0.06 || area > 0.9) return -1;
+  if (area < 0.08 || area > 0.82) return -1;
 
-  const matchExpected = 1 - Math.min(1, Math.abs(1 - sizeRatio) / 1.5);
-  const outerBias = Math.max(0, Math.min(1, (area - 0.08) / 0.5));
+  const matchExpected = 1 - Math.min(1, Math.abs(1 - sizeRatio) / 0.9);
+  const outerBias = Math.max(0, Math.min(1, (area - 0.1) / 0.45));
   const aspectScore = 1 - Math.min(1, aspectErr / 0.12);
-  return aspectScore * 0.3 + matchExpected * 0.25 + outerBias * 0.45;
+  return aspectScore * 0.32 + matchExpected * 0.48 + outerBias * 0.2;
+}
+
+function boxPrintScore(
+  data: Uint8ClampedArray,
+  w: number,
+  h: number,
+  box: DetectedCard,
+): number {
+  const x0 = clamp(Math.floor((box.left + box.width * 0.18) * w), 0, w - 1);
+  const x1 = clamp(Math.ceil((box.left + box.width * 0.82) * w), 0, w);
+  const y0 = clamp(Math.floor((box.top + box.height * 0.18) * h), 0, h - 1);
+  const y1 = clamp(Math.ceil((box.top + box.height * 0.82) * h), 0, h);
+  let chroma = 0;
+  let n = 0;
+  const step = Math.max(1, Math.floor(Math.min(x1 - x0, y1 - y0) / 16));
+  for (let y = y0; y < y1; y += step) {
+    for (let x = x0; x < x1; x += step) {
+      const i = (y * w + x) * 4;
+      chroma += Math.max(data[i], data[i + 1], data[i + 2]) - Math.min(data[i], data[i + 1], data[i + 2]);
+      n++;
+    }
+  }
+  return n ? Math.max(0, Math.min(1, chroma / n / 55)) : 0;
 }
 
 function detectFromBackground(
@@ -618,10 +641,10 @@ function collectGradientBandEdges(
   const yFracs = [0.3, 0.42, 0.5, 0.58, 0.7];
   const xFracs = [0.3, 0.42, 0.5, 0.58, 0.7];
 
-  const minW = Math.max(6, expectedHalfW * 0.45);
-  const maxW = Math.max(minW + 4, expectedHalfW * 2.5);
-  const minH = Math.max(6, expectedHalfH * 0.45);
-  const maxH = Math.max(minH + 4, expectedHalfH * 2.5);
+  const minW = Math.max(6, expectedHalfW * 0.55);
+  const maxW = Math.max(minW + 4, expectedHalfW * 1.45);
+  const minH = Math.max(6, expectedHalfH * 0.55);
+  const maxH = Math.max(minH + 4, expectedHalfH * 1.45);
 
   const leftXs: number[] = [];
   const rightXs: number[] = [];
@@ -781,7 +804,9 @@ export function detectCardFrameFromImageData(
 
   const consider = (found: CardFrameDetection | null) => {
     if (!found) return;
-    const score = scoreCardBox(found.box, expected, cardAspectRatio, w, h);
+    let score = scoreCardBox(found.box, expected, cardAspectRatio, w, h);
+    if (score < 0) return;
+    score += boxPrintScore(data, w, h, found.box) * 0.18;
     if (score > bestScore) {
       bestScore = score;
       best = found;
@@ -805,7 +830,6 @@ export function detectCardFrameFromImageData(
     }
 
     consider(detectFromGradientBand(luma, w, h, sx, sy, expectedHalfW, expectedHalfH));
-    consider(detectFromGradientBand(luma, w, h, sx, sy, expectedHalfW * 1.7, expectedHalfH * 1.7));
 
     if (bestScore < 0.4) {
       for (const thresh of [22, 28, 36, 44]) {
@@ -891,16 +915,13 @@ export function detectCardBox(video: HTMLVideoElement, canvas: HTMLCanvasElement
   return enforceCardRect(raw);
 }
 
-/** Typical phone vertical FOV when scanning flat (~50°). Used to size the guide from distance. */
-const SCAN_FOV_DEG = 50;
-
 export const SCAN_DISTANCE_OPTIONS = [12, 20, 30] as const;
 export type ScanDistanceCm = (typeof SCAN_DISTANCE_OPTIONS)[number];
 
 /** Fraction of the unobstructed frame the card silhouette should fill. */
 const GUIDE_FILL: Record<ScanDistanceCm, number> = {
-  12: 0.92,
-  20: 0.88,
+  12: 0.9,
+  20: 0.86,
   30: 0.78,
 };
 
@@ -910,7 +931,7 @@ export function guideBoxForDistance(
   cardAspectRatio: number = CARD_ASPECT,
   cardHeightMm: number = DEFAULT_CARD_HEIGHT_MM,
   frameAspect: number = 1,
-  obstructionBottom = 0.32,
+  obstructionBottom = 0,
 ): DetectedCard {
   const template = guideTemplateForDistance(
     distanceCm,
@@ -932,20 +953,14 @@ export function guideBoxForDistance(
 export function guideTemplateForDistance(
   distanceCm: ScanDistanceCm = 20,
   cardAspectRatio: number = CARD_ASPECT,
-  cardHeightMm: number = DEFAULT_CARD_HEIGHT_MM,
+  _cardHeightMm: number = DEFAULT_CARD_HEIGHT_MM,
   frameAspect: number = 1,
   obstructionBottom = 0,
 ): { width: number; height: number } {
   const fa = frameAspect > 0.15 && Number.isFinite(frameAspect) ? frameAspect : 1;
-  const fill = GUIDE_FILL[distanceCm] ?? 0.88;
-  const availableH = Math.max(0.42, 1 - Math.max(0, obstructionBottom) - 0.03);
-  // FOV estimate, then take the larger of that and the fill target so close-up
-  // grading shots are not stuck with a half-frame window.
-  const distanceMm = distanceCm * 10;
-  const angularHeightRad = 2 * Math.atan(cardHeightMm / (2 * distanceMm));
-  const fovRad = (SCAN_FOV_DEG * Math.PI) / 180;
-  const fovHeight = angularHeightRad / fovRad;
-  let height = Math.min(availableH, Math.max(availableH * fill, fovHeight));
+  const fill = GUIDE_FILL[distanceCm] ?? 0.86;
+  const availableH = Math.max(0.55, 1 - Math.max(0, obstructionBottom) - 0.02);
+  let height = Math.min(availableH, fill);
 
   let width = height * (cardAspectRatio / fa);
   const maxW = 0.94;

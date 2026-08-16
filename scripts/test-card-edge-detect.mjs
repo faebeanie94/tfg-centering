@@ -204,6 +204,44 @@ for (const c of cases) {
   }
 }
 
+// Light table below the card must not be swallowed into the detection box.
+{
+  const sitting = { left: 0.24, top: 0.06, width: 0.42, height: 0.42 / CARD_ASPECT };
+  const data = new Uint8ClampedArray(w * h * 4);
+  fillRect(data, w, h, 0, 0, 1, 1, [28, 30, 32]);
+  fillRect(data, w, h, 0, 0.68, 1, 1, [196, 168, 122]);
+  fillRect(
+    data, w, h,
+    sitting.left, sitting.top, sitting.left + sitting.width, sitting.top + sitting.height,
+    [236, 200, 50],
+  );
+  fillRect(
+    data, w, h,
+    sitting.left + sitting.width * 0.1,
+    sitting.top + sitting.height * 0.1,
+    sitting.left + sitting.width * 0.9,
+    sitting.top + sitting.height * 0.9,
+    [200, 60, 40],
+  );
+  const found = detectCardFrameFromImageData(data, w, h, {
+    cx: sitting.left + sitting.width / 2,
+    cy: sitting.top + sitting.height / 2,
+    expectedWidth: sitting.width,
+    expectedHeight: sitting.height,
+    cardAspect: CARD_ASPECT,
+  });
+  try {
+    assert(found, 'table-below: expected a detection');
+    assert(overlaps(found!.box, sitting, 0.5), 'table-below: should track the card, got ' + JSON.stringify(found!.box));
+    const bottom = found!.box.top + found!.box.height;
+    assert(bottom < 0.68, 'table-below: box must not extend onto the table (bottom=' + bottom + ')');
+    console.log('ok - ignores table below card', found!.box);
+  } catch (e) {
+    failed++;
+    console.error('FAIL -', (e as Error).message);
+  }
+}
+
 // Empty bright frame should not invent a card.
 {
   const data = makeFrame(w, h, [240, 240, 240], {
