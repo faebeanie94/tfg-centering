@@ -18,6 +18,7 @@ import {
   rectsAfterCropWithInnerSeed,
   type CaptureDetectHint,
   type AutoCropSkipReason,
+  type InnerSideConfidence,
 } from './lib/auto-crop';
 import type { QuadCorners } from './lib/perspective';
 import {
@@ -46,7 +47,11 @@ export default function App() {
   const [currentSide, setCurrentSide] = useState<CardSide>('front');
   const [rawImage, setRawImage] = useState<string | null>(null);
   const [workingImage, setWorkingImage] = useState<string | null>(null);
-  const [editorRects, setEditorRects] = useState<{ outer?: SideSnapshot['outer']; inner?: SideSnapshot['inner'] }>({});
+  const [editorRects, setEditorRects] = useState<{
+    outer?: SideSnapshot['outer'];
+    inner?: SideSnapshot['inner'];
+    innerSideConfidence?: InnerSideConfidence;
+  }>({});
   const [cardNames, setCardNames] = useState<{ front: string; back: string }>({ front: '', back: '' });
   const [showSettings, setShowSettings] = useState(false);
   const [returnPhaseAfterEdit, setReturnPhaseAfterEdit] = useState<Phase>('editor');
@@ -136,7 +141,7 @@ export default function App() {
       // later (via the editor menu), never a forced stop after capture.
       if (result) {
         setWorkingImage(result.imageSrc);
-        setEditorRects({ outer: result.outer, inner: result.inner });
+        setEditorRects({ outer: result.outer, inner: result.inner, innerSideConfidence: result.innerSideConfidence });
         setAutoCropInfo(skipReason ? { confidence, reason: skipReason } : null);
         setPhase('editor');
         return;
@@ -147,7 +152,7 @@ export default function App() {
       setAutoCropInfo(skipReason ? { confidence, reason: skipReason } : null);
       try {
         const rects = await seedEditorRectsFromImage(dataUrl, { cardAspect: cardAspect(format) }, corners, hint);
-        setEditorRects({ outer: rects.outer, inner: rects.inner });
+        setEditorRects({ outer: rects.outer, inner: rects.inner, innerSideConfidence: rects.innerSideConfidence });
       } catch {
         setEditorRects({});
       }
@@ -195,7 +200,7 @@ export default function App() {
         img.src = corrected;
       });
       const rects = rectsAfterCropWithInnerSeed(img);
-      setEditorRects({ outer: rects.outer, inner: rects.inner });
+      setEditorRects({ outer: rects.outer, inner: rects.inner, innerSideConfidence: rects.innerSideConfidence });
     } catch {
       setEditorRects({});
     }
@@ -213,7 +218,7 @@ export default function App() {
         perspectiveCorners,
         pendingHint,
       );
-      setEditorRects({ outer: rects.outer, inner: rects.inner });
+      setEditorRects({ outer: rects.outer, inner: rects.inner, innerSideConfidence: rects.innerSideConfidence });
     } catch {
       setEditorRects({});
     }
@@ -224,7 +229,7 @@ export default function App() {
     setWorkingImage(cropped);
     try {
       const rects = await seedEditorRectsFromImage(cropped, autoCropOptions);
-      setEditorRects({ outer: rects.outer, inner: rects.inner });
+      setEditorRects({ outer: rects.outer, inner: rects.inner, innerSideConfidence: rects.innerSideConfidence });
     } catch {
       setEditorRects({});
     }
@@ -415,6 +420,7 @@ export default function App() {
           cardName={cardNames[currentSide]}
           initialOuter={editorRects.outer}
           initialInner={editorRects.inner}
+          innerSideConfidence={editorRects.innerSideConfidence}
           autoCropInfo={autoCropInfo}
           onDismissAutoCropInfo={() => setAutoCropInfo(null)}
           onNameChange={(name) => setCardNames((prev) => ({ ...prev, [currentSide]: name }))}

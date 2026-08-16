@@ -18,7 +18,7 @@ import { CardMenu } from './CardMenu';
 import { EdgeArrowHandle, edgeHandleStyle } from './EdgeArrowHandle';
 import type { CardFormat } from '../lib/card-sizes';
 import { formatCardSizeMm } from '../lib/card-sizes';
-import type { AutoCropSkipReason } from '../lib/auto-crop';
+import type { AutoCropSkipReason, InnerSideConfidence } from '../lib/auto-crop';
 
 const SKIP_REASON_LABEL: Record<AutoCropSkipReason, string> = {
   no_detection: "couldn't find the card automatically",
@@ -37,6 +37,8 @@ interface BorderEditorProps {
   cardName: string;
   initialOuter?: Rect;
   initialInner?: Rect;
+  /** Which inner-box sides were actually measured vs estimated from the others. */
+  innerSideConfidence?: InnerSideConfidence;
   /** Auto-crop applied but wasn't fully confident — dismissible "worth checking" note. */
   autoCropInfo?: { confidence: number; reason: AutoCropSkipReason } | null;
   onDismissAutoCropInfo?: () => void;
@@ -78,6 +80,7 @@ export function BorderEditor({
   session,
   initialOuter,
   initialInner,
+  innerSideConfidence: initialInnerSideConfidence,
   autoCropInfo = null,
   onDismissAutoCropInfo,
   cardName,
@@ -104,6 +107,9 @@ export function BorderEditor({
   const { zoom, reset: resetZoom, layerStyle, viewportHandlers } = usePinchZoom(viewportRef, 15);
   const [outer, setOuter] = useState<Rect | null>(initialOuter ?? null);
   const [inner, setInner] = useState<Rect | null>(initialInner ?? null);
+  const [innerSideConfidence, setInnerSideConfidence] = useState<InnerSideConfidence | null>(
+    initialInnerSideConfidence ?? null,
+  );
   const [dragTarget, setDragTarget] = useState<DragTarget>(null);
   const [showStandards, setShowStandards] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -126,6 +132,7 @@ export function BorderEditor({
 
   useEffect(() => {
     if (!imageSize) return;
+    setInnerSideConfidence(initialInnerSideConfidence ?? null);
     if (initialOuter && initialInner) {
       setOuter(initialOuter);
       setInner(initialInner);
@@ -134,7 +141,7 @@ export function BorderEditor({
     const o = defaultOuterRect(imageSize.width, imageSize.height);
     setOuter(o);
     setInner(defaultInnerRect(o));
-  }, [imageSize, initialOuter, initialInner]);
+  }, [imageSize, initialOuter, initialInner, initialInnerSideConfidence]);
 
   const result = useMemo(() => {
     if (!outer || !inner) return null;
@@ -189,6 +196,10 @@ export function BorderEditor({
 
       const currentRect = target?.rect === 'outer' ? outer : inner;
       if (!currentRect) return;
+
+      // Once the user starts adjusting the inner box by hand, whatever was
+      // estimated vs measured no longer applies — they're setting it now.
+      if (target?.rect === 'inner') setInnerSideConfidence(null);
 
       dragStartRef.current = { x: e.clientX, y: e.clientY, rect: { ...currentRect } };
       setDragTarget(target);
@@ -306,12 +317,14 @@ export function BorderEditor({
     ));
   }
 
-  const mmReadings = [
-    { key: 'left', label: 'Left', value: result.bordersMm.left },
-    { key: 'right', label: 'Right', value: result.bordersMm.right },
-    { key: 'top', label: 'Top', value: result.bordersMm.top },
-    { key: 'bottom', label: 'Bottom', value: result.bordersMm.bottom },
-  ] as const;
+  const mmReadings = (
+    [
+      { key: 'left', label: 'Left', value: result.bordersMm.left },
+      { key: 'right', label: 'Right', value: result.bordersMm.right },
+      { key: 'top', label: 'Top', value: result.bordersMm.top },
+      { key: 'bottom', label: 'Bottom', value: result.bordersMm.bottom },
+    ] as const
+  ).map((r) => ({ ...r, estimated: innerSideConfidence ? innerSideConfidence[r.key] === 0 : false }));
 
   return (
     <div className="editor editor-shell">
@@ -401,8 +414,15 @@ export function BorderEditor({
 
       <div className="mm-readout" aria-label="Border measurements in millimetres">
         {mmReadings.map((reading) => (
-          <div key={reading.key} className="mm-readout-cell">
-            <span className="mm-readout-label">{reading.label}</span>
+          <div
+            key={reading.key}
+            className={`mm-readout-cell ${reading.estimated ? 'mm-readout-cell-estimated' : ''}`}
+            title={reading.estimated ? "Couldn't find this edge — estimated from the other sides" : undefined}
+          >
+            <span className="mm-readout-label">
+              {reading.label}
+              {reading.estimated && <span className="mm-readout-est-mark">~</span>}
+            </span>
             <span className="mm-readout-value">{reading.value.toFixed(2)}</span>
             <span className="mm-readout-unit">mm</span>
           </div>
@@ -411,6 +431,9 @@ export function BorderEditor({
       <p className="mm-scale-hint">
         mm from {cardFormat.shortLabel} size ({formatCardSizeMm(cardFormat)}) — keep the green box on
         the card edges
+        {mmReadings.some((r) => r.estimated) && (
+          <> · <span className="mm-scale-hint-est">~ estimated, not detected — drag to correct</span></>
+        )}
       </p>
 
       <div ref={viewportRef} className="editor-viewport" {...viewportHandlers}>

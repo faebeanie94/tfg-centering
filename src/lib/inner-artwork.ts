@@ -82,12 +82,19 @@ export function detectInnerArtwork(image: PixelBuffer, outer: Rect): InnerArtwor
 }
 
 /** Use the measured inner box when at least two sides locked; otherwise the 8% inset. */
-export function seedInnerRect(image: PixelBuffer, outer: Rect): { inner: Rect; confidence: number } {
+export function seedInnerRect(
+  image: PixelBuffer,
+  outer: Rect,
+): { inner: Rect; confidence: number; sideConfidence: InnerArtworkResult['sideConfidence'] } {
   const detected = detectInnerArtwork(image, outer);
   if (detected.confidence < 0.5) {
-    return { inner: defaultInnerRect(outer), confidence: detected.confidence };
+    return {
+      inner: defaultInnerRect(outer),
+      confidence: detected.confidence,
+      sideConfidence: { left: 0, right: 0, top: 0, bottom: 0 },
+    };
   }
-  return { inner: detected.inner, confidence: detected.confidence };
+  return { inner: detected.inner, confidence: detected.confidence, sideConfidence: detected.sideConfidence };
 }
 
 /**
@@ -131,10 +138,10 @@ export function pixelBufferFromImage(image: HTMLImageElement): PixelBuffer {
 export function seedInnerFromImage(
   image: HTMLImageElement,
   outer: Rect,
-): { inner: Rect; confidence: number } {
+): { inner: Rect; confidence: number; sideConfidence: InnerArtworkResult['sideConfidence'] } {
   const buffer = pixelBufferFromImage(image);
   if (buffer.width === 0) {
-    return { inner: defaultInnerRect(outer), confidence: 0 };
+    return { inner: defaultInnerRect(outer), confidence: 0, sideConfidence: { left: 0, right: 0, top: 0, bottom: 0 } };
   }
   return seedInnerRect(buffer, outer);
 }
@@ -218,19 +225,40 @@ function findFirstEdge(
   return { found: false, position: origin + direction * Math.round(sideLength * 0.08) };
 }
 
+/**
+ * A single-pixel-step delta only catches sharp transitions. Soft ones — a
+ * gradient sky bleeding into a border, a pale credit line on a cream box —
+ * change too little over any one pixel to clear a threshold, even though the
+ * cumulative change over the transition is real and substantial. Average a
+ * small window on each side of the candidate instead of single pixels either
+ * side, so a gradual-but-genuine transition still registers.
+ */
+const EDGE_WINDOW = 4;
+
 function edgeScore(image: PixelBuffer, pos: number, samples: number[], vertical: boolean): number {
   let total = 0;
   let count = 0;
   for (const sample of samples) {
-    if (vertical) {
-      total +=
-        Math.abs(luminance(image, sample, pos + 1) - luminance(image, sample, pos - 1)) +
-        0.5 * Math.abs(chromaAt(image, sample, pos + 1) - chromaAt(image, sample, pos - 1));
-    } else {
-      total +=
-        Math.abs(luminance(image, pos + 1, sample) - luminance(image, pos - 1, sample)) +
-        0.5 * Math.abs(chromaAt(image, pos + 1, sample) - chromaAt(image, pos - 1, sample));
+    let lumOuter = 0;
+    let lumInner = 0;
+    let chromaOuter = 0;
+    let chromaInner = 0;
+    for (let k = 1; k <= EDGE_WINDOW; k++) {
+      if (vertical) {
+        lumOuter += luminance(image, sample, pos - k);
+        lumInner += luminance(image, sample, pos + k);
+        chromaOuter += chromaAt(image, sample, pos - k);
+        chromaInner += chromaAt(image, sample, pos + k);
+      } else {
+        lumOuter += luminance(image, pos - k, sample);
+        lumInner += luminance(image, pos + k, sample);
+        chromaOuter += chromaAt(image, pos - k, sample);
+        chromaInner += chromaAt(image, pos + k, sample);
+      }
     }
+    total +=
+      Math.abs(lumInner - lumOuter) / EDGE_WINDOW +
+      0.5 * (Math.abs(chromaInner - chromaOuter) / EDGE_WINDOW);
     count++;
   }
   return count === 0 ? 0 : total / count;

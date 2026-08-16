@@ -7,7 +7,14 @@ import {
 } from './card-edge-detect';
 import type { Rect } from './centering';
 import { defaultInnerRect } from './centering';
-import { seedInnerRect, refineOuterRect, pixelBufferFromImage } from './inner-artwork';
+import {
+  seedInnerRect,
+  refineOuterRect,
+  pixelBufferFromImage,
+  type InnerArtworkResult,
+} from './inner-artwork';
+
+export type InnerSideConfidence = InnerArtworkResult['sideConfidence'];
 import {
   detectOuterRectWholeImage,
   outerSeparationScore,
@@ -43,6 +50,8 @@ export interface AutoCropResult {
   inner: Rect;
   corners: QuadCorners;
   confidence: number;
+  /** Which inner-box sides were actually measured vs estimated from the others. */
+  innerSideConfidence: InnerSideConfidence;
 }
 
 export interface AutoCropOptions {
@@ -182,7 +191,7 @@ export function seedRectsFromLoadedImage(
   options: AutoCropOptions = {},
   knownCorners?: QuadCorners | null,
   hint?: CaptureDetectHint,
-): { outer: Rect; inner: Rect } {
+): { outer: Rect; inner: Rect; innerSideConfidence: InnerSideConfidence } {
   const w = image.naturalWidth;
   const h = image.naturalHeight;
   const cardAspect = options.cardAspect ?? CARD_ASPECT;
@@ -223,12 +232,15 @@ export function seedRectsFromLoadedImage(
     if (best < 0.12) outer = candidates[0];
   }
 
+  const noConfidence: InnerSideConfidence = { left: 0, right: 0, top: 0, bottom: 0 };
+
   if (!outer) outer = padded.outer;
   if (buffer.width > 0) {
     outer = refineOuterRect(buffer, outer);
-    return { outer, inner: seedInnerRect(buffer, outer).inner };
+    const seeded = seedInnerRect(buffer, outer);
+    return { outer, inner: seeded.inner, innerSideConfidence: seeded.sideConfidence };
   }
-  return { outer, inner: padded.inner };
+  return { outer, inner: padded.inner, innerSideConfidence: noConfidence };
 }
 
 export async function seedEditorRectsFromImage(
@@ -236,17 +248,22 @@ export async function seedEditorRectsFromImage(
   options: AutoCropOptions = {},
   knownCorners?: QuadCorners | null,
   hint?: CaptureDetectHint,
-): Promise<{ outer: Rect; inner: Rect }> {
+): Promise<{ outer: Rect; inner: Rect; innerSideConfidence: InnerSideConfidence }> {
   const img = await loadImage(imageSrc);
   return seedRectsFromLoadedImage(img, options, knownCorners, hint);
 }
 
 /** Padded outer box plus yellow-handle seed from the inner-artwork detector. */
-export function rectsAfterCropWithInnerSeed(image: HTMLImageElement): { outer: Rect; inner: Rect } {
+export function rectsAfterCropWithInnerSeed(
+  image: HTMLImageElement,
+): { outer: Rect; inner: Rect; innerSideConfidence: InnerSideConfidence } {
   try {
     return seedRectsFromLoadedImage(image);
   } catch {
-    return defaultRectsAfterCrop(image.naturalWidth, image.naturalHeight);
+    return {
+      ...defaultRectsAfterCrop(image.naturalWidth, image.naturalHeight),
+      innerSideConfidence: { left: 0, right: 0, top: 0, bottom: 0 },
+    };
   }
 }
 
@@ -983,6 +1000,7 @@ export async function tryAutoCrop(
         imageSrc: corrected,
         outer: rects.outer,
         inner: rects.inner,
+        innerSideConfidence: rects.innerSideConfidence,
         corners: detected.corners,
         confidence: detected.confidence,
       },
