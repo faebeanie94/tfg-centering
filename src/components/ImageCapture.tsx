@@ -1,7 +1,6 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { useDeviceLevel } from '../hooks/useDeviceLevel';
 import { useCardEdgeDetector } from '../hooks/useCardEdgeDetector';
-import { useAutoCapture } from '../hooks/useAutoCapture';
 import type { AppSettings } from '../hooks/useAppSettings';
 import type { CardSide } from '../lib/tfg-standards';
 import {
@@ -75,12 +74,24 @@ export function ImageCapture({
       customHeightMm: settings.customHeightMm,
     });
   }, [settings.cardFormat, settings.customWidthMm, settings.customHeightMm]);
-  const { guideBox, detectedBox, alignment } = useCardEdgeDetector(cameraActive, videoRef, {
-    scanDistanceCm: settings.scanDistanceCm,
-    obstructionBottom: settings.scanObstructionBottom,
-    cardAspect: cardAspect(scanFormat),
-    cardHeightMm: scanFormat.heightMm,
-  });
+  const takePhotoRef = useRef<() => void>(() => {});
+
+  const { guideBox, detectedBox, alignment, tracker, analysisSize } = useCardEdgeDetector(
+    cameraActive,
+    videoRef,
+    {
+      scanDistanceCm: settings.scanDistanceCm,
+      obstructionBottom: settings.scanObstructionBottom,
+      cardAspect: cardAspect(scanFormat),
+      cardHeightMm: scanFormat.heightMm,
+      autoCaptureEnabled: settings.autoCapture,
+      canAutoCapture: () => {
+        if (showLevel && motionGranted && level.supported && !level.isLevel) return false;
+        return true;
+      },
+      onAutoCapture: () => takePhotoRef.current(),
+    },
+  );
   const detectedBoxRef = useRef(detectedBox);
   const guideBoxRef = useRef(guideBox);
   const alignmentRef = useRef(alignment);
@@ -129,6 +140,7 @@ export function ImageCapture({
       setCapturing(false);
     }
   }, [onCapture, capturing]);
+  takePhotoRef.current = takePhoto;
 
   const scanReady =
     !showLevel ||
@@ -144,7 +156,6 @@ export function ImageCapture({
     !motionGranted ||
     level.isLevel;
 
-  const captureReady = scanReady && !capturing && (focusReady || !showLevel);
   const manualCaptureReady = manualScanReady && !capturing && (focusReady || !scanReady);
 
   useEffect(() => {
@@ -177,13 +188,6 @@ export function ImageCapture({
       window.clearTimeout(fallbackTimer);
     };
   }, [cameraActive, scanReady]);
-
-  const { progress, isCountingDown } = useAutoCapture({
-    enabled: cameraActive && settings.autoCapture && showLevel && motionGranted,
-    isLevel: captureReady,
-    delayMs: settings.autoCaptureDelayMs,
-    onCapture: takePhoto,
-  });
 
   useEffect(() => {
     const video = videoRef.current;
@@ -324,9 +328,11 @@ export function ImageCapture({
     ? 'Focusing…'
     : scanReady && !focusReady
       ? 'Focusing on card…'
-      : isCountingDown
-        ? `Auto-capturing in ${((1 - progress) * settings.autoCaptureDelayMs / 1000).toFixed(1)}s…`
-        : getScannerHint(level, alignment, showLevel);
+      : tracker.isStable
+        ? 'READY — HOLD STEADY'
+        : tracker.corners.length === 4 && settings.autoCapture
+          ? `Hold steady… ${Math.round(tracker.stabilityPercentage)}% stable`
+          : getScannerHint(level, alignment, showLevel);
 
   if (cameraActive) {
     return (
@@ -362,7 +368,8 @@ export function ImageCapture({
               detectedBox={detectedBox}
               alignment={alignment}
               showLevel={showLevel}
-              progress={isCountingDown ? progress : 0}
+              tracker={tracker}
+              analysisSize={analysisSize}
             />
           </div>
           <canvas ref={canvasRef} hidden />

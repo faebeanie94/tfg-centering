@@ -1,6 +1,7 @@
 import type { CardAlignmentState } from '../lib/card-alignment';
 import type { DetectedCard } from '../lib/card-edge-detect';
 import type { LevelState } from '../hooks/useDeviceLevel';
+import { emptyTrackerSnapshot, type CardTrackerSnapshot } from '../lib/card-tracker';
 
 interface ScannerOverlayProps {
   level: LevelState;
@@ -8,7 +9,9 @@ interface ScannerOverlayProps {
   detectedBox: DetectedCard | null;
   alignment: CardAlignmentState;
   showLevel: boolean;
-  progress?: number;
+  tracker?: CardTrackerSnapshot;
+  /** Analysis frame size used by the tracker (for mapping px → viewBox). */
+  analysisSize?: { width: number; height: number };
 }
 
 function boxToSvg(box: DetectedCard) {
@@ -20,23 +23,125 @@ function boxToSvg(box: DetectedCard) {
   };
 }
 
+/** Debug overlay for the live tracker — confidence, stability, capture progress. */
+export function CardTrackerOverlay({
+  tracker,
+  analysisWidth = 240,
+  analysisHeight = 426,
+}: {
+  tracker: CardTrackerSnapshot;
+  analysisWidth?: number;
+  analysisHeight?: number;
+}) {
+  if (tracker.corners.length !== 4 || analysisWidth < 1 || analysisHeight < 1) {
+    return null;
+  }
+
+  const pts = tracker.corners.map((p) => ({
+    x: (p.x / analysisWidth) * 100,
+    y: (p.y / analysisHeight) * 100,
+  }));
+  const poly = pts.map((p) => `${p.x},${p.y}`).join(' ');
+  const cx = pts.reduce((s, p) => s + p.x, 0) / 4;
+  const cy = pts.reduce((s, p) => s + p.y, 0) / 4;
+  const color = tracker.isStable ? '#7CFFB2' : '#FFB347';
+  const confidencePct = Math.round(Math.min(1, Math.max(0, tracker.confidence)) * 100);
+  const stabilityPct = Math.round(tracker.stabilityPercentage);
+  const progress = Math.min(1, tracker.stableFrames / Math.max(1, tracker.requiredStableFrames));
+  const status = tracker.isStable ? 'READY — HOLD STEADY' : 'Hold steady...';
+
+  return (
+    <g className="scanner-tracker-overlay" pointerEvents="none">
+      <polygon
+        points={poly}
+        fill="none"
+        stroke="rgba(0,0,0,0.75)"
+        strokeWidth={2.2}
+        strokeLinejoin="round"
+      />
+      <polygon
+        points={poly}
+        fill={tracker.isStable ? 'rgba(124,255,178,0.10)' : 'rgba(255,179,71,0.10)'}
+        stroke={color}
+        strokeWidth={1.15}
+        strokeLinejoin="round"
+      />
+      {pts.map((p, i) => (
+        <g key={i}>
+          <circle cx={p.x} cy={p.y} r={2.4} fill="rgba(0,0,0,0.85)" />
+          <circle cx={p.x} cy={p.y} r={1.35} fill={color} />
+        </g>
+      ))}
+      <rect
+        x={cx - 22}
+        y={cy + 4}
+        width={44}
+        height={16}
+        rx={2.2}
+        fill="rgba(0,0,0,0.78)"
+      />
+      <text
+        x={cx}
+        y={cy + 8.2}
+        textAnchor="middle"
+        fill="#ffffff"
+        fontSize="3.1"
+        fontWeight="700"
+      >
+        {confidencePct}% confidence
+      </text>
+      <text
+        x={cx}
+        y={cy + 12.2}
+        textAnchor="middle"
+        fill="#ffffff"
+        fontSize="3.1"
+        fontWeight="700"
+      >
+        {stabilityPct}% stable
+      </text>
+      <text
+        x={cx}
+        y={cy + 16.2}
+        textAnchor="middle"
+        fill={color}
+        fontSize="2.8"
+        fontWeight="800"
+      >
+        {status}
+      </text>
+      <rect x={cx - 18} y={cy + 18.4} width={36} height={1.5} rx={0.7} fill="rgba(0,0,0,0.65)" />
+      <rect
+        x={cx - 18}
+        y={cy + 18.4}
+        width={36 * progress}
+        height={1.5}
+        rx={0.7}
+        fill={color}
+      />
+    </g>
+  );
+}
+
 export function ScannerOverlay({
   level,
   guideBox,
   detectedBox,
   alignment,
   showLevel,
-  progress = 0,
+  tracker = emptyTrackerSnapshot(),
+  analysisSize,
 }: ScannerOverlayProps) {
   const phoneLevel = showLevel && level.isLevel;
-  const cardReady = alignment.fitsGuide;
+  const cardReady = alignment.fitsGuide || tracker.isStable;
   const ready = !showLevel || (phoneLevel && cardReady);
 
   const guide = boxToSvg(guideBox);
-  const detected = detectedBox ? boxToSvg(detectedBox) : null;
+  const hasTrackedQuad = tracker.corners.length === 4;
+  const detected = !hasTrackedQuad && detectedBox ? boxToSvg(detectedBox) : null;
 
   const guideColor = '#ffffff';
-  const detectedColor = !detectedBox
+  const detectedColor = !detectedBox && !hasTrackedQuad
     ? '#adb5bd'
     : showLevel && cardReady
       ? '#78c285'
@@ -70,6 +175,12 @@ export function ScannerOverlay({
             />
           </>
         )}
+
+        <CardTrackerOverlay
+          tracker={tracker}
+          analysisWidth={analysisSize?.width}
+          analysisHeight={analysisSize?.height}
+        />
 
         <rect
           x={guide.x}
@@ -112,20 +223,6 @@ export function ScannerOverlay({
               </text>
             )}
           </g>
-        )}
-
-        {progress > 0 && detected && (
-          <circle
-            cx={detected.x + detected.w / 2}
-            cy={detected.y + detected.h / 2}
-            r={Math.min(detected.w, detected.h) * 50}
-            fill="none"
-            stroke="#78c285"
-            strokeWidth={0.5}
-            strokeDasharray={`${progress * 160} 160`}
-            transform={`rotate(-90 ${detected.x + detected.w / 2} ${detected.y + detected.h / 2})`}
-            opacity={0.8}
-          />
         )}
       </svg>
 
