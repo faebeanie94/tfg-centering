@@ -15,8 +15,8 @@ export interface CardAlignmentState {
 }
 
 const CENTER_TOLERANCE = 0.06;
-const SIZE_MIN = 0.72;
-const SIZE_MAX = 1.2;
+const SIZE_MIN = 0.62;
+const SIZE_MAX = 1.45;
 const ROTATION_TOLERANCE_DEG = 5;
 const GUIDE_INSET = 0.05;
 
