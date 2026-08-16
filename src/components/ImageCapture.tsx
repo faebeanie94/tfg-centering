@@ -329,10 +329,10 @@ export function ImageCapture({
     ? 'Focusing…'
     : scanReady && !focusReady
       ? 'Focusing on card…'
-      : detector.isStable
-        ? 'READY — HOLD STEADY'
-        : detector.detectedCorners && settings.autoCapture
-          ? `Hold steady… ${detector.stabilityPercentage}% stable`
+      : detector.isReadyToCapture
+        ? 'CAPTURING...'
+        : detector.detectedCorners && detector.confidence >= 0.9 && settings.autoCapture
+          ? `HOLD STEADY  ${Math.ceil((1 - detector.captureProgress) * detector.requiredFrames)}`
           : getScannerHint(level, alignment, showLevel);
 
   if (cameraActive) {

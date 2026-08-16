@@ -18,12 +18,13 @@ import {
   type CardCorners,
 } from '../components/CardDetector';
 
-const LOST_CORNERS: CardCorners = [
-  { x: 0, y: 0 },
-  { x: 0, y: 0 },
-  { x: 0, y: 0 },
-  { x: 0, y: 0 },
-];
+function clearLiveLock(detector: CardDetector | null) {
+  detector?.resetAutoCapture();
+  if (detector) {
+    detector.detectedCorners = null;
+    detector.confidence = 0;
+  }
+}
 
 interface CardEdgeDetectorOptions {
   scanDistanceCm: ScanDistanceCm;
@@ -59,13 +60,9 @@ export function useCardEdgeDetector(
   const detectorRef = useRef<CardDetector | null>(null);
   if (!detectorRef.current) {
     detectorRef.current = new CardDetector({
-      minimumConfidence: 0.88,
-      requiredStableFrames: 8,
-      maximumCornerMovement: 18,
-      smoothingFactor: 0.3,
       onAutoCapture: () => {
         if (!autoEnabledRef.current || canAutoCaptureRef.current?.() === false) {
-          detectorRef.current?.allowNextCapture();
+          detectorRef.current?.resetAutoCapture();
           return;
         }
         onAutoCaptureRef.current?.();
@@ -96,7 +93,7 @@ export function useCardEdgeDetector(
   const [detectorTick, setDetectorTick] = useState(0);
 
   useEffect(() => {
-    detectorRef.current?.reset();
+    clearLiveLock(detectorRef.current);
     const guide = positionGuideBox(template, guideAnchor.x, guideAnchor.y, { obstructionBottom });
     setGuideBox(guide);
     setDetectedBox(null);
@@ -106,7 +103,7 @@ export function useCardEdgeDetector(
 
   useEffect(() => {
     if (!active) {
-      detectorRef.current?.reset();
+      clearLiveLock(detectorRef.current);
       const guide = positionGuideBox(template, guideAnchor.x, guideAnchor.y, { obstructionBottom });
       setGuideBox(guide);
       setDetectedBox(null);
@@ -144,7 +141,7 @@ export function useCardEdgeDetector(
               ? Math.max(found.score ?? 0.5, 0.9)
               : (found.score ?? 0.4);
 
-            detector.setDetection({
+            detector.updateDetection({
               corners: cornersToOverlaySpace(
                 [quad.tl, quad.tr, quad.br, quad.bl],
                 frameWidth,
@@ -153,8 +150,8 @@ export function useCardEdgeDetector(
               confidence,
             });
           } else {
-            detector.setDetection({
-              corners: LOST_CORNERS,
+            detector.updateDetection({
+              corners: [] as unknown as CardCorners,
               confidence: 0,
             });
           }
