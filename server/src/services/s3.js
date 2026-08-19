@@ -1,9 +1,27 @@
 const { Storage } = require('@google-cloud/storage');
 
-const storage = new Storage({
+// Handle GCP credentials from env var (as JSON string) or file
+let storageConfig = {
   projectId: process.env.GCP_PROJECT_ID,
-  keyFilename: process.env.GCP_KEY_FILE || undefined,
-});
+};
+
+if (process.env.GCP_KEY_FILE) {
+  // Check if it's JSON content or a file path
+  if (process.env.GCP_KEY_FILE.startsWith('{')) {
+    // It's JSON content, parse it
+    try {
+      storageConfig.credentials = JSON.parse(process.env.GCP_KEY_FILE);
+    } catch (err) {
+      console.error('Failed to parse GCP_KEY_FILE as JSON:', err);
+      storageConfig.keyFilename = process.env.GCP_KEY_FILE;
+    }
+  } else {
+    // It's a file path
+    storageConfig.keyFilename = process.env.GCP_KEY_FILE;
+  }
+}
+
+const storage = new Storage(storageConfig);
 
 const BUCKET_NAME = process.env.GCS_BUCKET;
 const bucket = storage.bucket(BUCKET_NAME);
