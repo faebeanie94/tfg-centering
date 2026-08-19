@@ -28,7 +28,7 @@ export interface ZipSubmission {
  * Create a new submission via API or fallback to ZIP.
  */
 export async function startSubmission(submissionName?: string): Promise<SubmissionFolder> {
-  const name = submissionName || `submission-${new Date().toISOString().slice(0, 10)}`;
+  const name = submissionName || 'TFG000';
 
   try {
     const submission = await api.createSubmission(name);
