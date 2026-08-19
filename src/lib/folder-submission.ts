@@ -13,6 +13,7 @@ export interface ApiSubmission {
   nextCardNumber: number;
   currentEdit?: { cardNumber: number; side: 'front' | 'back' } | null;
   lastSideSaved?: 'front' | 'back' | null;
+  lastCardNumberUsed?: number | null;
 }
 
 export interface ZipSubmission {
@@ -22,6 +23,7 @@ export interface ZipSubmission {
   currentEdit?: { cardNumber: number; side: 'front' | 'back' } | null;
   lastSideSaved?: 'front' | 'back' | null;
   images: Map<string, Blob>;
+  lastCardNumberUsed?: number | null;
 }
 
 /**
@@ -60,6 +62,7 @@ export async function startSubmission(submissionName?: string): Promise<Submissi
       nextCardNumber: 1,
       currentEdit: null,
       lastSideSaved: null,
+      lastCardNumberUsed: null,
     };
   } catch (err) {
     console.warn('Backend API failed, falling back to ZIP:', err);
@@ -72,6 +75,7 @@ export async function startSubmission(submissionName?: string): Promise<Submissi
       currentEdit: null,
       lastSideSaved: null,
       images: new Map(),
+      lastCardNumberUsed: null,
     };
   }
 }
@@ -94,8 +98,8 @@ export async function saveToSubmissionFolder(
     // First side of a new pair - find lowest available number (handles deleted cards)
     cardNumber = await findLowestAvailableCardNumber(submission);
   } else if (submission.lastSideSaved !== side) {
-    // Opposite side of current pair
-    cardNumber = submission.currentEdit?.cardNumber || submission.nextCardNumber;
+    // Opposite side of current pair - use same card number as first side
+    cardNumber = submission.lastCardNumberUsed || submission.nextCardNumber;
   } else {
     // Same side again - this shouldn't happen in normal flow, but handle it
     submission.nextCardNumber += 1;
@@ -114,9 +118,13 @@ export async function saveToSubmissionFolder(
     submission.images.set(filename, blob);
   }
 
+  // Track this card number for the opposite side
+  submission.lastCardNumberUsed = cardNumber;
+
   // Only increment when we save back after front (completes the pair)
   if (side === 'back' && submission.lastSideSaved === 'front') {
     submission.nextCardNumber = Math.max(submission.nextCardNumber, cardNumber + 1);
+    submission.lastCardNumberUsed = null; // Reset for next pair
   }
 
   submission.lastSideSaved = side;
