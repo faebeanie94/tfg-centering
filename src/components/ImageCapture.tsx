@@ -29,6 +29,7 @@ import {
 } from '../lib/card-sizes';
 import type { SubmissionFolder } from '../lib/folder-submission';
 import { downloadSubmissionZip } from '../lib/folder-submission';
+import { deleteSubmissionHandle } from '../lib/submission-persistence';
 
 interface ImageCaptureProps {
   side: CardSide;
@@ -44,6 +45,7 @@ interface ImageCaptureProps {
   onEndSubmission?: () => void;
   savedSubmissions?: Array<{ id: string; name: string; timestamp: number }>;
   onRestoreSubmission?: (id: string) => void;
+  onDeleteSubmission?: (id: string) => void;
 }
 
 export function ImageCapture({
@@ -60,6 +62,7 @@ export function ImageCapture({
   onEndSubmission,
   savedSubmissions = [],
   onRestoreSubmission,
+  onDeleteSubmission,
 }: ImageCaptureProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -512,19 +515,17 @@ export function ImageCapture({
                 <span className="submission-mode">
                   {submissionFolder.type === 'filesystem' ? 'Folder' : 'ZIP'}
                 </span>
-                {submissionFolder.type === 'zip' && (
-                  <button
-                    type="button"
-                    className="submission-edit-btn"
-                    onClick={() => {
-                      setSubmissionNameDraft(submissionFolder.name);
-                      setEditingSubmissionName(true);
-                    }}
-                    aria-label="Rename submission"
-                  >
-                    ✎
-                  </button>
-                )}
+                <button
+                  type="button"
+                  className="submission-edit-btn"
+                  onClick={() => {
+                    setSubmissionNameDraft(submissionFolder.name);
+                    setEditingSubmissionName(true);
+                  }}
+                  aria-label="Rename submission"
+                >
+                  ✎
+                </button>
               </p>
               <p className="submission-count">Card {submissionFolder.nextCardNumber}</p>
             </div>
@@ -545,7 +546,7 @@ export function ImageCapture({
               )}
             </div>
           </div>
-          {editingSubmissionName && submissionFolder.type === 'zip' && (
+          {editingSubmissionName && (
             <div className="submission-rename-overlay" onClick={() => setEditingSubmissionName(false)}>
               <div className="submission-rename-dialog" onClick={(e) => e.stopPropagation()}>
                 <label htmlFor="submission-name">Submission name</label>
@@ -604,14 +605,25 @@ export function ImageCapture({
           <div className="saved-submissions">
             <p className="saved-submissions-label">Saved submissions:</p>
             {savedSubmissions.map((sub) => (
-              <button
-                key={sub.id}
-                type="button"
-                className="btn btn-secondary btn-small"
-                onClick={() => onRestoreSubmission(sub.id)}
-              >
-                Resume {sub.name}
-              </button>
+              <div key={sub.id} className="saved-submission-item">
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-small"
+                  onClick={() => onRestoreSubmission(sub.id)}
+                >
+                  Resume {sub.name}
+                </button>
+                {onDeleteSubmission && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-small"
+                    onClick={() => onDeleteSubmission(sub.id)}
+                    aria-label={`Delete ${sub.name}`}
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         )}

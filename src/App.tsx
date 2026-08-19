@@ -30,7 +30,7 @@ import {
 } from './lib/card-sizes';
 import { exportCleanImage } from './lib/export-image';
 import { startSubmission, saveToSubmissionFolder, type SubmissionFolder } from './lib/folder-submission';
-import { saveSubmissionHandle, listSubmissionHandles, restoreSubmissionHandle } from './lib/submission-persistence';
+import { saveSubmissionHandle, listSubmissionHandles, restoreSubmissionHandle, deleteSubmissionHandle } from './lib/submission-persistence';
 
 type Phase =
   | 'capture'
@@ -411,6 +411,15 @@ export default function App() {
     }
   }, [savedSubmissions]);
 
+  const handleDeleteSubmission = useCallback(async (id: string) => {
+    try {
+      await deleteSubmissionHandle(id);
+      setSavedSubmissions((prev) => prev.filter((s) => s.id !== id));
+    } catch (err) {
+      console.error('Failed to delete submission:', err);
+    }
+  }, []);
+
   const handleEndSubmission = useCallback(() => {
     setSubmissionFolder(null);
   }, []);
@@ -564,6 +573,7 @@ export default function App() {
         onEndSubmission={handleEndSubmission}
         savedSubmissions={savedSubmissions}
         onRestoreSubmission={handleRestoreSubmission}
+        onDeleteSubmission={handleDeleteSubmission}
       />
       <SettingsPanel open={showSettings} settings={settings} onChange={updateSettings} onClose={() => setShowSettings(false)} />
     </>

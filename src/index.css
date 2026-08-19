@@ -464,6 +464,22 @@ body.scanner-mode #root {
   margin: 0 0 8px 0;
 }
 
+.saved-submission-item {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.saved-submission-item:last-child {
+  margin-bottom: 0;
+}
+
+.saved-submission-item .btn {
+  flex: 1;
+  text-align: left;
+  margin: 0;
+}
+
 .saved-submissions .btn {
   width: 100%;
   text-align: left;
