@@ -20,13 +20,6 @@ import type { CardFormat } from '../lib/card-sizes';
 import { formatCardSizeMm } from '../lib/card-sizes';
 import type { AutoCropSkipReason, InnerSideConfidence } from '../lib/auto-crop';
 
-const SKIP_REASON_LABEL: Record<AutoCropSkipReason, string> = {
-  no_detection: "couldn't find the card automatically",
-  low_confidence: 'not fully confident in the corners',
-  not_frontal: 'card looked tilted',
-  rotation: 'phone wasn’t level at capture',
-};
-
 interface BorderEditorProps {
   imageSrc: string;
   side: CardSide;
