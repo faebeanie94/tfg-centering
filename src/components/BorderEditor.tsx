@@ -508,17 +508,27 @@ export function BorderEditor({
         <button type="button" className="btn btn-secondary" onClick={() => setShowStandards(true)}>
           Standards
         </button>
-        <button type="button" className={`btn btn-primary ${savedFlash ? 'btn-saved' : ''}`} onClick={handleSave}>
-          {savedFlash ? 'Saved ✓' : `Save ${side}`}
-        </button>
         {!otherSaved ? (
-          <button type="button" className="btn btn-secondary" onClick={() => { handleSave(); onCaptureSide(otherSide); }}>
-            Capture {otherSide}
-          </button>
+          <>
+            <button type="button" className="btn btn-secondary" onClick={() => { handleSave(); onCaptureSide(side); }}>
+              Retake
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={() => { handleSave(); onCaptureSide(otherSide); }}>
+              Capture {otherSide}
+            </button>
+          </>
         ) : (
-          <button type="button" className="btn btn-secondary" onClick={onCompare} disabled={!sessionHasAny(session)}>
-            Compare
-          </button>
+          <>
+            <button type="button" className={`btn btn-primary ${savedFlash ? 'btn-saved' : ''}`} onClick={handleSave}>
+              {savedFlash ? 'Saved ✓' : 'Save Card'}
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={() => { handleSave(); onCaptureSide('front'); }}>
+              Next Card
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={onCompare} disabled={!sessionHasAny(session)}>
+              Compare
+            </button>
+          </>
         )}
       </div>
 
