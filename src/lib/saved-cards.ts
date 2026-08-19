@@ -67,13 +67,13 @@ export async function saveCardToLibrary(
 
   const db = await openDb();
   try {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    await requestToPromise(tx.objectStore(STORE_NAME).put(record));
-    await new Promise<void>((resolve, reject) => {
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error ?? new Error('Failed to save card'));
+    return new Promise<SavedCardRecord>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const putRequest = tx.objectStore(STORE_NAME).put(record);
+      putRequest.onerror = () => reject(putRequest.error ?? new Error('Failed to save card'));
+      tx.oncomplete = () => resolve(record);
+      tx.onerror = () => reject(tx.error ?? new Error('Save transaction failed'));
     });
-    return record;
   } finally {
     db.close();
   }
@@ -109,11 +109,12 @@ export async function updateSavedCardLabel(id: string, label: string): Promise<v
 export async function deleteSavedCard(id: string): Promise<void> {
   const db = await openDb();
   try {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    await requestToPromise(tx.objectStore(STORE_NAME).delete(id));
-    await new Promise<void>((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const deleteRequest = tx.objectStore(STORE_NAME).delete(id);
+      deleteRequest.onerror = () => reject(deleteRequest.error ?? new Error('Failed to delete card'));
       tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error ?? new Error('Failed to delete card'));
+      tx.onerror = () => reject(tx.error ?? new Error('Delete transaction failed'));
     });
   } finally {
     db.close();
