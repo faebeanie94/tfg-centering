@@ -84,13 +84,22 @@ export async function updateSavedCardLabel(id: string, label: string): Promise<v
   try {
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
-    const getRequest = await requestToPromise(store.get(id));
-    if (!getRequest) throw new Error('Card not found');
-    getRequest.label = label.trim() || defaultCardLabel(getRequest.session);
-    await requestToPromise(store.put(getRequest));
-    await new Promise<void>((resolve, reject) => {
+
+    return new Promise<void>((resolve, reject) => {
+      const getRequest = store.get(id);
+      getRequest.onsuccess = () => {
+        const record = getRequest.result as SavedCardRecord | undefined;
+        if (!record) {
+          reject(new Error('Card not found'));
+          return;
+        }
+        record.label = label.trim() || defaultCardLabel(record.session);
+        const putRequest = store.put(record);
+        putRequest.onerror = () => reject(putRequest.error ?? new Error('Failed to update card'));
+      };
+      getRequest.onerror = () => reject(getRequest.error ?? new Error('Failed to get card'));
       tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error ?? new Error('Failed to update card'));
+      tx.onerror = () => reject(tx.error ?? new Error('Transaction failed'));
     });
   } finally {
     db.close();
