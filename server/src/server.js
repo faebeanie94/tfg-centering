@@ -27,6 +27,18 @@ app.use(fileUpload({ limits: { fileSize: 50 * 1024 * 1024 } }));
 
 // Serve static frontend files (in production)
 const frontendPath = path.join(__dirname, '../dist');
+app.use((req, res, next) => {
+  // Cache static assets permanently (they have hash in filename)
+  if (req.path.startsWith('/assets/')) {
+    res.set('Cache-Control', 'public, max-age=31536000, immutable');
+  } else {
+    // Don't cache HTML files - always fetch fresh
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+  }
+  next();
+});
 app.use(express.static(frontendPath));
 
 // Health check

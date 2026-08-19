@@ -25,6 +25,27 @@ export interface ZipSubmission {
 }
 
 /**
+ * Find the lowest available card number, reusing gaps from deleted cards.
+ */
+async function findLowestAvailableCardNumber(submission: SubmissionFolder): Promise<number> {
+  const existingCards = await listSubmissionCards(submission);
+
+  if (existingCards.length === 0) {
+    return 1;
+  }
+
+  // Find the first gap in the sequence
+  for (let i = 1; i <= Math.max(...existingCards); i++) {
+    if (!existingCards.includes(i)) {
+      return i;
+    }
+  }
+
+  // No gaps, return next number after highest
+  return Math.max(...existingCards) + 1;
+}
+
+/**
  * Create a new submission via API or fallback to ZIP.
  */
 export async function startSubmission(submissionName?: string): Promise<SubmissionFolder> {
@@ -70,12 +91,11 @@ export async function saveToSubmissionFolder(
     // Re-editing the same side of the same card
     cardNumber = submission.currentEdit.cardNumber;
   } else if (submission.lastSideSaved === null) {
-    // First side of a new pair
-    cardNumber = submission.nextCardNumber;
+    // First side of a new pair - find lowest available number (handles deleted cards)
+    cardNumber = await findLowestAvailableCardNumber(submission);
   } else if (submission.lastSideSaved !== side) {
     // Opposite side of current pair
-    cardNumber = submission.nextCardNumber;
-    // We'll increment nextCardNumber after saving both sides
+    cardNumber = submission.currentEdit?.cardNumber || submission.nextCardNumber;
   } else {
     // Same side again - this shouldn't happen in normal flow, but handle it
     submission.nextCardNumber += 1;
@@ -96,7 +116,7 @@ export async function saveToSubmissionFolder(
 
   // Only increment when we save back after front (completes the pair)
   if (side === 'back' && submission.lastSideSaved === 'front') {
-    submission.nextCardNumber += 1;
+    submission.nextCardNumber = Math.max(submission.nextCardNumber, cardNumber + 1);
   }
 
   submission.lastSideSaved = side;
