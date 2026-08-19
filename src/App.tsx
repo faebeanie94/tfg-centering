@@ -280,7 +280,9 @@ export default function App() {
                 ? submissionFolder.nextCardNumber - 1
                 : submissionFolder.nextCardNumber;
               const libraryLabel = `${submissionFolder.name}/${cardNum}`;
+              console.log('Auto-saving to library:', libraryLabel);
               await saveToLibrary(updatedSession, libraryLabel);
+              console.log('Auto-save to library succeeded:', libraryLabel);
             } catch (err) {
               console.error('Failed to auto-save to library:', err);
             }
