@@ -11,6 +11,7 @@ export interface FileSystemSubmission {
   name: string;
   nextCardNumber: number;
   currentEdit?: { cardNumber: number; side: 'front' | 'back' } | null;
+  lastSideSaved?: 'front' | 'back' | null;
 }
 
 export interface ZipSubmission {
@@ -18,6 +19,7 @@ export interface ZipSubmission {
   name: string;
   nextCardNumber: number;
   currentEdit?: { cardNumber: number; side: 'front' | 'back' } | null;
+  lastSideSaved?: 'front' | 'back' | null;
   images: Map<string, Blob>;
 }
 
@@ -45,6 +47,7 @@ export async function startSubmission(): Promise<SubmissionFolder> {
         name: dirHandle.name,
         nextCardNumber: 1,
         currentEdit: null,
+        lastSideSaved: null,
       };
     } catch (err) {
       if ((err as Error).name !== 'AbortError') {
@@ -61,25 +64,36 @@ export async function startSubmission(): Promise<SubmissionFolder> {
     name: `submission-${new Date().toISOString().slice(0, 10)}`,
     nextCardNumber: 1,
     currentEdit: null,
+    lastSideSaved: null,
     images: new Map(),
   };
 }
 
 /**
  * Save a clean image to the submission with naming scheme: {cardNumber}-{side}.jpg
+ * Front and back of the same card pair use the same card number.
  */
 export async function saveToSubmissionFolder(
   submission: SubmissionFolder,
   dataUrl: string,
   side: 'front' | 'back',
 ): Promise<void> {
-  // Determine the card number
   let cardNumber: number;
+
   if (submission.currentEdit && submission.currentEdit.side === side) {
+    // Re-editing the same side
     cardNumber = submission.currentEdit.cardNumber;
-  } else {
+  } else if (submission.lastSideSaved === null) {
+    // First save in session
     cardNumber = submission.nextCardNumber;
-    submission.nextCardNumber = Math.max(submission.nextCardNumber, cardNumber) + 1;
+  } else if (submission.lastSideSaved !== side) {
+    // Saving the OTHER side of the current card (front after back, or vice versa)
+    // Use the same card number as the last save
+    cardNumber = submission.nextCardNumber - 1;
+  } else {
+    // Saving the SAME side again (new session after finishing a card pair)
+    cardNumber = submission.nextCardNumber;
+    submission.nextCardNumber += 1;
   }
 
   const filename = `${cardNumber}-${side}.jpg`;
@@ -95,6 +109,7 @@ export async function saveToSubmissionFolder(
     submission.images.set(filename, blob);
   }
 
+  submission.lastSideSaved = side;
   submission.currentEdit = null;
 }
 
