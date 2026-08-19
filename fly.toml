@@ -1,4 +1,4 @@
-# fly.toml app configuration file generated for tfg-centering on 2026-08-19T19:00:01Z
+# fly.toml app configuration file generated for tfg-centering on 2026-08-19T21:33:20Z
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
@@ -11,9 +11,9 @@ primary_region = 'lhr'
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = true
+  auto_stop_machines = 'stop'
   auto_start_machines = true
-  min_machines_running = 0
+  min_machines_running = 1
 
 [env]
   PORT = "8080"
@@ -23,3 +23,6 @@ primary_region = 'lhr'
   cpu_kind = 'shared'
   cpus = 1
   memory_mb = 256
+
+[deploy]
+  strategy = 'bluegreen'
