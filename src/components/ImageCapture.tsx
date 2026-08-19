@@ -68,7 +68,7 @@ export function ImageCapture({
   onEndSubmission,
   savedSubmissions = [],
   onRestoreSubmission,
-  onDeleteSubmission,
+  onDeleteSubmission: _onDeleteSubmission,
 }: ImageCaptureProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -651,14 +651,14 @@ export function ImageCapture({
         >
           Choose from Photos
         </button>
-        {!submissionFolder && savedSubmissions.length > 0 && (
+        {!submissionFolder && savedSubmissions.length > 0 && onRestoreSubmission && (
           <div className="submissions-section">
             <label htmlFor="submissions-select" className="submissions-label">Restore submission:</label>
             <select
               id="submissions-select"
               className="submissions-select"
               onChange={(e) => {
-                if (e.target.value && onRestoreSubmission) {
+                if (e.target.value) {
                   onRestoreSubmission(e.target.value);
                 }
                 e.target.value = '';
@@ -680,32 +680,6 @@ export function ImageCapture({
           <button type="button" className="btn btn-secondary btn-large" onClick={onStartSubmission}>
             Start Submission
           </button>
-        )}
-        {!submissionFolder && savedSubmissions.length > 0 && onRestoreSubmission && (
-          <div className="saved-submissions">
-            <p className="saved-submissions-label">Saved submissions:</p>
-            {savedSubmissions.map((sub) => (
-              <div key={sub.id} className="saved-submission-item">
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-small"
-                  onClick={() => onRestoreSubmission(sub.id)}
-                >
-                  Resume {sub.name}
-                </button>
-                {onDeleteSubmission && (
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-small"
-                    onClick={() => onDeleteSubmission(sub.id)}
-                    aria-label={`Delete ${sub.name}`}
-                  >
-                    Delete
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
         )}
         {/* No capture attribute — that forces the camera on iOS and blocks the photo library. */}
         <input
