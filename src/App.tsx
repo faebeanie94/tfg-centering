@@ -250,7 +250,7 @@ export default function App() {
       if (submissionFolder && snapshot.imageSrc) {
         try {
           const cleanDataUrl = await exportCleanImage(snapshot.imageSrc);
-          const newCount = await saveToSubmissionFolder(submissionFolder, cleanDataUrl);
+          const newCount = await saveToSubmissionFolder(submissionFolder, cleanDataUrl, currentSide);
           setSubmissionFolder((prev) => prev ? { ...prev, imageCount: newCount } : null);
         } catch (err) {
           console.error('Failed to save to submission folder:', err);

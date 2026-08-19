@@ -7,6 +7,8 @@ export interface SubmissionFolder {
   handle: FileSystemDirectoryHandle;
   name: string;
   imageCount: number;
+  /** Track which file each side was saved to for updates */
+  fileNumbers?: { front?: number; back?: number };
 }
 
 /**
@@ -22,19 +24,24 @@ export async function startSubmission(): Promise<SubmissionFolder> {
     handle: dirHandle,
     name: dirHandle.name,
     imageCount: 0,
+    fileNumbers: {},
   };
 }
 
 /**
- * Save a clean image to the submission folder with sequential numbering.
- * Returns the next image count after saving.
+ * Save a clean image to the submission folder.
+ * If the side was already saved, updates that file.
+ * Otherwise creates a new numbered file.
  */
 export async function saveToSubmissionFolder(
   submission: SubmissionFolder,
   dataUrl: string,
+  side: 'front' | 'back',
 ): Promise<number> {
-  const nextCount = submission.imageCount + 1;
-  const filename = `${nextCount}.jpg`;
+  // Check if this side was already saved
+  const existingFileNumber = submission.fileNumbers?.[side];
+  const fileNumber = existingFileNumber ?? submission.imageCount + 1;
+  const filename = `${fileNumber}.jpg`;
 
   // Convert data URL to blob
   const response = await fetch(dataUrl);
@@ -46,5 +53,16 @@ export async function saveToSubmissionFolder(
   await writable.write(blob);
   await writable.close();
 
-  return nextCount;
+  // If this is a new file, increment the count
+  if (!existingFileNumber) {
+    submission.imageCount = fileNumber;
+  }
+
+  // Track which file this side was saved to
+  if (!submission.fileNumbers) {
+    submission.fileNumbers = {};
+  }
+  submission.fileNumbers[side] = fileNumber;
+
+  return submission.imageCount;
 }
