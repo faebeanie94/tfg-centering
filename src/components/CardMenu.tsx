@@ -18,6 +18,8 @@ interface CardMenuProps {
   onRetake?: () => void;
   onSaveToLibrary?: () => Promise<boolean>;
   savingToLibrary?: boolean;
+  submissionName?: string;
+  onViewCards?: () => void;
   onClose: () => void;
 }
 
@@ -37,6 +39,8 @@ export function CardMenu({
   onRetake,
   onSaveToLibrary,
   savingToLibrary = false,
+  submissionName,
+  onViewCards,
   onClose,
 }: CardMenuProps) {
   const [busy, setBusy] = useState(false);
@@ -84,6 +88,24 @@ export function CardMenu({
             ×
           </button>
         </div>
+
+        {submissionName && (
+          <div className="action-sheet-section">
+            <div className="action-sheet-section-title">{submissionName}</div>
+            {onViewCards && (
+              <button
+                type="button"
+                className="action-sheet-item"
+                onClick={() => {
+                  onViewCards();
+                  onClose();
+                }}
+              >
+                Manage Cards
+              </button>
+            )}
+          </div>
+        )}
 
         {showNameEdit ? (
           <div className="name-edit">

@@ -52,6 +52,7 @@ interface BorderEditorProps {
   libraryMessage?: string | null;
   submissionFolder?: SubmissionFolder | null;
   onEndSubmission?: () => void;
+  onViewCards?: () => void;
   onRetakeSubmission?: () => void;
 }
 
@@ -98,6 +99,7 @@ export function BorderEditor({
   submissionFolder,
   onEndSubmission,
   onRetakeSubmission,
+  onViewCards,
 }: BorderEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -542,6 +544,8 @@ export function BorderEditor({
               }
             : undefined
         }
+        submissionName={submissionFolder?.name}
+        onViewCards={onViewCards}
         onSaveToLibrary={
           onSaveToLibrary
             ? async () => {
