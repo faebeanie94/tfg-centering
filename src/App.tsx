@@ -246,10 +246,21 @@ export default function App() {
         setCardNames((prev) => ({ ...prev, [currentSide]: snapshot.name! }));
       }
 
+      // Check if editing a library entry from a submission and sync back
+      const cardNameMatch = cardNames[currentSide]?.match(/^([^/]+)\/(\d+)$/);
+      const isSubmissionCard = cardNameMatch && submissionFolder && cardNameMatch[1] === submissionFolder.name;
+
       // Auto-save clean image to submission folder if active
       if (submissionFolder && snapshot.imageSrc) {
         try {
           const cleanDataUrl = await exportCleanImage(snapshot.imageSrc);
+
+          if (isSubmissionCard) {
+            // Editing an existing submission card - update it in place
+            const cardNum = parseInt(cardNameMatch![2], 10);
+            submissionFolder.currentEdit = { cardNumber: cardNum, side: currentSide };
+          }
+
           await saveToSubmissionFolder(submissionFolder, cleanDataUrl, currentSide);
           setSubmissionFolder((prev) => prev ? { ...prev } : null);
 
@@ -272,7 +283,7 @@ export default function App() {
         }
       }
     },
-    [currentSide, submissionFolder, session, saveToLibrary],
+    [currentSide, submissionFolder, session, cardNames, saveToLibrary],
   );
 
   const loadSideIntoEditor = useCallback((side: CardSide) => {
