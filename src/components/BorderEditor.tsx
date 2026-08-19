@@ -19,6 +19,7 @@ import { EdgeArrowHandle, edgeHandleStyle } from './EdgeArrowHandle';
 import type { CardFormat } from '../lib/card-sizes';
 import { formatCardSizeMm } from '../lib/card-sizes';
 import type { AutoCropSkipReason, InnerSideConfidence } from '../lib/auto-crop';
+import type { SubmissionFolder } from '../lib/folder-submission';
 
 interface BorderEditorProps {
   imageSrc: string;
@@ -49,6 +50,8 @@ interface BorderEditorProps {
   onLibrary?: () => void;
   onSaveToLibrary?: (session: GradingSession) => Promise<boolean>;
   libraryMessage?: string | null;
+  submissionFolder?: SubmissionFolder | null;
+  onEndSubmission?: () => void;
 }
 
 type DragTarget =
@@ -91,6 +94,8 @@ export function BorderEditor({
   onLibrary,
   onSaveToLibrary,
   libraryMessage,
+  submissionFolder,
+  onEndSubmission,
 }: BorderEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -355,6 +360,17 @@ export function BorderEditor({
       </div>
 
       {libraryMessage && <div className="library-toast">{libraryMessage}</div>}
+
+      {submissionFolder && (
+        <div className="submission-banner">
+          <span>📁 {submissionFolder.name} · {submissionFolder.imageCount} image{submissionFolder.imageCount !== 1 ? 's' : ''}</span>
+          {onEndSubmission && (
+            <button type="button" className="btn btn-secondary btn-small" onClick={onEndSubmission}>
+              End
+            </button>
+          )}
+        </div>
+      )}
 
       {autoCropInfo && (
         <div className="autocrop-note">

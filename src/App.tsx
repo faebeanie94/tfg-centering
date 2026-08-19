@@ -28,6 +28,8 @@ import {
   type CardSizeSelection,
   type CardFormatId,
 } from './lib/card-sizes';
+import { exportCleanImage } from './lib/export-image';
+import { startSubmission, saveToSubmissionFolder, type SubmissionFolder } from './lib/folder-submission';
 
 type Phase =
   | 'capture'
@@ -66,6 +68,7 @@ export default function App() {
   /** Concrete size for this capture — set from Settings or post-capture picker. */
   const [sessionCardSize, setSessionCardSize] = useState<CardSizeSelection | null>(null);
   const [pendingHint, setPendingHint] = useState<CaptureDetectHint | undefined>(undefined);
+  const [submissionFolder, setSubmissionFolder] = useState<SubmissionFolder | null>(null);
 
   const activeCardFormat = useMemo(() => {
     const fromSettings = selectionFromSettings(settings);
@@ -237,13 +240,24 @@ export default function App() {
   }, [autoCropOptions]);
 
   const handleSaveSide = useCallback(
-    (snapshot: SideSnapshot) => {
+    async (snapshot: SideSnapshot) => {
       setSession((prev) => ({ ...prev, [currentSide]: snapshot }));
       if (snapshot.name) {
         setCardNames((prev) => ({ ...prev, [currentSide]: snapshot.name! }));
       }
+
+      // Auto-save clean image to submission folder if active
+      if (submissionFolder && snapshot.imageSrc) {
+        try {
+          const cleanDataUrl = await exportCleanImage(snapshot.imageSrc);
+          const newCount = await saveToSubmissionFolder(submissionFolder, cleanDataUrl);
+          setSubmissionFolder((prev) => prev ? { ...prev, imageCount: newCount } : null);
+        } catch (err) {
+          console.error('Failed to save to submission folder:', err);
+        }
+      }
     },
-    [currentSide],
+    [currentSide, submissionFolder],
   );
 
   const loadSideIntoEditor = useCallback((side: CardSide) => {
@@ -318,6 +332,21 @@ export default function App() {
     setPendingHint(undefined);
     setAutoCropInfo(null);
     setPhase('capture');
+  }, []);
+
+  const handleStartSubmission = useCallback(async () => {
+    try {
+      const folder = await startSubmission();
+      setSubmissionFolder(folder);
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') {
+        console.error('Failed to start submission:', err);
+      }
+    }
+  }, []);
+
+  const handleEndSubmission = useCallback(() => {
+    setSubmissionFolder(null);
   }, []);
 
   if (phase === 'library') {
@@ -437,6 +466,8 @@ export default function App() {
           onSettings={() => setShowSettings(true)}
           onSettingsChange={updateSettings}
           onReset={handleReset}
+          submissionFolder={submissionFolder}
+          onEndSubmission={handleEndSubmission}
         />
         <SettingsPanel open={showSettings} settings={settings} onChange={updateSettings} onClose={() => setShowSettings(false)} />
       </>
@@ -454,6 +485,9 @@ export default function App() {
         onLibrary={() => openLibrary('capture')}
         savedCount={cards.length}
         hasSavedSides={sessionHasAny(session)}
+        submissionFolder={submissionFolder}
+        onStartSubmission={handleStartSubmission}
+        onEndSubmission={handleEndSubmission}
       />
       <SettingsPanel open={showSettings} settings={settings} onChange={updateSettings} onClose={() => setShowSettings(false)} />
     </>

@@ -459,6 +459,35 @@ body.scanner-mode #root {
   font-size: 0.9rem;
 }
 
+.submission-status {
+  background: rgba(74, 144, 226, 0.1);
+  border: 1px solid var(--primary);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.submission-info {
+  flex: 1;
+}
+
+.submission-folder {
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin: 0 0 4px 0;
+  word-break: break-word;
+}
+
+.submission-count {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
 .camera-view {
   display: flex;
   flex-direction: column;
@@ -1748,6 +1777,20 @@ body.editor-mode #root {
 
 .library-toast {
   margin: 0 12px;
+}
+
+.submission-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin: 0 12px;
+  padding: 10px 14px;
+  background: rgba(74, 144, 226, 0.1);
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: var(--text-primary);
 }
 
 .autocrop-note {

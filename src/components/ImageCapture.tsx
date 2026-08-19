@@ -27,6 +27,7 @@ import {
   fallbackCardFormatForDetection,
   resolveCardFormat,
 } from '../lib/card-sizes';
+import type { SubmissionFolder } from '../lib/folder-submission';
 
 interface ImageCaptureProps {
   side: CardSide;
@@ -37,6 +38,9 @@ interface ImageCaptureProps {
   onLibrary?: () => void;
   savedCount?: number;
   hasSavedSides?: boolean;
+  submissionFolder?: SubmissionFolder | null;
+  onStartSubmission?: () => void;
+  onEndSubmission?: () => void;
 }
 
 export function ImageCapture({
@@ -48,6 +52,9 @@ export function ImageCapture({
   onLibrary,
   savedCount = 0,
   hasSavedSides,
+  submissionFolder,
+  onStartSubmission,
+  onEndSubmission,
 }: ImageCaptureProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -489,6 +496,20 @@ export function ImageCapture({
 
       {error && <div className="error-banner">{error}</div>}
 
+      {submissionFolder && (
+        <div className="submission-status">
+          <div className="submission-info">
+            <p className="submission-folder">📁 {submissionFolder.name}</p>
+            <p className="submission-count">{submissionFolder.imageCount} image{submissionFolder.imageCount !== 1 ? 's' : ''}</p>
+          </div>
+          {onEndSubmission && (
+            <button type="button" className="btn btn-secondary btn-small" onClick={onEndSubmission}>
+              End Submission
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="capture-actions">
         <button type="button" className="btn btn-primary btn-large" onClick={startCamera}>
           Take Photo
@@ -500,6 +521,11 @@ export function ImageCapture({
         >
           Choose from Photos
         </button>
+        {!submissionFolder && onStartSubmission && (
+          <button type="button" className="btn btn-secondary btn-large" onClick={onStartSubmission}>
+            Start Submission
+          </button>
+        )}
         {/* No capture attribute — that forces the camera on iOS and blocks the photo library. */}
         <input
           ref={fileInputRef}
