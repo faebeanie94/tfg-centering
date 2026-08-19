@@ -94,8 +94,8 @@ export async function saveToSubmissionFolder(
     submission.images.set(filename, blob);
   }
 
-  // Check if we just completed a pair (saved both front and back)
-  if (submission.lastSideSaved !== null && submission.lastSideSaved !== side) {
+  // Only increment when we save back after front (completes the pair)
+  if (side === 'back' && submission.lastSideSaved === 'front') {
     submission.nextCardNumber += 1;
   }
 
