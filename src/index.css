@@ -2454,6 +2454,7 @@ body.editor-mode #root {
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   gap: 12px;
+  flex-shrink: 0;
 }
 
 .submission-toolbar-name {
