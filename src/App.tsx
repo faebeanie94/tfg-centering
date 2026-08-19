@@ -31,6 +31,7 @@ import {
 import { exportCleanImage } from './lib/export-image';
 import { startSubmission, saveToSubmissionFolder, type SubmissionFolder } from './lib/folder-submission';
 import { listSubmissionHandles, restoreSubmissionHandle, deleteSubmissionHandle } from './lib/submission-persistence';
+import * as api from './lib/api-client';
 
 type Phase =
   | 'capture'
@@ -394,11 +395,23 @@ export default function App() {
 
       const submission = savedSubmissions.find((s) => s.id === id);
       if (submission && handle) {
+        // Fetch existing cards to determine next card number
+        let nextCardNumber = 1;
+        try {
+          const cards = await api.listCards(id);
+          if (cards.length > 0) {
+            const maxCardNumber = Math.max(...cards.map(c => c.card_number));
+            nextCardNumber = maxCardNumber + 1;
+          }
+        } catch (err) {
+          console.warn('Failed to fetch cards, starting from card 1:', err);
+        }
+
         const apiSubmission = {
           type: 'api' as const,
           submissionId: id,
           name: submission.name,
-          nextCardNumber: 1,
+          nextCardNumber,
           currentEdit: null,
           lastSideSaved: null,
         };
