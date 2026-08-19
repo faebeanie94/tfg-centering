@@ -28,13 +28,16 @@ RUN if [ ! -f .env ]; then cp .env.example .env; fi
 
 EXPOSE 8080
 
-# Create entrypoint script that writes GCP key from env var to file
-RUN echo '#!/bin/sh\n\
-if [ -n "$GCP_KEY_FILE" ]; then\n\
-  echo "$GCP_KEY_FILE" > /app/gcs-key.json\n\
-  export GCP_KEY_FILE=/app/gcs-key.json\n\
-fi\n\
-exec node src/server.js' > /entrypoint.sh && chmod +x /entrypoint.sh
+# Create entrypoint script - handles GCP_KEY_FILE environment variable
+RUN cat > /entrypoint.sh << 'SCRIPT'
+#!/bin/sh
+if [ -n "$GCP_KEY_FILE" ]; then
+  echo "$GCP_KEY_FILE" > /app/gcs-key.json
+  export GCP_KEY_FILE=/app/gcs-key.json
+fi
+exec node src/server.js
+SCRIPT
+RUN chmod +x /entrypoint.sh
 
 # Start backend server (which will serve frontend)
 CMD ["/entrypoint.sh"]
