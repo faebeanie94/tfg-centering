@@ -16,6 +16,9 @@ pool.on('error', (err) => {
   console.error('Unexpected error on idle client', err);
 });
 
+// Export pool early to avoid circular dependency issues
+module.exports = { app, pool };
+
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
@@ -56,5 +59,3 @@ process.on('SIGTERM', () => {
     });
   });
 });
-
-module.exports = { app, pool };
