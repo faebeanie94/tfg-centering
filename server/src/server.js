@@ -26,7 +26,7 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(fileUpload({ limits: { fileSize: 50 * 1024 * 1024 } }));
 
 // Serve static frontend files (in production)
-const frontendPath = path.join(__dirname, '../../dist');
+const frontendPath = path.join(__dirname, '../dist');
 app.use(express.static(frontendPath));
 
 // Health check
