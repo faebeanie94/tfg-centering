@@ -252,18 +252,18 @@ export default function App() {
           const cleanDataUrl = await exportCleanImage(snapshot.imageSrc);
           await saveToSubmissionFolder(submissionFolder, cleanDataUrl, currentSide);
           setSubmissionFolder((prev) => prev ? { ...prev } : null);
+
+          // Auto-save to library when BOTH sides are complete, using submission name
+          const updatedSession = { ...session, [currentSide]: snapshot };
+          if (updatedSession.front && updatedSession.back) {
+            try {
+              await saveToLibrary(updatedSession, submissionFolder.name);
+            } catch (err) {
+              console.error('Failed to auto-save to library:', err);
+            }
+          }
         } catch (err) {
           console.error('Failed to save to submission folder:', err);
-        }
-      }
-
-      // Also auto-save to library when in submission
-      if (submissionFolder) {
-        try {
-          const sessionToSave: GradingSession = { ...session, [currentSide]: snapshot };
-          await saveToLibrary(sessionToSave);
-        } catch (err) {
-          console.error('Failed to auto-save to library:', err);
         }
       }
     },
