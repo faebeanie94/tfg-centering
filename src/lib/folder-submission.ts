@@ -125,9 +125,11 @@ export async function saveToSubmissionFolder(
   if (side === 'back' && submission.lastSideSaved === 'front') {
     submission.nextCardNumber = Math.max(submission.nextCardNumber, cardNumber + 1);
     submission.lastCardNumberUsed = null; // Reset for next pair
+    submission.lastSideSaved = null; // Reset so next front is recognized as new pair
+  } else {
+    submission.lastSideSaved = side;
   }
 
-  submission.lastSideSaved = side;
   submission.currentEdit = null;
 }
 
