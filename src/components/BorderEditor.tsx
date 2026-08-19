@@ -363,7 +363,13 @@ export function BorderEditor({
 
       {submissionFolder && (
         <div className="submission-banner">
-          <span>📁 {submissionFolder.name} · Card {submissionFolder.nextCardNumber}</span>
+          <span>
+            {submissionFolder.type === 'filesystem' ? '📁' : '📦'} {submissionFolder.name}
+            <span className="submission-mode-badge">
+              {submissionFolder.type === 'filesystem' ? 'Folder' : 'ZIP'}
+            </span>
+            · Card {submissionFolder.nextCardNumber}
+          </span>
           {onEndSubmission && (
             <button type="button" className="btn btn-secondary btn-small" onClick={onEndSubmission}>
               End

@@ -28,6 +28,7 @@ import {
   resolveCardFormat,
 } from '../lib/card-sizes';
 import type { SubmissionFolder } from '../lib/folder-submission';
+import { downloadSubmissionZip } from '../lib/folder-submission';
 
 interface ImageCaptureProps {
   side: CardSide;
@@ -499,14 +500,30 @@ export function ImageCapture({
       {submissionFolder && (
         <div className="submission-status">
           <div className="submission-info">
-            <p className="submission-folder">📁 {submissionFolder.name}</p>
+            <p className="submission-folder">
+              {submissionFolder.type === 'filesystem' ? '📁' : '📦'} {submissionFolder.name}
+              <span className="submission-mode">
+                {submissionFolder.type === 'filesystem' ? 'Folder' : 'ZIP'}
+              </span>
+            </p>
             <p className="submission-count">Card {submissionFolder.nextCardNumber}</p>
           </div>
-          {onEndSubmission && (
-            <button type="button" className="btn btn-secondary btn-small" onClick={onEndSubmission}>
-              End Submission
-            </button>
-          )}
+          <div className="submission-actions">
+            {submissionFolder.type === 'zip' && (
+              <button
+                type="button"
+                className="btn btn-secondary btn-small"
+                onClick={() => downloadSubmissionZip(submissionFolder as any)}
+              >
+                Download
+              </button>
+            )}
+            {onEndSubmission && (
+              <button type="button" className="btn btn-secondary btn-small" onClick={onEndSubmission}>
+                End
+              </button>
+            )}
+          </div>
         </div>
       )}
 

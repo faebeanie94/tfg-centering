@@ -1,78 +1,134 @@
-/**
- * File System Access API utilities for folder-based submissions.
- * Allows users to pick a folder and auto-save numbered images to it.
- */
+import JSZip from 'jszip';
 
-export interface SubmissionFolder {
+/**
+ * Submission folder with support for both File System API and ZIP export fallback.
+ */
+export type SubmissionFolder = FileSystemSubmission | ZipSubmission;
+
+export interface FileSystemSubmission {
+  type: 'filesystem';
   handle: FileSystemDirectoryHandle;
   name: string;
   nextCardNumber: number;
-  /** Track which card/side is currently being edited (null = new card) */
   currentEdit?: { cardNumber: number; side: 'front' | 'back' } | null;
 }
 
+export interface ZipSubmission {
+  type: 'zip';
+  name: string;
+  nextCardNumber: number;
+  currentEdit?: { cardNumber: number; side: 'front' | 'back' } | null;
+  images: Map<string, Blob>;
+}
+
 /**
- * Request user to pick or create a folder for a new submission.
+ * Check if File System Access API is supported in this browser.
+ */
+function isFileSystemApiSupported(): boolean {
+  return typeof (window as any).showDirectoryPicker === 'function';
+}
+
+/**
+ * Request user to pick a folder or create a ZIP submission based on browser support.
  */
 export async function startSubmission(): Promise<SubmissionFolder> {
-  const dirHandle = await (window as any).showDirectoryPicker({
-    mode: 'readwrite',
-    startIn: 'downloads',
-  });
+  if (isFileSystemApiSupported()) {
+    try {
+      const dirHandle = await (window as any).showDirectoryPicker({
+        mode: 'readwrite',
+        startIn: 'downloads',
+      });
 
+      return {
+        type: 'filesystem',
+        handle: dirHandle,
+        name: dirHandle.name,
+        nextCardNumber: 1,
+        currentEdit: null,
+      };
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') {
+        console.warn('File System API failed, falling back to ZIP:', err);
+      } else {
+        throw err;
+      }
+    }
+  }
+
+  // Fallback to ZIP submission
   return {
-    handle: dirHandle,
-    name: dirHandle.name,
+    type: 'zip',
+    name: `submission-${new Date().toISOString().slice(0, 10)}`,
     nextCardNumber: 1,
     currentEdit: null,
+    images: new Map(),
   };
 }
 
 /**
- * Save a clean image to the submission folder with naming scheme: {cardNumber}-{side}.jpg
- * If editing an existing image, updates that file.
- * Otherwise creates a new numbered file.
+ * Save a clean image to the submission with naming scheme: {cardNumber}-{side}.jpg
  */
 export async function saveToSubmissionFolder(
   submission: SubmissionFolder,
   dataUrl: string,
   side: 'front' | 'back',
 ): Promise<void> {
-  // Determine the card number: use current edit if set, otherwise new card
+  // Determine the card number
   let cardNumber: number;
   if (submission.currentEdit && submission.currentEdit.side === side) {
-    // Updating an existing image
     cardNumber = submission.currentEdit.cardNumber;
   } else {
-    // New image for this side
     cardNumber = submission.nextCardNumber;
-    // Advance counter after saving
     submission.nextCardNumber = Math.max(submission.nextCardNumber, cardNumber) + 1;
   }
 
   const filename = `${cardNumber}-${side}.jpg`;
-
-  // Convert data URL to blob
   const response = await fetch(dataUrl);
   const blob = await response.blob();
 
-  // Write to file
-  const fileHandle = await submission.handle.getFileHandle(filename, { create: true });
-  const writable = await fileHandle.createWritable();
-  await writable.write(blob);
-  await writable.close();
+  if (submission.type === 'filesystem') {
+    const fileHandle = await submission.handle.getFileHandle(filename, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(blob);
+    await writable.close();
+  } else {
+    submission.images.set(filename, blob);
+  }
 
-  // Clear current edit after save (was a one-time thing)
   submission.currentEdit = null;
 }
 
 /**
- * List all saved card pairs in the submission folder.
- * Returns array of card numbers that have at least one side saved.
+ * Download the ZIP submission. Only applicable for ZIP submissions.
+ */
+export async function downloadSubmissionZip(submission: ZipSubmission): Promise<void> {
+  if (submission.type !== 'zip') return;
+
+  const zip = new JSZip();
+  for (const [filename, blob] of submission.images) {
+    zip.file(filename, blob);
+  }
+
+  const content = await zip.generateAsync({ type: 'blob' });
+  const url = URL.createObjectURL(content);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${submission.name}.zip`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * List all saved card numbers (filesystem only).
  */
 export async function listSubmissionCards(submission: SubmissionFolder): Promise<number[]> {
-  const cards = new Set<number>();
+  if (submission.type !== 'filesystem') {
+    return Array.from({ length: submission.nextCardNumber - 1 }, (_, i) => i + 1);
+  }
 
+  const cards = new Set<number>();
   try {
     for await (const entry of (submission.handle as any)) {
       if (entry.kind === 'file') {
@@ -90,7 +146,7 @@ export async function listSubmissionCards(submission: SubmissionFolder): Promise
 }
 
 /**
- * Load a saved image from the submission folder.
+ * Load a saved image from the submission.
  */
 export async function loadSubmissionImage(
   submission: SubmissionFolder,
@@ -99,16 +155,27 @@ export async function loadSubmissionImage(
 ): Promise<string | null> {
   const filename = `${cardNumber}-${side}.jpg`;
 
+  if (submission.type === 'zip') {
+    const blob = submission.images.get(filename);
+    if (!blob) return null;
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  // Filesystem
   try {
     const fileHandle = await submission.handle.getFileHandle(filename);
     const file = await fileHandle.getFile();
-    const dataUrl = await new Promise<string>((resolve, reject) => {
+    return new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result as string);
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
-    return dataUrl;
   } catch (err) {
     return null;
   }

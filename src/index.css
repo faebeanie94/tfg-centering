@@ -480,12 +480,29 @@ body.scanner-mode #root {
   font-size: 0.95rem;
   margin: 0 0 4px 0;
   word-break: break-word;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.submission-mode {
+  font-size: 0.75rem;
+  font-weight: normal;
+  color: var(--text-muted);
+  background: rgba(0, 0, 0, 0.1);
+  padding: 2px 6px;
+  border-radius: 3px;
 }
 
 .submission-count {
   font-size: 0.85rem;
   color: var(--text-muted);
   margin: 0;
+}
+
+.submission-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .camera-view {
@@ -1791,6 +1808,15 @@ body.editor-mode #root {
   border-radius: 8px;
   font-size: 0.85rem;
   color: var(--text-primary);
+}
+
+.submission-mode-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: rgba(0, 0, 0, 0.15);
+  padding: 2px 6px;
+  border-radius: 3px;
+  margin-left: 6px;
 }
 
 .autocrop-note {
