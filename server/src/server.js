@@ -2,11 +2,12 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const fileUpload = require('express-fileupload');
+const path = require('path');
 const { Pool } = require('pg');
 const { errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3001;
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -24,6 +25,10 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(fileUpload({ limits: { fileSize: 50 * 1024 * 1024 } }));
 
+// Serve static frontend files (in production)
+const frontendPath = path.join(__dirname, '../../dist');
+app.use(express.static(frontendPath));
+
 // Health check
 app.get('/health', async (req, res) => {
   try {
@@ -37,9 +42,11 @@ app.get('/health', async (req, res) => {
 // Mount API routes
 app.use('/api', require('./api/routes'));
 
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({ error: 'Not found' });
+// SPA fallback - serve index.html for non-API routes
+app.get('*', (req, res) => {
+  res.sendFile(path.join(frontendPath, 'index.html'), (err) => {
+    if (err) res.status(404).json({ error: 'Not found' });
+  });
 });
 
 // Error handler (must be last)

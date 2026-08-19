@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.REACT_APP_API_URL || 'http://localhost:3001/api';
+const API_BASE = import.meta.env.REACT_APP_API_URL || '/api';
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000;
 
