@@ -142,6 +142,22 @@ export function SavedCardsView({ cards, loading, onClose, onOpen, onDelete }: Sa
     }
   }
 
+  async function handleDeleteGroup(groupId: string, groupName: string) {
+    if (!confirm(`Delete "${groupName}" and all its cards?`)) return;
+
+    setBusy(true);
+    setMessage(null);
+    try {
+      await api.deleteSubmission(groupId);
+      setMessage(`Deleted "${groupName}"`);
+      window.location.reload();
+    } catch {
+      setMessage('Could not delete — try again');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function renderCard(record: SavedCardRecord) {
     const thumb = thumbSrc(record);
     const sides = [record.session.front ? 'Front' : null, record.session.back ? 'Back' : null]
@@ -282,6 +298,15 @@ export function SavedCardsView({ cards, loading, onClose, onOpen, onDelete }: Sa
                     title={`Download ${group.label} as one .zip`}
                   >
                     Export ZIP
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-small"
+                    disabled={busy}
+                    onClick={() => void handleDeleteGroup(id, group.label)}
+                    title={`Delete ${group.label}`}
+                  >
+                    Delete
                   </button>
                 </div>
               )}
