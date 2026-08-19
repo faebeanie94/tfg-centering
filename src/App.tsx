@@ -253,11 +253,16 @@ export default function App() {
           await saveToSubmissionFolder(submissionFolder, cleanDataUrl, currentSide);
           setSubmissionFolder((prev) => prev ? { ...prev } : null);
 
-          // Auto-save to library when BOTH sides are complete, using submission name
+          // Auto-save to library when BOTH sides are complete, using submission name + card number
           const updatedSession = { ...session, [currentSide]: snapshot };
           if (updatedSession.front && updatedSession.back) {
             try {
-              await saveToLibrary(updatedSession, submissionFolder.name);
+              // Determine which card number was just completed
+              const cardNum = submissionFolder.lastSideSaved === 'back'
+                ? submissionFolder.nextCardNumber - 1
+                : submissionFolder.nextCardNumber;
+              const libraryLabel = `${submissionFolder.name}/${cardNum}`;
+              await saveToLibrary(updatedSession, libraryLabel);
             } catch (err) {
               console.error('Failed to auto-save to library:', err);
             }
