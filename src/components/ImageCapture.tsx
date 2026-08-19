@@ -41,6 +41,7 @@ interface ImageCaptureProps {
   onRetake?: () => void;
   onCaptureSide?: (side: CardSide) => void;
   onNextCard?: () => void;
+  onViewCards?: () => void;
   savedCount?: number;
   hasSavedSides?: boolean;
   submissionFolder?: SubmissionFolder | null;
@@ -61,6 +62,7 @@ export function ImageCapture({
   onRetake,
   onCaptureSide,
   onNextCard,
+  onViewCards,
   savedCount = 0,
   hasSavedSides,
   submissionFolder,
@@ -577,6 +579,15 @@ export function ImageCapture({
               <p className="submission-count">Card {submissionFolder.nextCardNumber}</p>
             </div>
             <div className="submission-actions">
+              {onViewCards && (
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-small"
+                  onClick={onViewCards}
+                >
+                  Manage Cards
+                </button>
+              )}
               {submissionFolder.type === 'zip' && (
                 <button
                   type="button"
