@@ -41,6 +41,7 @@ interface ImageCaptureProps {
   onRetake?: () => void;
   onCaptureSide?: (side: CardSide) => void;
   onNextCard?: () => void;
+  onViewCards?: () => void;
   savedCount?: number;
   hasSavedSides?: boolean;
   submissionFolder?: SubmissionFolder | null;
@@ -61,13 +62,14 @@ export function ImageCapture({
   onRetake,
   onCaptureSide,
   onNextCard,
+  onViewCards,
   savedCount = 0,
   hasSavedSides,
   submissionFolder,
   onStartSubmission,
   onEndSubmission,
-  savedSubmissions = [],
-  onRestoreSubmission,
+  savedSubmissions: _savedSubmissions,
+  onRestoreSubmission: _onRestoreSubmission,
   onDeleteSubmission: _onDeleteSubmission,
 }: ImageCaptureProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -577,6 +579,19 @@ export function ImageCapture({
               <p className="submission-count">Card {submissionFolder.nextCardNumber}</p>
             </div>
             <div className="submission-actions">
+              <select
+                className="submissions-select"
+                onChange={(e) => {
+                  if (e.target.value === 'manage-cards') {
+                    onViewCards?.();
+                  }
+                  e.target.value = '';
+                }}
+                defaultValue=""
+              >
+                <option value="">⋯</option>
+                <option value="manage-cards">Manage Cards</option>
+              </select>
               {submissionFolder.type === 'zip' && (
                 <button
                   type="button"
@@ -651,31 +666,6 @@ export function ImageCapture({
         >
           Choose from Photos
         </button>
-        {!submissionFolder && savedSubmissions.length > 0 && onRestoreSubmission && (
-          <div className="submissions-section">
-            <label htmlFor="submissions-select" className="submissions-label">Restore submission:</label>
-            <select
-              id="submissions-select"
-              className="submissions-select"
-              onChange={(e) => {
-                if (e.target.value) {
-                  onRestoreSubmission(e.target.value);
-                }
-                e.target.value = '';
-              }}
-              defaultValue=""
-            >
-              <option value="">Choose a saved submission…</option>
-              {savedSubmissions
-                .sort((a, b) => b.timestamp - a.timestamp)
-                .map((submission) => (
-                  <option key={submission.id} value={submission.id}>
-                    {submission.name}
-                  </option>
-                ))}
-            </select>
-          </div>
-        )}
         {!submissionFolder && onStartSubmission && (
           <button type="button" className="btn btn-secondary btn-large" onClick={onStartSubmission}>
             Start Submission
