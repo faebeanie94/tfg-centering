@@ -67,14 +67,19 @@ export async function saveToSubmissionFolder(
   let cardNumber: number;
 
   if (submission.currentEdit && submission.currentEdit.side === side) {
+    // Re-editing the same side of the same card
     cardNumber = submission.currentEdit.cardNumber;
   } else if (submission.lastSideSaved === null) {
+    // First side of a new pair
     cardNumber = submission.nextCardNumber;
   } else if (submission.lastSideSaved !== side) {
-    cardNumber = submission.nextCardNumber - 1;
-  } else {
+    // Opposite side of current pair
     cardNumber = submission.nextCardNumber;
+    // We'll increment nextCardNumber after saving both sides
+  } else {
+    // Same side again - this shouldn't happen in normal flow, but handle it
     submission.nextCardNumber += 1;
+    cardNumber = submission.nextCardNumber;
   }
 
   const response = await fetch(dataUrl);
@@ -87,6 +92,11 @@ export async function saveToSubmissionFolder(
   } else {
     const filename = `${cardNumber}-${side}.jpg`;
     submission.images.set(filename, blob);
+  }
+
+  // Check if we just completed a pair (saved both front and back)
+  if (submission.lastSideSaved !== null && submission.lastSideSaved !== side) {
+    submission.nextCardNumber += 1;
   }
 
   submission.lastSideSaved = side;
