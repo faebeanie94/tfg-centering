@@ -366,9 +366,7 @@ export function BorderEditor({
       {autoCropInfo && (
         <div className="autocrop-note">
           <span>
-            Auto-crop applied — {SKIP_REASON_LABEL[autoCropInfo.reason]}
-            {autoCropInfo.confidence > 0 ? ` (${Math.round(autoCropInfo.confidence * 100)}% confidence)` : ''}.
-            Worth a check via{' '}
+            Unsure if level. Worth a check via{' '}
             <button type="button" className="autocrop-note-link" onClick={onPerspectiveFix}>
               Fix perspective
             </button>{' '}
