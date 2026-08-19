@@ -500,7 +500,7 @@ export function ImageCapture({
         <div className="submission-status">
           <div className="submission-info">
             <p className="submission-folder">📁 {submissionFolder.name}</p>
-            <p className="submission-count">{submissionFolder.imageCount} image{submissionFolder.imageCount !== 1 ? 's' : ''}</p>
+            <p className="submission-count">Card {submissionFolder.nextCardNumber}</p>
           </div>
           {onEndSubmission && (
             <button type="button" className="btn btn-secondary btn-small" onClick={onEndSubmission}>

@@ -363,7 +363,7 @@ export function BorderEditor({
 
       {submissionFolder && (
         <div className="submission-banner">
-          <span>📁 {submissionFolder.name} · {submissionFolder.imageCount} image{submissionFolder.imageCount !== 1 ? 's' : ''}</span>
+          <span>📁 {submissionFolder.name} · Card {submissionFolder.nextCardNumber}</span>
           {onEndSubmission && (
             <button type="button" className="btn btn-secondary btn-small" onClick={onEndSubmission}>
               End
