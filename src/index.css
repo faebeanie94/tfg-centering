@@ -2423,12 +2423,22 @@ body.editor-mode #root {
   overflow: hidden;
   border-radius: 4px;
   background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 0.8rem;
 }
 
 .card-list-thumbnail img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.card-list-thumbnail::before {
+  content: '(no image)';
+  position: absolute;
 }
 
 .card-list-number {

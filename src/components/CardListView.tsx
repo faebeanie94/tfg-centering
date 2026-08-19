@@ -93,14 +93,18 @@ export function CardListView({ submission, onClose, onCardDeleted }: CardListVie
         <div className="card-list-grid">
           {cards.map(card => (
             <div key={card.cardNumber} className="card-list-item">
-              {(card.frontUrl || card.backUrl) && (
-                <div className="card-list-thumbnail">
+              <div className="card-list-thumbnail">
+                {(card.frontUrl || card.backUrl) ? (
                   <img
                     src={(card.frontUrl || card.backUrl) as string}
                     alt={`Card ${card.cardNumber}`}
+                    onError={(e) => {
+                      // If image fails to load, hide it
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
                   />
-                </div>
-              )}
+                ) : null}
+              </div>
               <div className="card-list-number">Card {card.cardNumber}</div>
               <button
                 type="button"
