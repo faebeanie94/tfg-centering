@@ -165,6 +165,7 @@ router.delete(
   validateUUID('submissionId'),
   asyncHandler(async (req, res) => {
     const { submissionId, cardNumber } = req.params;
+    console.log(`DELETE card: submission=${submissionId}, cardNumber=${cardNumber}`);
 
     const cardResult = await pool.query(
       'SELECT * FROM cards WHERE submission_id = $1 AND card_number = $2',
@@ -172,6 +173,7 @@ router.delete(
     );
 
     if (cardResult.rows.length === 0) {
+      console.log(`Card not found: ${cardNumber}`);
       return res.status(404).json({ error: 'Card not found' });
     }
 
@@ -182,10 +184,11 @@ router.delete(
 
     await deleteCardFolder(submissionId, parseInt(cardNumber));
 
-    await pool.query('DELETE FROM cards WHERE submission_id = $1 AND card_number = $2', [
+    const deleteResult = await pool.query('DELETE FROM cards WHERE submission_id = $1 AND card_number = $2', [
       submissionId,
       parseInt(cardNumber),
     ]);
+    console.log(`Deleted card ${cardNumber}: ${deleteResult.rowCount} rows affected`);
 
     res.json({ message: 'Card deleted', cardNumber: parseInt(cardNumber) });
   })
