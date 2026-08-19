@@ -505,6 +505,68 @@ body.scanner-mode #root {
   gap: 8px;
 }
 
+.submission-edit-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.85rem;
+  cursor: pointer;
+  color: var(--primary);
+  margin-left: 4px;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.submission-edit-btn:hover {
+  opacity: 1;
+}
+
+.submission-rename-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.submission-rename-dialog {
+  background: var(--bg-primary);
+  border-radius: var(--radius);
+  padding: 20px;
+  max-width: 320px;
+  width: 90%;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.submission-rename-dialog label {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+
+.submission-rename-dialog input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+  margin-bottom: 12px;
+  box-sizing: border-box;
+}
+
+.submission-rename-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 .camera-view {
   display: flex;
   flex-direction: column;

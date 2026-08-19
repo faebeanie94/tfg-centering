@@ -71,6 +71,8 @@ export function ImageCapture({
   const [cameraCaps, setCameraCaps] = useState<CameraCapabilities>({ torch: false, macro: false, focus: false });
   const [focusReady, setFocusReady] = useState(true);
   const [capturing, setCapturing] = useState(false);
+  const [editingSubmissionName, setEditingSubmissionName] = useState(false);
+  const [submissionNameDraft, setSubmissionNameDraft] = useState('');
   const scanReadyRef = useRef(false);
 
   const showLevel = settings.levelIndicators;
@@ -498,33 +500,84 @@ export function ImageCapture({
       {error && <div className="error-banner">{error}</div>}
 
       {submissionFolder && (
-        <div className="submission-status">
-          <div className="submission-info">
-            <p className="submission-folder">
-              {submissionFolder.type === 'filesystem' ? '📁' : '📦'} {submissionFolder.name}
-              <span className="submission-mode">
-                {submissionFolder.type === 'filesystem' ? 'Folder' : 'ZIP'}
-              </span>
-            </p>
-            <p className="submission-count">Card {submissionFolder.nextCardNumber}</p>
+        <>
+          <div className="submission-status">
+            <div className="submission-info">
+              <p className="submission-folder">
+                {submissionFolder.type === 'filesystem' ? '📁' : '📦'} {submissionFolder.name}
+                <span className="submission-mode">
+                  {submissionFolder.type === 'filesystem' ? 'Folder' : 'ZIP'}
+                </span>
+                {submissionFolder.type === 'zip' && (
+                  <button
+                    type="button"
+                    className="submission-edit-btn"
+                    onClick={() => {
+                      setSubmissionNameDraft(submissionFolder.name);
+                      setEditingSubmissionName(true);
+                    }}
+                    aria-label="Rename submission"
+                  >
+                    ✎
+                  </button>
+                )}
+              </p>
+              <p className="submission-count">Card {submissionFolder.nextCardNumber}</p>
+            </div>
+            <div className="submission-actions">
+              {submissionFolder.type === 'zip' && (
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-small"
+                  onClick={() => downloadSubmissionZip(submissionFolder as any)}
+                >
+                  Download
+                </button>
+              )}
+              {onEndSubmission && (
+                <button type="button" className="btn btn-secondary btn-small" onClick={onEndSubmission}>
+                  End
+                </button>
+              )}
+            </div>
           </div>
-          <div className="submission-actions">
-            {submissionFolder.type === 'zip' && (
-              <button
-                type="button"
-                className="btn btn-secondary btn-small"
-                onClick={() => downloadSubmissionZip(submissionFolder as any)}
-              >
-                Download
-              </button>
-            )}
-            {onEndSubmission && (
-              <button type="button" className="btn btn-secondary btn-small" onClick={onEndSubmission}>
-                End
-              </button>
-            )}
-          </div>
-        </div>
+          {editingSubmissionName && submissionFolder.type === 'zip' && (
+            <div className="submission-rename-overlay" onClick={() => setEditingSubmissionName(false)}>
+              <div className="submission-rename-dialog" onClick={(e) => e.stopPropagation()}>
+                <label htmlFor="submission-name">Submission name</label>
+                <input
+                  id="submission-name"
+                  type="text"
+                  value={submissionNameDraft}
+                  onChange={(e) => setSubmissionNameDraft(e.target.value)}
+                  placeholder="e.g. My Cards"
+                  autoFocus
+                />
+                <div className="submission-rename-actions">
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-small"
+                    onClick={() => setEditingSubmissionName(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-small"
+                    onClick={() => {
+                      if (submissionNameDraft.trim()) {
+                        submissionFolder.name = submissionNameDraft.trim();
+                        setEditingSubmissionName(false);
+                      }
+                    }}
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       <div className="capture-actions">
