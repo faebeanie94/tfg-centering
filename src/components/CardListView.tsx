@@ -53,6 +53,9 @@ export function CardListView({ submission, onClose, onCardDeleted }: CardListVie
         await api.deleteCard(submission.submissionId, cardNumber);
         setCards(cards.filter(c => c.cardNumber !== cardNumber));
         setMessage(`Deleted card ${cardNumber}`);
+        // Reset submission state for proper gap-filling on next capture
+        submission.lastSideSaved = null;
+        submission.lastCardNumberUsed = null;
         onCardDeleted();
       }
     } catch (err) {
