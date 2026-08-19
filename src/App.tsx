@@ -7,12 +7,11 @@ import { PerspectiveCorrector } from './components/PerspectiveCorrector';
 import { CropEditor } from './components/CropEditor';
 import { BorderEditor } from './components/BorderEditor';
 import { CompareView } from './components/CompareView';
-import { SavedCardsView } from './components/SavedCardsView';
 import { CardListView } from './components/CardListView';
+import { ImageGalleryView } from './components/ImageGalleryView';
 import { SettingsPanel } from './components/SettingsPanel';
 import { CardSizePickerScreen, selectionFromSettings } from './components/CardSizeFields';
 import { useSavedCards } from './hooks/useSavedCards';
-import type { SavedCardRecord } from './lib/saved-cards';
 import {
   tryAutoCrop,
   seedEditorRectsFromImage,
@@ -27,7 +26,6 @@ import {
   fallbackCardFormatForDetection,
   resolveCardFormat,
   type CardSizeSelection,
-  type CardFormatId,
 } from './lib/card-sizes';
 import { exportCleanImage } from './lib/export-image';
 import { startSubmission, saveToSubmissionFolder, type SubmissionFolder } from './lib/folder-submission';
@@ -47,7 +45,7 @@ type Phase =
 
 export default function App() {
   const { settings, updateSettings } = useAppSettings();
-  const { cards, loading: libraryLoading, save: saveToLibrary, remove: deleteFromLibrary, update: updateCardLabel } = useSavedCards();
+  const { cards, save: saveToLibrary } = useSavedCards();
   const [phase, setPhase] = useState<Phase>('capture');
 
   // Load saved submissions on mount
@@ -111,36 +109,6 @@ export default function App() {
     [saveToLibrary],
   );
 
-  const handleOpenSavedCard = useCallback((record: SavedCardRecord) => {
-    setSession(record.session);
-    setCardNames({
-      front: record.session.front?.name ?? '',
-      back: record.session.back?.name ?? '',
-    });
-    const side = record.session.front || record.session.back;
-    const cardFormatId = side?.cardFormatId;
-    let selection: CardSizeSelection | null = null;
-    if (cardFormatId && cardFormatId !== 'ask') {
-      selection = {
-        cardFormat: cardFormatId as CardFormatId,
-        customWidthMm: settings.customWidthMm,
-        customHeightMm: settings.customHeightMm,
-      };
-    } else {
-      selection = selectionFromSettings(settings);
-    }
-    setSessionCardSize(selection);
-    if (record.session.front) {
-      setWorkingImage(record.session.front.imageSrc);
-      setEditorRects({ outer: record.session.front.outer, inner: record.session.front.inner });
-      setCurrentSide('front');
-    } else if (record.session.back) {
-      setWorkingImage(record.session.back.imageSrc);
-      setEditorRects({ outer: record.session.back.outer, inner: record.session.back.inner });
-      setCurrentSide('back');
-    }
-    setPhase('editor');
-  }, [settings]);
 
   const finishAutoCrop = useCallback(
     async (dataUrl: string, hint: CaptureDetectHint | undefined, selection: CardSizeSelection) => {
@@ -462,14 +430,7 @@ export default function App() {
   if (phase === 'library') {
     return (
       <>
-        <SavedCardsView
-          cards={cards}
-          loading={libraryLoading}
-          onClose={() => setPhase(libraryReturnPhase)}
-          onOpen={handleOpenSavedCard}
-          onDelete={deleteFromLibrary}
-          onUpdate={updateCardLabel}
-        />
+        <ImageGalleryView onClose={() => setPhase(libraryReturnPhase)} />
         <SettingsPanel open={showSettings} settings={settings} onChange={updateSettings} onClose={() => setShowSettings(false)} />
       </>
     );
