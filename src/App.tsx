@@ -47,7 +47,7 @@ type Phase =
 
 export default function App() {
   const { settings, updateSettings } = useAppSettings();
-  const { cards, loading: libraryLoading, save: saveToLibrary, remove: deleteFromLibrary } = useSavedCards();
+  const { cards, loading: libraryLoading, save: saveToLibrary, remove: deleteFromLibrary, update: updateCardLabel } = useSavedCards();
   const [phase, setPhase] = useState<Phase>('capture');
 
   // Load saved submissions on mount
@@ -468,6 +468,7 @@ export default function App() {
           onClose={() => setPhase(libraryReturnPhase)}
           onOpen={handleOpenSavedCard}
           onDelete={deleteFromLibrary}
+          onUpdate={updateCardLabel}
         />
         <SettingsPanel open={showSettings} settings={settings} onChange={updateSettings} onClose={() => setShowSettings(false)} />
       </>

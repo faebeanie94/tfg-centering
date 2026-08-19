@@ -11,6 +11,7 @@ interface SavedCardsViewProps {
   onClose: () => void;
   onOpen: (record: SavedCardRecord) => void;
   onDelete: (id: string) => Promise<void>;
+  onUpdate?: (id: string, label: string) => Promise<void>;
 }
 
 function formatWhen(savedAt: number): string {
@@ -58,11 +59,13 @@ function storeCollapsedGroups(keys: Set<string>): void {
   }
 }
 
-export function SavedCardsView({ cards, loading, onClose, onOpen, onDelete }: SavedCardsViewProps) {
+export function SavedCardsView({ cards, loading, onClose, onOpen, onDelete, onUpdate }: SavedCardsViewProps) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [progress, setProgress] = useState<ArchiveProgress | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editLabel, setEditLabel] = useState('');
   const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsedGroups);
 
   const groups = useMemo(() => groupSavedCards(cards), [cards]);
@@ -125,6 +128,22 @@ export function SavedCardsView({ cards, loading, onClose, onOpen, onDelete }: Sa
     }
   }
 
+  async function handleSaveLabel(id: string) {
+    if (!onUpdate) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      await onUpdate(id, editLabel);
+      setEditingId(null);
+      setEditLabel('');
+      setMessage('Card renamed');
+    } catch {
+      setMessage('Could not rename — try again');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleRenameGroup(groupId: string, currentName: string) {
     const newName = prompt('Rename submission:', currentName);
     if (!newName || newName === currentName) return;
@@ -163,17 +182,29 @@ export function SavedCardsView({ cards, loading, onClose, onOpen, onDelete }: Sa
     const sides = [record.session.front ? 'Front' : null, record.session.back ? 'Back' : null]
       .filter(Boolean)
       .join(' · ');
+    const isEditing = editingId === record.id;
 
     return (
       <li key={record.id} className="library-item">
-        <button type="button" className="library-item-main" onClick={() => onOpen(record)} disabled={busy}>
+        <button type="button" className="library-item-main" onClick={() => onOpen(record)} disabled={busy || isEditing}>
           {thumb ? (
             <img src={thumb} alt="" className="library-thumb" />
           ) : (
             <div className="library-thumb library-thumb-empty">?</div>
           )}
           <div className="library-item-body">
-            <div className="library-item-title">{record.label}</div>
+            {isEditing ? (
+              <input
+                type="text"
+                className="library-item-title-input"
+                value={editLabel}
+                onChange={(e) => setEditLabel(e.target.value)}
+                placeholder="Card name"
+                autoFocus
+              />
+            ) : (
+              <div className="library-item-title">{record.label}</div>
+            )}
             <div className="library-item-meta">
               <span className="library-grade">{gradeSummary(record)}</span>
               <span>{sides}</span>
@@ -183,42 +214,78 @@ export function SavedCardsView({ cards, loading, onClose, onOpen, onDelete }: Sa
         </button>
 
         <div className="library-item-actions">
-          <button
-            type="button"
-            className="btn btn-secondary btn-small"
-            disabled={busy}
-            onClick={() => runExport(() => exportSessionImages(record.session), `Exported ${record.label}`)}
-          >
-            Export
-          </button>
-          {confirmDeleteId === record.id ? (
-            <div className="library-delete-confirm">
+          {isEditing ? (
+            <>
               <button
                 type="button"
-                className="btn btn-danger btn-small"
-                disabled={busy}
-                onClick={() => void handleDelete(record.id)}
+                className="btn btn-primary btn-small"
+                disabled={busy || !editLabel.trim()}
+                onClick={() => void handleSaveLabel(record.id)}
               >
-                Delete
+                Save
               </button>
               <button
                 type="button"
                 className="btn btn-secondary btn-small"
                 disabled={busy}
-                onClick={() => setConfirmDeleteId(null)}
+                onClick={() => setEditingId(null)}
               >
                 Cancel
               </button>
-            </div>
+            </>
           ) : (
-            <button
-              type="button"
-              className="btn btn-secondary btn-small library-delete-btn"
-              disabled={busy}
-              onClick={() => setConfirmDeleteId(record.id)}
-            >
-              Delete
-            </button>
+            <>
+              {onUpdate && (
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-small"
+                  disabled={busy}
+                  onClick={() => {
+                    setEditingId(record.id);
+                    setEditLabel(record.label);
+                  }}
+                >
+                  Edit
+                </button>
+              )}
+              <button
+                type="button"
+                className="btn btn-secondary btn-small"
+                disabled={busy}
+                onClick={() => runExport(() => exportSessionImages(record.session), `Exported ${record.label}`)}
+              >
+                Export
+              </button>
+              {confirmDeleteId === record.id ? (
+                <div className="library-delete-confirm">
+                  <button
+                    type="button"
+                    className="btn btn-danger btn-small"
+                    disabled={busy}
+                    onClick={() => void handleDelete(record.id)}
+                  >
+                    Delete
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-small"
+                    disabled={busy}
+                    onClick={() => setConfirmDeleteId(null)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-small library-delete-btn"
+                  disabled={busy}
+                  onClick={() => setConfirmDeleteId(record.id)}
+                >
+                  Delete
+                </button>
+              )}
+            </>
           )}
         </div>
       </li>

@@ -4,6 +4,7 @@ import {
   deleteSavedCard,
   listSavedCards,
   saveCardToLibrary,
+  updateSavedCardLabel,
   type SavedCardRecord,
 } from '../lib/saved-cards';
 
@@ -38,5 +39,10 @@ export function useSavedCards() {
     setCards((prev) => prev.filter((c) => c.id !== id));
   }, []);
 
-  return { cards, loading, refresh, save, remove };
+  const update = useCallback(async (id: string, label: string) => {
+    await updateSavedCardLabel(id, label);
+    setCards((prev) => prev.map((c) => (c.id === id ? { ...c, label } : c)));
+  }, []);
+
+  return { cards, loading, refresh, save, remove, update };
 }

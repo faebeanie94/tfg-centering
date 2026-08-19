@@ -79,6 +79,24 @@ export async function saveCardToLibrary(
   }
 }
 
+export async function updateSavedCardLabel(id: string, label: string): Promise<void> {
+  const db = await openDb();
+  try {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    const getRequest = await requestToPromise(store.get(id));
+    if (!getRequest) throw new Error('Card not found');
+    getRequest.label = label.trim() || defaultCardLabel(getRequest.session);
+    await requestToPromise(store.put(getRequest));
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error ?? new Error('Failed to update card'));
+    });
+  } finally {
+    db.close();
+  }
+}
+
 export async function deleteSavedCard(id: string): Promise<void> {
   const db = await openDb();
   try {

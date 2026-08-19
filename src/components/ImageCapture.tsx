@@ -651,6 +651,31 @@ export function ImageCapture({
         >
           Choose from Photos
         </button>
+        {!submissionFolder && savedSubmissions.length > 0 && (
+          <div className="submissions-section">
+            <label htmlFor="submissions-select" className="submissions-label">Restore submission:</label>
+            <select
+              id="submissions-select"
+              className="submissions-select"
+              onChange={(e) => {
+                if (e.target.value && onRestoreSubmission) {
+                  onRestoreSubmission(e.target.value);
+                }
+                e.target.value = '';
+              }}
+              defaultValue=""
+            >
+              <option value="">Choose a saved submission…</option>
+              {savedSubmissions
+                .sort((a, b) => b.timestamp - a.timestamp)
+                .map((submission) => (
+                  <option key={submission.id} value={submission.id}>
+                    {submission.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+        )}
         {!submissionFolder && onStartSubmission && (
           <button type="button" className="btn btn-secondary btn-large" onClick={onStartSubmission}>
             Start Submission
