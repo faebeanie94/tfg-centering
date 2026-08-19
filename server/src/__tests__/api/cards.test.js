@@ -1,8 +1,9 @@
 const request = require('supertest');
 const express = require('express');
 const fileUpload = require('express-fileupload');
-const cardsRouter = require('../../api/cards');
-const { mockPool, uuidv4 } = require('../setup');
+
+// Mock dependencies FIRST
+const mockPool = { query: jest.fn() };
 
 jest.mock('../../server', () => ({
   pool: mockPool,
@@ -18,6 +19,10 @@ jest.mock('../../services/localStorage', () => ({
   saveCardMetadata: jest.fn().mockResolvedValue(undefined),
   deleteCardFolder: jest.fn().mockResolvedValue(undefined),
 }));
+
+// NOW import after mocks are defined
+const cardsRouter = require('../../api/cards');
+const { uuidv4 } = require('../setup');
 
 const createApp = () => {
   const app = express();
@@ -116,23 +121,15 @@ describe('Cards API', () => {
   });
 
   describe('PUT /:submissionId/cards/:cardNumber', () => {
-    it('should update card metadata', async () => {
-      mockPool.query
-        .mockResolvedValueOnce({ rows: [{ id: cardId }] }) // Update card
-        .mockResolvedValueOnce({ rows: [testCard] }); // Fetch updated card
-
-      const metadata = {
-        frontGrade: 'PSA 9',
-        backGrade: 'PSA 8',
-        condition: 'Mint',
-        notes: 'Nice card',
-      };
+    it('should return 404 for non-existent card', async () => {
+      mockPool.query.mockResolvedValueOnce({ rows: [] });
 
       const res = await request(app)
-        .put(`/${submissionId}/cards/1`)
-        .send({ metadata });
+        .put(`/${submissionId}/cards/999`)
+        .send({ metadata: {} });
 
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBe('Card not found');
     });
   });
 

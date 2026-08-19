@@ -1,9 +1,9 @@
 const request = require('supertest');
 const express = require('express');
-const submissionsRouter = require('../../api/submissions');
-const { mockPool, uuidv4 } = require('../setup');
 
-// Mock dependencies
+// Mock dependencies FIRST
+const mockPool = { query: jest.fn() };
+
 jest.mock('../../server', () => ({
   pool: mockPool,
 }));
@@ -16,6 +16,10 @@ jest.mock('../../services/localStorage', () => ({
   saveSubmissionMetadata: jest.fn().mockResolvedValue(undefined),
   deleteSubmissionFolder: jest.fn().mockResolvedValue(undefined),
 }));
+
+// NOW import after mocks are defined
+const submissionsRouter = require('../../api/submissions');
+const { uuidv4 } = require('../setup');
 
 // Create test app
 const createApp = () => {
