@@ -3,6 +3,7 @@ import type { SavedCardRecord } from '../lib/saved-cards';
 import { exportSessionImages } from '../lib/export-image';
 import { exportLibraryZip, groupSavedCards, type ArchiveProgress } from '../lib/export-library';
 import { formatGrade, limitingGrade } from '../lib/session';
+import * as api from '../lib/api-client';
 
 interface SavedCardsViewProps {
   cards: SavedCardRecord[];
@@ -119,6 +120,23 @@ export function SavedCardsView({ cards, loading, onClose, onOpen, onDelete }: Sa
       setMessage('Removed from library');
     } catch {
       setMessage('Could not delete — try again');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleRenameGroup(groupId: string, currentName: string) {
+    const newName = prompt('Rename submission:', currentName);
+    if (!newName || newName === currentName) return;
+
+    setBusy(true);
+    setMessage(null);
+    try {
+      await api.updateSubmission(groupId, newName);
+      setMessage(`Renamed to "${newName}"`);
+      window.location.reload();
+    } catch {
+      setMessage('Could not rename — try again');
     } finally {
       setBusy(false);
     }
@@ -248,7 +266,12 @@ export function SavedCardsView({ cards, loading, onClose, onOpen, onDelete }: Sa
                     <span className="library-group-chevron" aria-hidden="true">
                       ▾
                     </span>
-                    <span className="library-group-name">{group.label}</span>
+                    <span className="library-group-name" onClick={(e) => {
+                      e.stopPropagation();
+                      void handleRenameGroup(id, group.label);
+                    }} style={{ cursor: 'pointer' }} title="Click to rename">
+                      {group.label}
+                    </span>
                     <span className="library-group-count">{plural(group.cards.length, 'card')}</span>
                   </button>
                   <button
