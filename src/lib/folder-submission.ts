@@ -31,20 +31,25 @@ export interface ZipSubmission {
  */
 async function findLowestAvailableCardNumber(submission: SubmissionFolder): Promise<number> {
   const existingCards = await listSubmissionCards(submission);
+  console.log('findLowestAvailableCardNumber - existing cards:', existingCards);
 
   if (existingCards.length === 0) {
+    console.log('No existing cards, returning 1');
     return 1;
   }
 
   // Find the first gap in the sequence
   for (let i = 1; i <= Math.max(...existingCards); i++) {
     if (!existingCards.includes(i)) {
+      console.log('Found gap at', i);
       return i;
     }
   }
 
   // No gaps, return next number after highest
-  return Math.max(...existingCards) + 1;
+  const nextNum = Math.max(...existingCards) + 1;
+  console.log('No gaps, returning next number:', nextNum);
+  return nextNum;
 }
 
 /**
@@ -89,22 +94,28 @@ export async function saveToSubmissionFolder(
   dataUrl: string,
   side: 'front' | 'back',
 ): Promise<void> {
+  console.log(`saveToSubmissionFolder: side=${side}, lastSideSaved=${submission.lastSideSaved}, currentEdit=${submission.currentEdit?.cardNumber}, lastCardNumberUsed=${submission.lastCardNumberUsed}`);
   let cardNumber: number;
 
   if (submission.currentEdit && submission.currentEdit.side === side) {
     // Re-editing the same side of the same card
+    console.log('Re-editing same side');
     cardNumber = submission.currentEdit.cardNumber;
   } else if (submission.lastSideSaved === null) {
     // First side of a new pair - find lowest available number (handles deleted cards)
+    console.log('New pair - finding lowest available number');
     cardNumber = await findLowestAvailableCardNumber(submission);
   } else if (submission.lastSideSaved !== side) {
     // Opposite side of current pair - use same card number as first side
+    console.log('Opposite side of pair');
     cardNumber = submission.lastCardNumberUsed || submission.nextCardNumber;
   } else {
     // Same side again - this shouldn't happen in normal flow, but handle it
+    console.log('Same side again - incrementing');
     submission.nextCardNumber += 1;
     cardNumber = submission.nextCardNumber;
   }
+  console.log(`Using card number: ${cardNumber}`);
 
   const response = await fetch(dataUrl);
   const blob = await response.blob();
