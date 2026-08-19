@@ -9,7 +9,7 @@ import { BorderEditor } from './components/BorderEditor';
 import { CompareView } from './components/CompareView';
 import { SavedCardsView } from './components/SavedCardsView';
 import { CardListView } from './components/CardListView';
-import { SubmissionToolbar } from './components/SubmissionToolbar';
+import { SubmissionMenu } from './components/SubmissionMenu';
 import { SettingsPanel } from './components/SettingsPanel';
 import { CardSizePickerScreen, selectionFromSettings } from './components/CardSizeFields';
 import { useSavedCards } from './hooks/useSavedCards';
@@ -484,7 +484,7 @@ export default function App() {
     return (
       <>
         {submissionFolder && (
-          <SubmissionToolbar
+          <SubmissionMenu
             submissionName={submissionFolder.name}
             onViewCards={() => {
               setCardListReturnPhase('compare');
@@ -569,7 +569,7 @@ export default function App() {
     return (
       <>
         {submissionFolder && (
-          <SubmissionToolbar
+          <SubmissionMenu
             submissionName={submissionFolder.name}
             onViewCards={() => {
               setCardListReturnPhase('editor');
@@ -616,7 +616,7 @@ export default function App() {
   return (
     <>
       {submissionFolder && (
-        <SubmissionToolbar
+        <SubmissionMenu
           submissionName={submissionFolder.name}
           onViewCards={() => {
             setCardListReturnPhase('capture');
