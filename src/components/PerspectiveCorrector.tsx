@@ -472,9 +472,6 @@ export function PerspectiveCorrector({
               const stroke = isActive ? crosshairStrokeActive : crosshairStroke;
               const outline = outlineExtra;
 
-              // Show a guide circle indicating the corner area for rounded corners
-              const showRadiusGuide = isActive && estimatedRadius > 0;
-
               return (
                 <g key={key} className={`perspective-crosshair ${isActive ? 'active' : ''}`}>
                   {isActive && (
