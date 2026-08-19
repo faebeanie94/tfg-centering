@@ -1,107 +1,72 @@
 const express = require('express');
 const { pool } = require('../server');
+const { deleteSubmissionImages } = require('../services/s3');
+const { saveSubmissionMetadata, deleteSubmissionFolder } = require('../services/localStorage');
+const { validateSubmissionName, validateUUID } = require('../middleware/validation');
+const { asyncHandler } = require('../middleware/errorHandler');
 
 const router = express.Router();
 
-// Create submission
-router.post('/', async (req, res) => {
+router.post('/', validateSubmissionName, asyncHandler(async (req, res) => {
   const { name } = req.body;
 
-  if (!name) {
-    return res.status(400).json({ error: 'Name is required' });
-  }
+  const result = await pool.query(
+    'INSERT INTO submissions (name) VALUES ($1) RETURNING *',
+    [name]
+  );
+  const submission = result.rows[0];
 
-  try {
-    const result = await pool.query(
-      'INSERT INTO submissions (name) VALUES ($1) RETURNING *',
-      [name]
-    );
-    res.status(201).json(result.rows[0]);
-  } catch (err) {
-    console.error('Error creating submission:', err);
-    res.status(500).json({ error: 'Failed to create submission' });
-  }
-});
+  await saveSubmissionMetadata(submission);
+  res.status(201).json(submission);
+}));
 
-// List all submissions
-router.get('/', async (req, res) => {
-  try {
-    const result = await pool.query(
-      'SELECT * FROM submissions ORDER BY created_at DESC'
-    );
-    res.json(result.rows);
-  } catch (err) {
-    console.error('Error fetching submissions:', err);
-    res.status(500).json({ error: 'Failed to fetch submissions' });
-  }
-});
+router.get('/', asyncHandler(async (req, res) => {
+  const result = await pool.query('SELECT * FROM submissions ORDER BY created_at DESC');
+  res.json(result.rows);
+}));
 
-// Get submission by ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', validateUUID('id'), asyncHandler(async (req, res) => {
   const { id } = req.params;
+  const result = await pool.query('SELECT * FROM submissions WHERE id = $1', [id]);
 
-  try {
-    const result = await pool.query(
-      'SELECT * FROM submissions WHERE id = $1',
-      [id]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Submission not found' });
-    }
-
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error('Error fetching submission:', err);
-    res.status(500).json({ error: 'Failed to fetch submission' });
+  if (result.rows.length === 0) {
+    return res.status(404).json({ error: 'Submission not found' });
   }
-});
 
-// Update submission
-router.put('/:id', async (req, res) => {
+  res.json(result.rows[0]);
+}));
+
+router.put('/:id', validateUUID('id'), validateSubmissionName, asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { name } = req.body;
 
-  if (!name) {
-    return res.status(400).json({ error: 'Name is required' });
+  const result = await pool.query(
+    'UPDATE submissions SET name = $1 WHERE id = $2 RETURNING *',
+    [name, id]
+  );
+
+  if (result.rows.length === 0) {
+    return res.status(404).json({ error: 'Submission not found' });
   }
 
-  try {
-    const result = await pool.query(
-      'UPDATE submissions SET name = $1 WHERE id = $2 RETURNING *',
-      [name, id]
-    );
+  const submission = result.rows[0];
+  await saveSubmissionMetadata(submission);
+  res.json(submission);
+}));
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Submission not found' });
-    }
-
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error('Error updating submission:', err);
-    res.status(500).json({ error: 'Failed to update submission' });
-  }
-});
-
-// Delete submission
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', validateUUID('id'), asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  try {
-    const result = await pool.query(
-      'DELETE FROM submissions WHERE id = $1 RETURNING *',
-      [id]
-    );
+  const result = await pool.query('DELETE FROM submissions WHERE id = $1 RETURNING *', [id]);
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Submission not found' });
-    }
-
-    res.json({ message: 'Submission deleted', id: result.rows[0].id });
-  } catch (err) {
-    console.error('Error deleting submission:', err);
-    res.status(500).json({ error: 'Failed to delete submission' });
+  if (result.rows.length === 0) {
+    return res.status(404).json({ error: 'Submission not found' });
   }
-});
+
+  await deleteSubmissionImages(id);
+  await deleteSubmissionFolder(id);
+
+  res.json({ message: 'Submission deleted', id: result.rows[0].id });
+}));
 
 module.exports = router;
