@@ -9,6 +9,7 @@ import { BorderEditor } from './components/BorderEditor';
 import { CompareView } from './components/CompareView';
 import { SavedCardsView } from './components/SavedCardsView';
 import { CardListView } from './components/CardListView';
+import { SubmissionToolbar } from './components/SubmissionToolbar';
 import { SettingsPanel } from './components/SettingsPanel';
 import { CardSizePickerScreen, selectionFromSettings } from './components/CardSizeFields';
 import { useSavedCards } from './hooks/useSavedCards';
@@ -482,6 +483,15 @@ export default function App() {
   if (phase === 'compare') {
     return (
       <>
+        {submissionFolder && (
+          <SubmissionToolbar
+            submissionName={submissionFolder.name}
+            onViewCards={() => {
+              setCardListReturnPhase('compare');
+              setPhase('cardlist');
+            }}
+          />
+        )}
         <CompareView
           session={session}
           onEdit={loadSideIntoEditor}
@@ -558,6 +568,15 @@ export default function App() {
   if (phase === 'editor' && workingImage) {
     return (
       <>
+        {submissionFolder && (
+          <SubmissionToolbar
+            submissionName={submissionFolder.name}
+            onViewCards={() => {
+              setCardListReturnPhase('editor');
+              setPhase('cardlist');
+            }}
+          />
+        )}
         <BorderEditor
           key={`${currentSide}-${workingImage}`}
           imageSrc={workingImage}
@@ -596,6 +615,15 @@ export default function App() {
 
   return (
     <>
+      {submissionFolder && (
+        <SubmissionToolbar
+          submissionName={submissionFolder.name}
+          onViewCards={() => {
+            setCardListReturnPhase('capture');
+            setPhase('cardlist');
+          }}
+        />
+      )}
       <ImageCapture
         side={currentSide}
         settings={settings}
