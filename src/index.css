@@ -2359,3 +2359,65 @@ body.editor-mode #root {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
+.card-list {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 16px;
+  background: var(--bg);
+}
+
+.card-list-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.card-list-header h2 {
+  flex: 1;
+  font-size: 1.25rem;
+  margin: 0;
+}
+
+.card-list-message {
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  background: var(--surface);
+  border-left: 3px solid var(--tfg-grade);
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.card-list-empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 24px;
+}
+
+.card-list-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.card-list-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  text-align: center;
+}
+
+.card-list-number {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+

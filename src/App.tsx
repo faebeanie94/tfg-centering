@@ -8,6 +8,7 @@ import { CropEditor } from './components/CropEditor';
 import { BorderEditor } from './components/BorderEditor';
 import { CompareView } from './components/CompareView';
 import { SavedCardsView } from './components/SavedCardsView';
+import { CardListView } from './components/CardListView';
 import { SettingsPanel } from './components/SettingsPanel';
 import { CardSizePickerScreen, selectionFromSettings } from './components/CardSizeFields';
 import { useSavedCards } from './hooks/useSavedCards';
@@ -41,7 +42,8 @@ type Phase =
   | 'crop'
   | 'editor'
   | 'compare'
-  | 'library';
+  | 'library'
+  | 'cardlist';
 
 export default function App() {
   const { settings, updateSettings } = useAppSettings();
@@ -66,6 +68,7 @@ export default function App() {
   const [returnPhaseAfterEdit, setReturnPhaseAfterEdit] = useState<Phase>('editor');
   const [libraryReturnPhase, setLibraryReturnPhase] = useState<Phase>('capture');
   const [libraryMessage, setLibraryMessage] = useState<string | null>(null);
+  const [cardListReturnPhase, setCardListReturnPhase] = useState<Phase>('compare');
   const [perspectiveCorners, setPerspectiveCorners] = useState<QuadCorners | null>(null);
   /** Why auto-crop fell back to manual review — cleared when Perspective Fix is opened by hand. */
   const [autoCropInfo, setAutoCropInfo] = useState<{
@@ -458,6 +461,24 @@ export default function App() {
     );
   }
 
+  if (phase === 'cardlist' && submissionFolder) {
+    return (
+      <>
+        <CardListView
+          submission={submissionFolder}
+          onClose={() => setPhase(cardListReturnPhase)}
+          onCardDeleted={() => {
+            // Refresh the card numbering by updating the submission
+            if (submissionFolder.type === 'api') {
+              setSubmissionFolder(prev => prev ? { ...prev } : null);
+            }
+          }}
+        />
+        <SettingsPanel open={showSettings} settings={settings} onChange={updateSettings} onClose={() => setShowSettings(false)} />
+      </>
+    );
+  }
+
   if (phase === 'compare') {
     return (
       <>
@@ -466,6 +487,10 @@ export default function App() {
           onEdit={loadSideIntoEditor}
           onSaveToLibrary={() => handleSaveToLibrary(session)}
           onLibrary={() => openLibrary('compare')}
+          onViewCards={() => {
+            setCardListReturnPhase('compare');
+            setPhase('cardlist');
+          }}
           libraryMessage={libraryMessage}
           onClose={() => {
             if (session.front) loadSideIntoEditor('front');

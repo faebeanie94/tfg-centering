@@ -11,6 +11,7 @@ interface CompareViewProps {
   onClose: () => void;
   onSaveToLibrary?: () => Promise<boolean>;
   onLibrary?: () => void;
+  onViewCards?: () => void;
   libraryMessage?: string | null;
 }
 
@@ -90,6 +91,7 @@ export function CompareView({
   onClose,
   onSaveToLibrary,
   onLibrary,
+  onViewCards,
   libraryMessage,
 }: CompareViewProps) {
   const [showExport, setShowExport] = useState(false);
@@ -111,6 +113,11 @@ export function CompareView({
         </button>
         <h2>Front & Back Compare</h2>
         <div className="compare-header-actions">
+          {onViewCards && (
+            <button type="button" className="btn btn-secondary btn-small" onClick={onViewCards}>
+              Cards
+            </button>
+          )}
           {onLibrary && (
             <button type="button" className="btn btn-secondary btn-small" onClick={onLibrary}>
               Library
