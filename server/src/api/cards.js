@@ -1,6 +1,6 @@
 const express = require('express');
 const { pool } = require('../server');
-const { uploadImage, deleteImage } = require('../services/s3');
+const { uploadImage, deleteImage, getPresignedUrl } = require('../services/s3');
 const { saveCardImage, saveCardMetadata, deleteCardFolder } = require('../services/localStorage');
 const { validateCardNumber, validateUUID, validateCardMetadata } = require('../middleware/validation');
 const { asyncHandler } = require('../middleware/errorHandler');
@@ -82,7 +82,20 @@ router.get('/:submissionId/cards', validateUUID('submissionId'), asyncHandler(as
     [submissionId]
   );
 
-  res.json(result.rows);
+  // Generate presigned URLs for images
+  const cards = await Promise.all(
+    result.rows.map(async (card) => {
+      const front_url = card.front_s3_url ? await getPresignedUrl(submissionId, card.card_number, 'front') : null;
+      const back_url = card.back_s3_url ? await getPresignedUrl(submissionId, card.card_number, 'back') : null;
+      return {
+        ...card,
+        front_s3_url: front_url,
+        back_s3_url: back_url,
+      };
+    })
+  );
+
+  res.json(cards);
 }));
 
 router.get(
@@ -103,7 +116,15 @@ router.get(
       return res.status(404).json({ error: 'Card not found' });
     }
 
-    res.json(result.rows[0]);
+    const card = result.rows[0];
+    const front_url = card.front_s3_url ? await getPresignedUrl(submissionId, card.card_number, 'front') : null;
+    const back_url = card.back_s3_url ? await getPresignedUrl(submissionId, card.card_number, 'back') : null;
+
+    res.json({
+      ...card,
+      front_s3_url: front_url,
+      back_s3_url: back_url,
+    });
   })
 );
 
