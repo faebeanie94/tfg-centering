@@ -42,13 +42,18 @@ app.get('/health', async (req, res) => {
 // Mount API routes
 app.use('/api', require('./api/routes'));
 
-// SPA fallback - serve index.html for non-API routes
-app.use((req, res) => {
+// SPA fallback - serve index.html for non-API routes (before error handler)
+app.use((req, res, next) => {
+  // Check if it's an API request that wasn't handled
+  if (req.path.startsWith('/api')) {
+    return next();
+  }
+
   const indexPath = path.join(frontendPath, 'index.html');
   res.sendFile(indexPath, (err) => {
     if (err) {
       console.error('Error serving index.html:', err);
-      res.status(404).json({ error: 'Not found' });
+      next(err);
     }
   });
 });
