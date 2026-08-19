@@ -52,6 +52,7 @@ interface BorderEditorProps {
   libraryMessage?: string | null;
   submissionFolder?: SubmissionFolder | null;
   onEndSubmission?: () => void;
+  onRetakeSubmission?: () => void;
 }
 
 type DragTarget =
@@ -96,6 +97,7 @@ export function BorderEditor({
   libraryMessage,
   submissionFolder,
   onEndSubmission,
+  onRetakeSubmission,
 }: BorderEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -532,6 +534,14 @@ export function BorderEditor({
         onFlipSide={() => handleSideSwitch(side === 'front' ? 'back' : 'front')}
         onResetLines={resetLines}
         onDelete={onDelete}
+        onRetake={
+          submissionFolder
+            ? () => {
+                onRetakeSubmission?.();
+                setShowMenu(false);
+              }
+            : undefined
+        }
         onSaveToLibrary={
           onSaveToLibrary
             ? async () => {

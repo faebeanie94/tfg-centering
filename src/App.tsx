@@ -349,6 +349,13 @@ export default function App() {
     setSubmissionFolder(null);
   }, []);
 
+  const handleRetakeSubmission = useCallback(() => {
+    if (submissionFolder) {
+      submissionFolder.lastSideSaved = null;
+    }
+    handleCaptureSide(currentSide);
+  }, [submissionFolder, currentSide, handleCaptureSide]);
+
   if (phase === 'library') {
     return (
       <>
@@ -468,6 +475,7 @@ export default function App() {
           onReset={handleReset}
           submissionFolder={submissionFolder}
           onEndSubmission={handleEndSubmission}
+          onRetakeSubmission={handleRetakeSubmission}
         />
         <SettingsPanel open={showSettings} settings={settings} onChange={updateSettings} onClose={() => setShowSettings(false)} />
       </>

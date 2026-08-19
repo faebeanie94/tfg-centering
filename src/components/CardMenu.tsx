@@ -15,6 +15,7 @@ interface CardMenuProps {
   onFlipSide: () => void;
   onResetLines: () => void;
   onDelete: () => void;
+  onRetake?: () => void;
   onSaveToLibrary?: () => Promise<boolean>;
   savingToLibrary?: boolean;
   onClose: () => void;
@@ -33,6 +34,7 @@ export function CardMenu({
   onFlipSide,
   onResetLines,
   onDelete,
+  onRetake,
   onSaveToLibrary,
   savingToLibrary = false,
   onClose,
@@ -162,6 +164,18 @@ export function CardMenu({
               <span className="action-icon">⇄</span>
               Flip to {otherSide} side
             </button>
+
+            {onRetake && (
+              <button
+                type="button"
+                className="action-sheet-item"
+                disabled={busy}
+                onClick={() => handleAction(onRetake)}
+              >
+                <span className="action-icon">📷</span>
+                Retake {side} photo
+              </button>
+            )}
 
             <button
               type="button"
