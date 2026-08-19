@@ -6,4 +6,8 @@ export default defineConfig({
   define: {
     __APP_BUILD__: JSON.stringify(new Date().toISOString()),
   },
+  server: {
+    host: '0.0.0.0',
+    port: 5173,
+  },
 });

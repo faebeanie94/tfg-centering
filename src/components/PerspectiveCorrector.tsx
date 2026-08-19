@@ -129,6 +129,78 @@ export function PerspectiveCorrector({
     };
   }, [imageSrc, initialCorners]);
 
+  // Detect rounded corners by checking for curvature near corner points
+  const detectRoundedCorners = useCallback(() => {
+    const canvas = document.createElement('canvas');
+    const img = imageRef.current;
+    if (!img || !corners || !imageSize) return 0;
+
+    canvas.width = imageSize.width;
+    canvas.height = imageSize.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return 0;
+
+    ctx.drawImage(img, 0, 0);
+    const imageData = ctx.getImageData(0, 0, imageSize.width, imageSize.height);
+    const data = imageData.data;
+
+    // Check TL corner for curvature
+    const corner = corners.tl;
+    const x = Math.round(corner.x);
+    const y = Math.round(corner.y);
+    const scanRadius = 25;
+
+    // Measure how much the edge curves by checking pixels
+    let curvePoints: number[] = [];
+    for (let i = 1; i <= scanRadius; i++) {
+      // Check right edge
+      const px = Math.round(x + i);
+      const py = Math.round(y);
+      if (px >= 0 && px < imageSize.width && py >= 0 && py < imageSize.height) {
+        const idx = (py * imageSize.width + px) * 4;
+        const brightness = data[idx] + data[idx + 1] + data[idx + 2];
+        // If we hit a dark edge (background), record the distance
+        if (brightness < 300) {
+          curvePoints.push(i);
+          break;
+        }
+      }
+
+      // Check down edge
+      const px2 = Math.round(x);
+      const py2 = Math.round(y + i);
+      if (px2 >= 0 && px2 < imageSize.width && py2 >= 0 && py2 < imageSize.height) {
+        const idx = (py2 * imageSize.width + px2) * 4;
+        const brightness = data[idx] + data[idx + 1] + data[idx + 2];
+        if (brightness < 300) {
+          curvePoints.push(i);
+          break;
+        }
+      }
+
+      // Check diagonal for curvature
+      const px3 = Math.round(x + i);
+      const py3 = Math.round(y + i);
+      if (px3 >= 0 && px3 < imageSize.width && py3 >= 0 && py3 < imageSize.height) {
+        const idx = (py3 * imageSize.width + px3) * 4;
+        const brightness = data[idx] + data[idx + 1] + data[idx + 2];
+        if (brightness < 300) {
+          // If diagonal reaches edge before edges do, corners are rounded
+          if (curvePoints.length < 2) {
+            curvePoints.push(i * 0.7); // Discount diagonal
+          }
+        }
+      }
+    }
+
+    // Return detected radius
+    if (curvePoints.length === 0) return 0;
+    const radius = curvePoints.reduce((a, b) => a + b, 0) / curvePoints.length;
+    return Math.max(2, Math.min(radius, 30));
+  }, [corners, imageSize]);
+
+  const estimatedRadius = detectRoundedCorners();
+
   const drawLoupe = useCallback(
     (corner: CornerKey) => {
       const canvas = loupeCanvasRef.current;
@@ -169,6 +241,29 @@ export function PerspectiveCorrector({
         LOUPE_SIZE,
       );
 
+      // For rounded corners, show the center point more prominently
+      if (estimatedRadius > 0) {
+        // Show radius circle with background for visibility
+        const radiusPixels = (estimatedRadius / LOUPE_ZOOM) * (LOUPE_SIZE / srcSize);
+
+        // Black outline for contrast
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.arc(LOUPE_SIZE / 2, LOUPE_SIZE / 2, Math.max(4, radiusPixels), 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Orange circle for visibility
+        ctx.strokeStyle = 'rgba(231, 125, 49, 0.7)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(LOUPE_SIZE / 2, LOUPE_SIZE / 2, Math.max(4, radiusPixels), 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.setLineDash([]);
+      }
+
       const center = LOUPE_SIZE / 2;
       ctx.strokeStyle = '#e77d31';
       ctx.lineWidth = 2.5;
@@ -192,7 +287,7 @@ export function PerspectiveCorrector({
       ctx.arc(LOUPE_SIZE / 2, LOUPE_SIZE / 2, LOUPE_SIZE / 2 - 1.5, 0, Math.PI * 2);
       ctx.stroke();
     },
-    [corners, imageSize],
+    [corners, imageSize, estimatedRadius],
   );
 
   // Draw before paint so the loupe is never an empty circle on first drag frame.
@@ -304,6 +399,18 @@ export function PerspectiveCorrector({
           ← Cancel
         </button>
         <h2>Perspective Fix</h2>
+        <div
+          style={{
+            marginLeft: 'auto',
+            fontSize: '12px',
+            color: '#999',
+            padding: '4px 12px',
+            backgroundColor: 'rgba(231, 125, 49, 0.08)',
+            borderRadius: '4px',
+          }}
+        >
+          💡 Place crosshair at the corner point {estimatedRadius > 2 && '(radius ≈' + Math.round(estimatedRadius) + 'px)'}
+        </div>
       </div>
 
       <div ref={viewportRef} className="editor-viewport perspective-viewport">
@@ -364,8 +471,27 @@ export function PerspectiveCorrector({
               const color = isActive ? '#e77d31' : '#ffffff';
               const stroke = isActive ? crosshairStrokeActive : crosshairStroke;
               const outline = outlineExtra;
+
+              // Show a guide circle indicating the corner area for rounded corners
+              const showRadiusGuide = isActive && estimatedRadius > 0;
+
               return (
                 <g key={key} className={`perspective-crosshair ${isActive ? 'active' : ''}`}>
+                  {isActive && (
+                    <>
+                      {/* Bright green circle to show corner radius */}
+                      <circle
+                        cx={p.x}
+                        cy={p.y}
+                        r={estimatedRadius}
+                        fill="none"
+                        stroke="#00FF00"
+                        strokeWidth="3"
+                        pointerEvents="none"
+                      />
+                    </>
+                  )}
+
                   <line
                     x1={p.x - crosshairArm}
                     y1={p.y}
@@ -421,6 +547,52 @@ export function PerspectiveCorrector({
                 </g>
               );
             })}
+
+            {/* Green arc for selected corner - long arc matching card corner steepness */}
+            {(() => {
+              // Use actual detected radius for accurate steepness, make it longer for visibility
+              const r = Math.max(30, estimatedRadius * 3.5);
+              const p = active;
+              let arcPath = '';
+
+              // Arc in interior quadrant, curving the same way as the rounded corner (concave inward)
+              if (selectedCorner === 'tl') {
+                // TL: arc in bottom-right quadrant, concave inward
+                arcPath = `M ${p.x + r} ${p.y} A ${r} ${r} 0 0 0 ${p.x} ${p.y + r}`;
+              } else if (selectedCorner === 'tr') {
+                // TR: arc in bottom-left quadrant, concave inward
+                arcPath = `M ${p.x} ${p.y + r} A ${r} ${r} 0 0 0 ${p.x - r} ${p.y}`;
+              } else if (selectedCorner === 'br') {
+                // BR: arc in top-left quadrant, concave inward
+                arcPath = `M ${p.x - r} ${p.y} A ${r} ${r} 0 0 0 ${p.x} ${p.y - r}`;
+              } else if (selectedCorner === 'bl') {
+                // BL: arc in top-right quadrant, concave inward
+                arcPath = `M ${p.x} ${p.y - r} A ${r} ${r} 0 0 0 ${p.x + r} ${p.y}`;
+              }
+
+              return (
+                <>
+                  <path
+                    d={arcPath}
+                    fill="none"
+                    stroke="#000000"
+                    strokeWidth="5"
+                    opacity="0.3"
+                    strokeLinecap="round"
+                    pointerEvents="none"
+                  />
+                  <path
+                    d={arcPath}
+                    fill="none"
+                    stroke="#00FF00"
+                    strokeWidth="3.5"
+                    opacity="0.95"
+                    strokeLinecap="round"
+                    pointerEvents="none"
+                  />
+                </>
+              );
+            })()}
           </svg>
         </div>
         )}

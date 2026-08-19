@@ -676,6 +676,40 @@ function boxChroma(data: Uint8ClampedArray, w: number, h: number, box: DetectedC
   return n ? sum / n : 0;
 }
 
+/** Estimate corner radius by checking how much the edge curves near the corner. */
+function estimateCornerRadius(
+  buckets: Point[][],
+): number {
+  // For rounded corners, points near the corner show curvature.
+  // Check if the line residuals suggest a significant radius.
+  let maxCurvature = 0;
+
+  for (const bucket of buckets) {
+    if (bucket.length < 4) continue;
+    // Fit line to the middle-of-side points (away from corners).
+    const midPoints = bucket.slice(
+      Math.floor(bucket.length * 0.25),
+      Math.ceil(bucket.length * 0.75),
+    );
+    const line = fitLine(midPoints);
+    if (!line) continue;
+
+    // Check residual for corner-region points.
+    const cornerPoints = [
+      ...bucket.slice(0, Math.ceil(bucket.length * 0.2)),
+      ...bucket.slice(Math.floor(bucket.length * 0.8)),
+    ];
+    for (const p of cornerPoints) {
+      const residual = Math.abs(line.a * p.x + line.b * p.y - line.c);
+      maxCurvature = Math.max(maxCurvature, residual);
+    }
+  }
+
+  // Residual in pixels indicates curvature; roughly estimate radius.
+  // Higher residual = more curve = larger radius.
+  return Math.max(0, maxCurvature * 0.8);
+}
+
 function refineQuadFromSeed(
   data: Uint8ClampedArray,
   w: number,
@@ -721,11 +755,46 @@ function refineQuadFromSeed(
   const bottom = fitLine(buckets[3]);
   if (!left || !right || !top || !bottom) return null;
 
-  const tl = intersectLines(top, left);
-  const tr = intersectLines(top, right);
-  const br = intersectLines(bottom, right);
-  const bl = intersectLines(bottom, left);
+  let tl = intersectLines(top, left);
+  let tr = intersectLines(top, right);
+  let br = intersectLines(bottom, right);
+  let bl = intersectLines(bottom, left);
   if (!tl || !tr || !br || !bl) return null;
+
+  // Detect rounded corners and adjust corner positions outward.
+  const estimatedRadius = estimateCornerRadius(buckets);
+  if (estimatedRadius > 2) {
+    // Card corners are rounded; adjust corner points outward from the curve
+    // to the theoretical intersection of the straight edges.
+    const radiusOffset = estimatedRadius * 0.65;
+
+    // Adjust each corner outward along both edges.
+    const adjustCorner = (
+      corner: Point,
+      edgeA: LineFit,
+      edgeB: LineFit,
+    ): Point => {
+      // Normal vectors pointing inward (perpendicular to edges).
+      const normA = Math.hypot(edgeA.a, edgeA.b);
+      const nxA = edgeA.a / normA;
+      const nyA = edgeA.b / normA;
+
+      const normB = Math.hypot(edgeB.a, edgeB.b);
+      const nxB = edgeB.a / normB;
+      const nyB = edgeB.b / normB;
+
+      // Move outward (away from center) by the estimated offset.
+      return {
+        x: corner.x + (nxA + nxB) * radiusOffset / 2,
+        y: corner.y + (nyA + nyB) * radiusOffset / 2,
+      };
+    };
+
+    tl = adjustCorner(tl, left, top);
+    tr = adjustCorner(tr, right, top);
+    br = adjustCorner(br, right, bottom);
+    bl = adjustCorner(bl, left, bottom);
+  }
 
   const ordered = orderCorners([tl, tr, br, bl]);
   if (!ordered) return null;
