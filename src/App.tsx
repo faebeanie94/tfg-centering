@@ -624,10 +624,6 @@ export default function App() {
         onRetake={handleRetakeSubmission}
         onCaptureSide={handleCaptureSideChange}
         onNextCard={handleNextCard}
-        onViewCards={() => {
-          setCardListReturnPhase('capture');
-          setPhase('cardlist');
-        }}
         savedCount={cards.length}
         hasSavedSides={sessionHasAny(session)}
         submissionFolder={submissionFolder}
