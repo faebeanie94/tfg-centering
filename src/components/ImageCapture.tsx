@@ -42,6 +42,8 @@ interface ImageCaptureProps {
   submissionFolder?: SubmissionFolder | null;
   onStartSubmission?: () => void;
   onEndSubmission?: () => void;
+  savedSubmissions?: Array<{ id: string; name: string; timestamp: number }>;
+  onRestoreSubmission?: (id: string) => void;
 }
 
 export function ImageCapture({
@@ -56,6 +58,8 @@ export function ImageCapture({
   submissionFolder,
   onStartSubmission,
   onEndSubmission,
+  savedSubmissions = [],
+  onRestoreSubmission,
 }: ImageCaptureProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -595,6 +599,21 @@ export function ImageCapture({
           <button type="button" className="btn btn-secondary btn-large" onClick={onStartSubmission}>
             Start Submission
           </button>
+        )}
+        {!submissionFolder && savedSubmissions.length > 0 && onRestoreSubmission && (
+          <div className="saved-submissions">
+            <p className="saved-submissions-label">Saved submissions:</p>
+            {savedSubmissions.map((sub) => (
+              <button
+                key={sub.id}
+                type="button"
+                className="btn btn-secondary btn-small"
+                onClick={() => onRestoreSubmission(sub.id)}
+              >
+                Resume {sub.name}
+              </button>
+            ))}
+          </div>
         )}
         {/* No capture attribute — that forces the camera on iOS and blocks the photo library. */}
         <input

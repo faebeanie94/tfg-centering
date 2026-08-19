@@ -450,6 +450,30 @@ body.scanner-mode #root {
   gap: 12px;
 }
 
+.saved-submissions {
+  padding: 12px;
+  background: rgba(74, 144, 226, 0.08);
+  border-radius: var(--radius);
+  border: 1px solid rgba(74, 144, 226, 0.2);
+}
+
+.saved-submissions-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin: 0 0 8px 0;
+}
+
+.saved-submissions .btn {
+  width: 100%;
+  text-align: left;
+  margin-bottom: 8px;
+}
+
+.saved-submissions .btn:last-child {
+  margin-bottom: 0;
+}
+
 .error-banner {
   background: rgba(231, 125, 49, 0.15);
   border: 1px solid var(--danger);

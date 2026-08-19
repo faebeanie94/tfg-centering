@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, useEffect } from 'react';
 import type { CardSide } from './lib/tfg-standards';
 import { useAppSettings } from './hooks/useAppSettings';
 import { emptySession, sessionHasAny, type GradingSession, type SideSnapshot } from './lib/session';
@@ -30,6 +30,7 @@ import {
 } from './lib/card-sizes';
 import { exportCleanImage } from './lib/export-image';
 import { startSubmission, saveToSubmissionFolder, type SubmissionFolder } from './lib/folder-submission';
+import { saveSubmissionHandle, listSubmissionHandles, restoreSubmissionHandle } from './lib/submission-persistence';
 
 type Phase =
   | 'capture'
@@ -45,6 +46,11 @@ export default function App() {
   const { settings, updateSettings } = useAppSettings();
   const { cards, loading: libraryLoading, save: saveToLibrary, remove: deleteFromLibrary } = useSavedCards();
   const [phase, setPhase] = useState<Phase>('capture');
+
+  // Load saved submissions on mount
+  useEffect(() => {
+    listSubmissionHandles().then(setSavedSubmissions).catch(console.error);
+  }, []);
   const [session, setSession] = useState<GradingSession>(emptySession);
   const [currentSide, setCurrentSide] = useState<CardSide>('front');
   const [rawImage, setRawImage] = useState<string | null>(null);
@@ -69,6 +75,7 @@ export default function App() {
   const [sessionCardSize, setSessionCardSize] = useState<CardSizeSelection | null>(null);
   const [pendingHint, setPendingHint] = useState<CaptureDetectHint | undefined>(undefined);
   const [submissionFolder, setSubmissionFolder] = useState<SubmissionFolder | null>(null);
+  const [savedSubmissions, setSavedSubmissions] = useState<Array<{ id: string; name: string; timestamp: number }>>([]);
 
   const activeCardFormat = useMemo(() => {
     const fromSettings = selectionFromSettings(settings);
@@ -364,12 +371,45 @@ export default function App() {
     try {
       const folder = await startSubmission();
       setSubmissionFolder(folder);
+      // Save handle for later restoration (only for filesystem submissions)
+      if (folder.type === 'filesystem') {
+        await saveSubmissionHandle((folder as any).handle, folder.name);
+      }
+      // Refresh saved submissions list
+      const saved = await listSubmissionHandles();
+      setSavedSubmissions(saved);
     } catch (err) {
       if ((err as Error).name !== 'AbortError') {
         console.error('Failed to start submission:', err);
       }
     }
   }, []);
+
+  const handleRestoreSubmission = useCallback(async (id: string) => {
+    try {
+      const handle = await restoreSubmissionHandle(id);
+      if (!handle) {
+        // Handle is invalid, remove from list
+        setSavedSubmissions((prev) => prev.filter((s) => s.id !== id));
+        return;
+      }
+
+      const submission = savedSubmissions.find((s) => s.id === id);
+      if (submission && handle) {
+        const fsSubmission = {
+          type: 'filesystem' as const,
+          handle,
+          name: submission.name,
+          nextCardNumber: 1,
+          currentEdit: null as any,
+          lastSideSaved: null as any,
+        };
+        setSubmissionFolder(fsSubmission);
+      }
+    } catch (err) {
+      console.error('Failed to restore submission:', err);
+    }
+  }, [savedSubmissions]);
 
   const handleEndSubmission = useCallback(() => {
     setSubmissionFolder(null);
@@ -522,6 +562,8 @@ export default function App() {
         submissionFolder={submissionFolder}
         onStartSubmission={handleStartSubmission}
         onEndSubmission={handleEndSubmission}
+        savedSubmissions={savedSubmissions}
+        onRestoreSubmission={handleRestoreSubmission}
       />
       <SettingsPanel open={showSettings} settings={settings} onChange={updateSettings} onClose={() => setShowSettings(false)} />
     </>
