@@ -96,7 +96,7 @@ export function CardListView({ submission, onClose, onCardDeleted }: CardListVie
               {(card.frontUrl || card.backUrl) && (
                 <div className="card-list-thumbnail">
                   <img
-                    src={card.frontUrl || card.backUrl}
+                    src={(card.frontUrl || card.backUrl) as string}
                     alt={`Card ${card.cardNumber}`}
                   />
                 </div>
