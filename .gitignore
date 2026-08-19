@@ -25,3 +25,4 @@ reference
 *.sln
 *.sw?
 /server/.env
+/server/gcs-key.json
