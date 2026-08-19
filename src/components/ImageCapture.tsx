@@ -38,6 +38,9 @@ interface ImageCaptureProps {
   onSettings: () => void;
   onCompare?: () => void;
   onLibrary?: () => void;
+  onRetake?: () => void;
+  onCaptureSide?: (side: CardSide) => void;
+  onNextCard?: () => void;
   savedCount?: number;
   hasSavedSides?: boolean;
   submissionFolder?: SubmissionFolder | null;
@@ -55,6 +58,9 @@ export function ImageCapture({
   onSettings,
   onCompare,
   onLibrary,
+  onRetake,
+  onCaptureSide,
+  onNextCard,
   savedCount = 0,
   hasSavedSides,
   submissionFolder,
@@ -482,19 +488,60 @@ export function ImageCapture({
       <div className="capture-top-bar">
         <span className="capture-side-badge">{side === 'front' ? 'Front' : 'Back'} side</span>
         <div className="capture-top-actions">
-          {onLibrary && (
-            <button type="button" className="btn btn-secondary btn-small" onClick={onLibrary}>
-              Library{savedCount > 0 ? ` (${savedCount})` : ''}
-            </button>
+          {side === 'front' && hasSavedSides ? (
+            <>
+              <button type="button" className="btn btn-secondary btn-small" onClick={onSettings}>
+                Standards
+              </button>
+              {onRetake && (
+                <button type="button" className="btn btn-secondary btn-small" onClick={onRetake}>
+                  Retake
+                </button>
+              )}
+              {onCaptureSide && (
+                <button type="button" className="btn btn-secondary btn-small" onClick={() => onCaptureSide('back')}>
+                  Capture Back
+                </button>
+              )}
+            </>
+          ) : side === 'back' && hasSavedSides ? (
+            <>
+              <button type="button" className="btn btn-secondary btn-small" onClick={onSettings}>
+                Standards
+              </button>
+              {onCompare && (
+                <button type="button" className="btn btn-secondary btn-small" onClick={onCompare}>
+                  Save Card
+                </button>
+              )}
+              {onNextCard && (
+                <button type="button" className="btn btn-secondary btn-small" onClick={onNextCard}>
+                  Next Card
+                </button>
+              )}
+              {onCompare && (
+                <button type="button" className="btn btn-secondary btn-small" onClick={onCompare}>
+                  Compare
+                </button>
+              )}
+            </>
+          ) : (
+            <>
+              {onLibrary && (
+                <button type="button" className="btn btn-secondary btn-small" onClick={onLibrary}>
+                  Library{savedCount > 0 ? ` (${savedCount})` : ''}
+                </button>
+              )}
+              {hasSavedSides && onCompare && (
+                <button type="button" className="btn btn-secondary btn-small" onClick={onCompare}>
+                  Compare
+                </button>
+              )}
+              <button type="button" className="btn btn-secondary btn-small" onClick={onSettings}>
+                Settings
+              </button>
+            </>
           )}
-          {hasSavedSides && onCompare && (
-            <button type="button" className="btn btn-secondary btn-small" onClick={onCompare}>
-              Compare
-            </button>
-          )}
-          <button type="button" className="btn btn-secondary btn-small" onClick={onSettings}>
-            Settings
-          </button>
         </div>
       </div>
 

@@ -446,6 +446,19 @@ export default function App() {
     handleCaptureSide(currentSide);
   }, [submissionFolder, currentSide, handleCaptureSide]);
 
+  const handleNextCard = useCallback(() => {
+    // Reset session and go back to capture for next card
+    setSession(emptySession);
+    setCardNames({ front: '', back: '' });
+    setCurrentSide('front');
+    setPhase('capture');
+  }, []);
+
+  const handleCaptureSideChange = useCallback((side: CardSide) => {
+    setCurrentSide(side);
+    setPhase('capture');
+  }, []);
+
   if (phase === 'library') {
     return (
       <>
@@ -607,6 +620,9 @@ export default function App() {
         onSettings={() => setShowSettings(true)}
         onCompare={() => setPhase('compare')}
         onLibrary={() => openLibrary('capture')}
+        onRetake={handleRetakeSubmission}
+        onCaptureSide={handleCaptureSideChange}
+        onNextCard={handleNextCard}
         savedCount={cards.length}
         hasSavedSides={sessionHasAny(session)}
         submissionFolder={submissionFolder}
