@@ -256,8 +256,18 @@ export default function App() {
           console.error('Failed to save to submission folder:', err);
         }
       }
+
+      // Also auto-save to library when in submission
+      if (submissionFolder) {
+        try {
+          const sessionToSave: GradingSession = { ...session, [currentSide]: snapshot };
+          await saveToLibrary(sessionToSave);
+        } catch (err) {
+          console.error('Failed to auto-save to library:', err);
+        }
+      }
     },
-    [currentSide, submissionFolder],
+    [currentSide, submissionFolder, session, saveToLibrary],
   );
 
   const loadSideIntoEditor = useCallback((side: CardSide) => {
