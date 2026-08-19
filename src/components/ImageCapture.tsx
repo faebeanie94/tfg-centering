@@ -29,6 +29,7 @@ import {
 } from '../lib/card-sizes';
 import type { SubmissionFolder } from '../lib/folder-submission';
 import { downloadSubmissionZip } from '../lib/folder-submission';
+import * as api from '../lib/api-client';
 
 interface ImageCaptureProps {
   side: CardSide;
@@ -568,10 +569,18 @@ export function ImageCapture({
                   <button
                     type="button"
                     className="btn btn-primary btn-small"
-                    onClick={() => {
+                    onClick={async () => {
                       if (submissionNameDraft.trim()) {
-                        submissionFolder.name = submissionNameDraft.trim();
-                        setEditingSubmissionName(false);
+                        try {
+                          // Update submission name in API if it's an API submission
+                          if (submissionFolder.type === 'api') {
+                            await api.updateSubmission(submissionFolder.submissionId, submissionNameDraft.trim());
+                          }
+                          submissionFolder.name = submissionNameDraft.trim();
+                          setEditingSubmissionName(false);
+                        } catch (err) {
+                          console.error('Failed to update submission name:', err);
+                        }
                       }
                     }}
                   >
