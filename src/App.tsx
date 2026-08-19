@@ -414,6 +414,7 @@ export default function App() {
           nextCardNumber,
           currentEdit: null,
           lastSideSaved: null,
+          lastCardNumberUsed: null,
         };
         setSubmissionFolder(apiSubmission);
       }
