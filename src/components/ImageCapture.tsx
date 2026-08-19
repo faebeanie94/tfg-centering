@@ -29,7 +29,6 @@ import {
 } from '../lib/card-sizes';
 import type { SubmissionFolder } from '../lib/folder-submission';
 import { downloadSubmissionZip } from '../lib/folder-submission';
-import { deleteSubmissionHandle } from '../lib/submission-persistence';
 
 interface ImageCaptureProps {
   side: CardSide;
@@ -511,9 +510,9 @@ export function ImageCapture({
           <div className="submission-status">
             <div className="submission-info">
               <p className="submission-folder">
-                {submissionFolder.type === 'filesystem' ? '📁' : '📦'} {submissionFolder.name}
+                {submissionFolder.type === 'api' ? '📁' : '📦'} {submissionFolder.name}
                 <span className="submission-mode">
-                  {submissionFolder.type === 'filesystem' ? 'Folder' : 'ZIP'}
+                  {submissionFolder.type === 'api' ? 'Cloud' : 'ZIP'}
                 </span>
                 <button
                   type="button"

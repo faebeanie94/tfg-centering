@@ -30,7 +30,7 @@ import {
 } from './lib/card-sizes';
 import { exportCleanImage } from './lib/export-image';
 import { startSubmission, saveToSubmissionFolder, type SubmissionFolder } from './lib/folder-submission';
-import { saveSubmissionHandle, listSubmissionHandles, restoreSubmissionHandle, deleteSubmissionHandle } from './lib/submission-persistence';
+import { listSubmissionHandles, restoreSubmissionHandle, deleteSubmissionHandle } from './lib/submission-persistence';
 
 type Phase =
   | 'capture'
@@ -371,10 +371,6 @@ export default function App() {
     try {
       const folder = await startSubmission();
       setSubmissionFolder(folder);
-      // Save handle for later restoration (only for filesystem submissions)
-      if (folder.type === 'filesystem') {
-        await saveSubmissionHandle((folder as any).handle, folder.name);
-      }
       // Refresh saved submissions list
       const saved = await listSubmissionHandles();
       setSavedSubmissions(saved);
@@ -396,15 +392,15 @@ export default function App() {
 
       const submission = savedSubmissions.find((s) => s.id === id);
       if (submission && handle) {
-        const fsSubmission = {
-          type: 'filesystem' as const,
-          handle,
+        const apiSubmission = {
+          type: 'api' as const,
+          submissionId: id,
           name: submission.name,
           nextCardNumber: 1,
-          currentEdit: null as any,
-          lastSideSaved: null as any,
+          currentEdit: null,
+          lastSideSaved: null,
         };
-        setSubmissionFolder(fsSubmission);
+        setSubmissionFolder(apiSubmission);
       }
     } catch (err) {
       console.error('Failed to restore submission:', err);
