@@ -2,6 +2,12 @@ import { useState, useEffect } from 'react';
 import type { SubmissionFolder } from '../lib/folder-submission';
 import * as api from '../lib/api-client';
 
+interface Card {
+  cardNumber: number;
+  frontUrl?: string | null;
+  backUrl?: string | null;
+}
+
 interface CardListViewProps {
   submission: SubmissionFolder;
   onClose: () => void;
@@ -9,7 +15,7 @@ interface CardListViewProps {
 }
 
 export function CardListView({ submission, onClose, onCardDeleted }: CardListViewProps) {
-  const [cards, setCards] = useState<number[]>([]);
+  const [cards, setCards] = useState<Card[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<number | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -18,7 +24,15 @@ export function CardListView({ submission, onClose, onCardDeleted }: CardListVie
     if (submission.type === 'api') {
       api.listCards(submission.submissionId)
         .then(cardList => {
-          setCards(cardList.map(c => c.card_number).sort((a, b) => a - b));
+          setCards(
+            cardList
+              .map(c => ({
+                cardNumber: c.card_number,
+                frontUrl: c.front_s3_url,
+                backUrl: c.back_s3_url,
+              }))
+              .sort((a, b) => a.cardNumber - b.cardNumber)
+          );
           setLoading(false);
         })
         .catch(err => {
@@ -37,7 +51,7 @@ export function CardListView({ submission, onClose, onCardDeleted }: CardListVie
     try {
       if (submission.type === 'api') {
         await api.deleteCard(submission.submissionId, cardNumber);
-        setCards(cards.filter(c => c !== cardNumber));
+        setCards(cards.filter(c => c.cardNumber !== cardNumber));
         setMessage(`Deleted card ${cardNumber}`);
         onCardDeleted();
       }
@@ -77,16 +91,24 @@ export function CardListView({ submission, onClose, onCardDeleted }: CardListVie
         <p className="card-list-empty">No cards in this submission</p>
       ) : (
         <div className="card-list-grid">
-          {cards.map(cardNumber => (
-            <div key={cardNumber} className="card-list-item">
-              <div className="card-list-number">Card {cardNumber}</div>
+          {cards.map(card => (
+            <div key={card.cardNumber} className="card-list-item">
+              {(card.frontUrl || card.backUrl) && (
+                <div className="card-list-thumbnail">
+                  <img
+                    src={card.frontUrl || card.backUrl}
+                    alt={`Card ${card.cardNumber}`}
+                  />
+                </div>
+              )}
+              <div className="card-list-number">Card {card.cardNumber}</div>
               <button
                 type="button"
                 className="btn btn-danger btn-small"
-                onClick={() => handleDelete(cardNumber)}
-                disabled={deleting === cardNumber}
+                onClick={() => handleDelete(card.cardNumber)}
+                disabled={deleting === card.cardNumber}
               >
-                {deleting === cardNumber ? 'Deleting...' : 'Delete'}
+                {deleting === card.cardNumber ? 'Deleting...' : 'Delete'}
               </button>
             </div>
           ))}
