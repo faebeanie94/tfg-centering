@@ -5,6 +5,7 @@ const fileUpload = require('express-fileupload');
 const path = require('path');
 const { Pool } = require('pg');
 const { errorHandler } = require('./middleware/errorHandler');
+const { initializeDatabase } = require('./services/db');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -15,6 +16,12 @@ const pool = new Pool({
 
 pool.on('error', (err) => {
   console.error('Unexpected error on idle client', err);
+});
+
+// Initialize database (run migrations)
+initializeDatabase(pool).catch(err => {
+  console.error('Failed to initialize database:', err);
+  process.exit(1);
 });
 
 // Export pool early to avoid circular dependency issues
