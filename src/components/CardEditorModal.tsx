@@ -13,8 +13,6 @@ interface CardEditorModalProps {
 export function CardEditorModal({ card, submissionId, onClose, onSave, onEditImage }: CardEditorModalProps) {
   const [frontGrade, setFrontGrade] = useState(card.front_grade || '');
   const [backGrade, setBackGrade] = useState(card.back_grade || '');
-  const [condition, setCondition] = useState(card.condition || '');
-  const [notes, setNotes] = useState(card.notes || '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(!card.front_grade && !card.back_grade);
@@ -27,8 +25,6 @@ export function CardEditorModal({ card, submissionId, onClose, onSave, onEditIma
       .then(fullCard => {
         setFrontGrade(fullCard.front_grade || '');
         setBackGrade(fullCard.back_grade || '');
-        setCondition(fullCard.condition || '');
-        setNotes(fullCard.notes || '');
         setLoading(false);
       })
       .catch(err => {
@@ -44,8 +40,6 @@ export function CardEditorModal({ card, submissionId, onClose, onSave, onEditIma
       const updatedCard = await api.updateCard(submissionId, card.card_number, {
         frontGrade: frontGrade || undefined,
         backGrade: backGrade || undefined,
-        condition: condition || undefined,
-        notes: notes || undefined,
       });
       onSave(updatedCard);
     } catch (err) {
@@ -86,28 +80,6 @@ export function CardEditorModal({ card, submissionId, onClose, onSave, onEditIma
               value={backGrade}
               onChange={(e) => setBackGrade(e.target.value)}
               placeholder="e.g., 9, PSA 10"
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="condition">Condition</label>
-            <input
-              id="condition"
-              type="text"
-              value={condition}
-              onChange={(e) => setCondition(e.target.value)}
-              placeholder="e.g., Mint, Near Mint"
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="notes">Notes</label>
-            <textarea
-              id="notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Additional notes..."
-              rows={3}
             />
           </div>
         </div>
