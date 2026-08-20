@@ -531,7 +531,7 @@ export function ImageCapture({
             <>
               {onLibrary && (
                 <button type="button" className="btn btn-secondary btn-small" onClick={onLibrary}>
-                  Library{savedCount > 0 ? ` (${savedCount})` : ''}
+                  Library
                 </button>
               )}
               {hasSavedSides && onCompare && (
