@@ -52,11 +52,14 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
+DROP TRIGGER IF EXISTS update_submissions_updated_at ON submissions;
 CREATE TRIGGER update_submissions_updated_at BEFORE UPDATE ON submissions
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_cards_updated_at ON cards;
 CREATE TRIGGER update_cards_updated_at BEFORE UPDATE ON cards
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_card_metadata_updated_at ON card_metadata;
 CREATE TRIGGER update_card_metadata_updated_at BEFORE UPDATE ON card_metadata
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
