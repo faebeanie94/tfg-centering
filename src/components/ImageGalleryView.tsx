@@ -22,10 +22,10 @@ function getWorstGrade(frontGrade: string | null | undefined, backGrade: string 
   const backNum = extractGradeNumber(backGrade);
 
   if (frontNum === null && backNum === null) return null;
-  if (frontNum === null) return backGrade || null;
-  if (backNum === null) return frontGrade || null;
+  if (frontNum === null) return (backGrade as string | null) || null;
+  if (backNum === null) return (frontGrade as string | null) || null;
 
-  return frontNum <= backNum ? frontGrade : backGrade;
+  return frontNum <= backNum ? (frontGrade as string) : (backGrade as string);
 }
 
 export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void; onEditImage?: (submissionId: string, card: Card, side: 'front' | 'back') => void }) {
