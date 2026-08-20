@@ -4,23 +4,11 @@ const path = require('path');
 function parseSQL(sql) {
   // Replace dollar-quoted strings with placeholders, split, then restore
   const dollarStrings = [];
-  let processedSQL = sql;
 
   // Match dollar-quoted strings: $tag$...content...$tag$ (tag must match on both ends)
-  const dollarQuoteRegex = /\$([a-zA-Z0-9_]*)\$[\s\S]*?\$\1\$/g;
-  let match;
-
-  // Replace all dollar-quoted strings with placeholders
-  while ((match = dollarQuoteRegex.exec(sql)) !== null) {
-    dollarStrings.push(match[0]);
-  }
-
-  // Sort by length descending to replace longer strings first
-  dollarStrings.sort((a, b) => b.length - a.length);
-
-  // Replace all dollar-quoted strings with placeholders
-  dollarStrings.forEach((dollarStr, idx) => {
-    processedSQL = processedSQL.replace(dollarStr, `__PLACEHOLDER_${idx}__`);
+  const processedSQL = sql.replace(/\$([a-zA-Z0-9_]*)\$[\s\S]*?\$\1\$/g, (match) => {
+    dollarStrings.push(match);
+    return `__PLACEHOLDER_${dollarStrings.length - 1}__`;
   });
 
   // Split on semicolons
