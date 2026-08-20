@@ -6,14 +6,12 @@ interface CardEditorModalProps {
   card: Card;
   submissionId: string;
   onClose: () => void;
-  onSave: (updatedCard: Card) => void;
   onEditImage?: (submissionId: string, card: Card, side: 'front' | 'back') => void;
 }
 
-export function CardEditorModal({ card, submissionId, onClose, onSave, onEditImage }: CardEditorModalProps) {
+export function CardEditorModal({ card, submissionId, onClose, onEditImage }: CardEditorModalProps) {
   const [frontGrade, setFrontGrade] = useState(card.front_grade || '');
   const [backGrade, setBackGrade] = useState(card.back_grade || '');
-  const [error, setError] = useState<string | null>(null);
 
   // Fetch full card data on mount to ensure grades are loaded
   useEffect(() => {
@@ -37,8 +35,6 @@ export function CardEditorModal({ card, submissionId, onClose, onSave, onEditIma
         </div>
 
         <div className="modal-content">
-          {error && <div className="error-message">{error}</div>}
-
           <div className="form-group">
             <label htmlFor="front-grade">Front Grade</label>
             <input

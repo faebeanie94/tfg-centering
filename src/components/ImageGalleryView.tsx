@@ -213,21 +213,6 @@ export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void
           card={editingCard.card}
           submissionId={editingCard.submissionId}
           onClose={() => setEditingCard(null)}
-          onSave={(updatedCard) => {
-            setSubmissions(
-              submissions.map((sub) =>
-                sub.id === editingCard.submissionId
-                  ? {
-                      ...sub,
-                      cards: sub.cards.map((c) =>
-                        c.card_number === updatedCard.card_number ? updatedCard : c
-                      ),
-                    }
-                  : sub
-              )
-            );
-            setEditingCard(null);
-          }}
           onEditImage={onEditImage && ((submissionId: string, card: Card, side: 'front' | 'back') => onEditImage(submissionId, card, side))}
         />
       )}
