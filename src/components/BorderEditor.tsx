@@ -54,6 +54,7 @@ interface BorderEditorProps {
   onEndSubmission?: () => void;
   onViewCards?: () => void;
   onRetakeSubmission?: () => void;
+  onNextCard?: () => void;
 }
 
 type DragTarget =
@@ -81,6 +82,7 @@ export function BorderEditor({
   innerSideConfidence: initialInnerSideConfidence,
   autoCropInfo = null,
   onDismissAutoCropInfo,
+  onNextCard,
   cardName,
   onNameChange,
   onSave,
@@ -522,7 +524,7 @@ export function BorderEditor({
             <button type="button" className={`btn btn-primary ${savedFlash ? 'btn-saved' : ''}`} onClick={handleSave}>
               {savedFlash ? 'Saved ✓' : 'Save Card'}
             </button>
-            <button type="button" className="btn btn-secondary" onClick={() => { handleSave(); onCaptureSide('front'); }}>
+            <button type="button" className="btn btn-secondary" onClick={() => { handleSave(); onNextCard?.(); }}>
               Next Card
             </button>
             <button type="button" className="btn btn-secondary" onClick={onCompare} disabled={!sessionHasAny(session)}>

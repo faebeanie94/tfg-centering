@@ -563,6 +563,7 @@ export default function App() {
           submissionFolder={submissionFolder}
           onEndSubmission={handleEndSubmission}
           onRetakeSubmission={handleRetakeSubmission}
+          onNextCard={handleNextCard}
           onViewCards={() => {
             setCardListReturnPhase('editor');
             setPhase('cardlist');
