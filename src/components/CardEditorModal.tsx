@@ -7,7 +7,7 @@ interface CardEditorModalProps {
   submissionId: string;
   onClose: () => void;
   onSave: (updatedCard: Card) => void;
-  onEditImage?: (card: Card) => void;
+  onEditImage?: (submissionId: string, card: Card) => void;
 }
 
 export function CardEditorModal({ card, submissionId, onClose, onSave, onEditImage }: CardEditorModalProps) {
@@ -96,8 +96,8 @@ export function CardEditorModal({ card, submissionId, onClose, onSave, onEditIma
         <div className="modal-footer">
           <button type="button" className="btn btn-secondary" onClick={onClose}>Close</button>
           {onEditImage && (
-            <button type="button" className="btn btn-secondary" onClick={() => { onClose(); onEditImage(card); }}>
-              Edit Image
+            <button type="button" className="btn btn-secondary" onClick={() => { onEditImage(submissionId, card); }}>
+              Edit Images
             </button>
           )}
           <button type="button" className="btn btn-primary" onClick={handleSave} disabled={saving}>

@@ -438,7 +438,23 @@ export default function App() {
   if (phase === 'library') {
     return (
       <>
-        <ImageGalleryView onClose={() => setPhase(libraryReturnPhase)} />
+        <ImageGalleryView
+          onClose={() => setPhase(libraryReturnPhase)}
+          onEditImage={(submissionId, card) => {
+            if (card.front_s3_url) {
+              setRawImage(card.front_s3_url);
+              setCurrentSide('front');
+              setPhase('crop');
+              setSubmissionFolder({
+                type: 'api',
+                submissionId,
+                name: '',
+                nextCardNumber: card.card_number + 1,
+                currentEdit: { cardNumber: card.card_number, side: 'front' },
+              } as any);
+            }
+          }}
+        />
         <SettingsPanel open={showSettings} settings={settings} onChange={updateSettings} onClose={() => setShowSettings(false)} />
       </>
     );

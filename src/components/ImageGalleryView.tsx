@@ -11,7 +11,7 @@ interface SubmissionWithCards {
   cards: Card[];
 }
 
-export function ImageGalleryView({ onClose }: { onClose: () => void }) {
+export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void; onEditImage?: (submissionId: string, card: Card) => void }) {
   const [submissions, setSubmissions] = useState<SubmissionWithCards[]>([]);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState<string | null>(null);
@@ -180,10 +180,7 @@ export function ImageGalleryView({ onClose }: { onClose: () => void }) {
             );
             setEditingCard(null);
           }}
-          onEditImage={() => {
-            // TODO: Load card image and open the crop/border editing workflow
-            console.log('Edit image for card:', editingCard.card.card_number);
-          }}
+          onEditImage={onEditImage && (() => onEditImage(editingCard.submissionId, editingCard.card))}
         />
       )}
     </div>
