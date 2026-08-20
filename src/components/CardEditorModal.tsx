@@ -13,7 +13,6 @@ interface CardEditorModalProps {
 export function CardEditorModal({ card, submissionId, onClose, onSave, onEditImage }: CardEditorModalProps) {
   const [frontGrade, setFrontGrade] = useState(card.front_grade || '');
   const [backGrade, setBackGrade] = useState(card.back_grade || '');
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Fetch full card data on mount to ensure grades are loaded
@@ -28,22 +27,6 @@ export function CardEditorModal({ card, submissionId, onClose, onSave, onEditIma
       });
   }, [card.card_number, submissionId]);
 
-  const handleSave = async () => {
-    setSaving(true);
-    setError(null);
-    try {
-      const updatedCard = await api.updateCard(submissionId, card.card_number, {
-        frontGrade: frontGrade || undefined,
-        backGrade: backGrade || undefined,
-      });
-      onSave(updatedCard);
-    } catch (err) {
-      setError('Failed to save card');
-      console.error(err);
-    } finally {
-      setSaving(false);
-    }
-  };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -62,8 +45,8 @@ export function CardEditorModal({ card, submissionId, onClose, onSave, onEditIma
               id="front-grade"
               type="text"
               value={frontGrade}
-              onChange={(e) => setFrontGrade(e.target.value)}
-              placeholder="e.g., 9, PSA 10"
+              readOnly
+              placeholder="—"
             />
           </div>
 
@@ -73,8 +56,8 @@ export function CardEditorModal({ card, submissionId, onClose, onSave, onEditIma
               id="back-grade"
               type="text"
               value={backGrade}
-              onChange={(e) => setBackGrade(e.target.value)}
-              placeholder="e.g., 9, PSA 10"
+              readOnly
+              placeholder="—"
             />
           </div>
         </div>
@@ -95,9 +78,6 @@ export function CardEditorModal({ card, submissionId, onClose, onSave, onEditIma
               )}
             </div>
           )}
-          <button type="button" className="btn btn-primary" onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving...' : 'Save'}
-          </button>
         </div>
       </div>
     </div>
