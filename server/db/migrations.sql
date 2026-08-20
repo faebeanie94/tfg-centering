@@ -9,8 +9,8 @@ CREATE TABLE IF NOT EXISTS submissions (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_submissions_name ON submissions(name);
-CREATE INDEX idx_submissions_created_at ON submissions(created_at);
+CREATE INDEX IF NOT EXISTS idx_submissions_name ON submissions(name);
+CREATE INDEX IF NOT EXISTS idx_submissions_created_at ON submissions(created_at);
 
 -- Cards table
 CREATE TABLE IF NOT EXISTS cards (
@@ -26,8 +26,8 @@ CREATE TABLE IF NOT EXISTS cards (
   UNIQUE(submission_id, card_number)
 );
 
-CREATE INDEX idx_cards_submission_id ON cards(submission_id);
-CREATE INDEX idx_cards_card_number ON cards(card_number);
+CREATE INDEX IF NOT EXISTS idx_cards_submission_id ON cards(submission_id);
+CREATE INDEX IF NOT EXISTS idx_cards_card_number ON cards(card_number);
 
 -- Card metadata table
 CREATE TABLE IF NOT EXISTS card_metadata (
@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS card_metadata (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_card_metadata_card_id ON card_metadata(card_id);
+CREATE INDEX IF NOT EXISTS idx_card_metadata_card_id ON card_metadata(card_id);
 
 -- Trigger to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
