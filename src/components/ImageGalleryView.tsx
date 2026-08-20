@@ -16,6 +16,7 @@ export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState<string | null>(null);
   const [editingCard, setEditingCard] = useState<{ submissionId: string; card: Card } | null>(null);
+  const [expandedSubmissions, setExpandedSubmissions] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadSubmissions();
@@ -61,6 +62,18 @@ export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void
     }
   }
 
+  function toggleSubmissionExpanded(submissionId: string) {
+    setExpandedSubmissions(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(submissionId)) {
+        newSet.delete(submissionId);
+      } else {
+        newSet.add(submissionId);
+      }
+      return newSet;
+    });
+  }
+
   if (loading) {
     return (
       <div className="gallery-view">
@@ -88,21 +101,32 @@ export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void
         <p className="gallery-empty">No submissions with images yet.</p>
       ) : (
         <div className="gallery-submissions">
-          {submissions.map((submission) => (
-            <div key={submission.id} className="gallery-submission">
-              <div className="gallery-submission-header">
-                <h3>{submission.name}</h3>
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-small"
-                  disabled={exporting === submission.id}
-                  onClick={() => handleExportSubmission(submission.id)}
-                >
-                  {exporting === submission.id ? 'Exporting…' : 'Export ZIP'}
-                </button>
-              </div>
+          {submissions.map((submission) => {
+            const isExpanded = expandedSubmissions.has(submission.id);
+            return (
+              <div key={submission.id} className="gallery-submission">
+                <div className="gallery-submission-header">
+                  <button
+                    type="button"
+                    className="gallery-submission-toggle"
+                    onClick={() => toggleSubmissionExpanded(submission.id)}
+                  >
+                    <span className="toggle-icon">{isExpanded ? '▼' : '▶'}</span>
+                    <h3>{submission.name}</h3>
+                    <span className="card-count">({submission.cards.length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-small"
+                    disabled={exporting === submission.id}
+                    onClick={() => handleExportSubmission(submission.id)}
+                  >
+                    {exporting === submission.id ? 'Exporting…' : 'Export ZIP'}
+                  </button>
+                </div>
 
-              <div className="gallery-grid">
+                {isExpanded && (
+                  <div className="gallery-grid">
                 {submission.cards.length === 0 ? (
                   <p className="gallery-empty-submission">No images in this submission</p>
                 ) : (
@@ -154,9 +178,11 @@ export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void
                     </div>
                   ))
                 )}
+                </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

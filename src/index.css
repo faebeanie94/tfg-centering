@@ -2635,6 +2635,37 @@ body.editor-mode #root {
   flex: 1;
 }
 
+.gallery-submission-toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  color: inherit;
+  font-size: inherit;
+}
+
+.gallery-submission-toggle:hover h3 {
+  color: var(--primary);
+}
+
+.toggle-icon {
+  display: inline-flex;
+  width: 20px;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.card-count {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-weight: normal;
+}
+
 .gallery-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
