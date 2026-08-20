@@ -245,8 +245,9 @@ export default function App() {
           setSubmissionFolder((prev) => prev ? { ...prev } : null);
 
           // Auto-save to library when BOTH sides are complete, using submission name + card number
+          // Skip auto-save if re-editing existing card (card already in library)
           const updatedSession = { ...session, [currentSide]: snapshot };
-          if (updatedSession.front && updatedSession.back) {
+          if (updatedSession.front && updatedSession.back && !isSubmissionCard) {
             try {
               // Determine which card number was just completed
               const cardNum = submissionFolder.lastSideSaved === 'back'
