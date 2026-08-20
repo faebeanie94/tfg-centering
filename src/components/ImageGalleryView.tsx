@@ -11,6 +11,23 @@ interface SubmissionWithCards {
   cards: Card[];
 }
 
+function extractGradeNumber(grade: string | null | undefined): number | null {
+  if (!grade) return null;
+  const match = grade.match(/\d+/);
+  return match ? parseInt(match[0], 10) : null;
+}
+
+function getWorstGrade(frontGrade: string | null | undefined, backGrade: string | null | undefined): string | null {
+  const frontNum = extractGradeNumber(frontGrade);
+  const backNum = extractGradeNumber(backGrade);
+
+  if (frontNum === null && backNum === null) return null;
+  if (frontNum === null) return backGrade || null;
+  if (backNum === null) return frontGrade || null;
+
+  return frontNum <= backNum ? frontGrade : backGrade;
+}
+
 export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void; onEditImage?: (submissionId: string, card: Card, side: 'front' | 'back') => void }) {
   const [submissions, setSubmissions] = useState<SubmissionWithCards[]>([]);
   const [loading, setLoading] = useState(true);
@@ -168,13 +185,14 @@ export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void
                           <p className="gallery-no-images">No images</p>
                         )}
                       </div>
-                      {(card.front_grade || card.back_grade || card.condition) && (
-                        <div className="gallery-card-metadata">
-                          {card.front_grade && <span className="grade-badge">F: {card.front_grade}</span>}
-                          {card.back_grade && <span className="grade-badge">B: {card.back_grade}</span>}
-                          {card.condition && <span className="condition-badge">{card.condition}</span>}
-                        </div>
-                      )}
+                      {(() => {
+                        const worstGrade = getWorstGrade(card.front_grade, card.back_grade);
+                        return worstGrade ? (
+                          <div className="gallery-card-metadata">
+                            <span className="grade-badge">Grade: {worstGrade}</span>
+                          </div>
+                        ) : null;
+                      })()}
                     </div>
                   ))
                 )}
