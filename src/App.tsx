@@ -398,10 +398,14 @@ export default function App() {
     try {
       await deleteSubmissionHandle(id);
       setSavedSubmissions((prev) => prev.filter((s) => s.id !== id));
+      if (submissionFolder && submissionFolder.type === 'api' && submissionFolder.submissionId === id) {
+        setSubmissionFolder(null);
+        setPhase('capture');
+      }
     } catch (err) {
       console.error('Failed to delete submission:', err);
     }
-  }, []);
+  }, [submissionFolder]);
 
   const handleEndSubmission = useCallback(() => {
     setSubmissionFolder(null);
