@@ -2,55 +2,32 @@ const fs = require('fs');
 const path = require('path');
 
 function parseSQL(sql) {
-  const statements = [];
-  let current = '';
-  let inDollarQuote = null;
-  let i = 0;
+  // Replace dollar-quoted strings with placeholders, split, then restore
+  const dollarStrings = [];
+  let processedSQL = sql;
 
-  while (i < sql.length) {
-    const char = sql[i];
+  // Match dollar-quoted strings: $tag$...content...$tag$
+  const dollarQuoteRegex = /\$[a-zA-Z0-9_]*\$[\s\S]*?\$[a-zA-Z0-9_]*\$/g;
+  let match;
 
-    if (inDollarQuote) {
-      current += char;
-      // Check if we're at the start of the closing dollar quote
-      if (sql.substr(i, inDollarQuote.length) === inDollarQuote) {
-        // Add the rest of the dollar quote (we already added first char)
-        if (inDollarQuote.length > 1) {
-          current += sql.substr(i + 1, inDollarQuote.length - 1);
-          i += inDollarQuote.length - 1;
-        }
-        inDollarQuote = null;
-      }
-    } else if (char === '$') {
-      // Look for dollar quote pattern (e.g., $$, $tag$, etc.)
-      let j = i + 1;
-      while (j < sql.length && /[a-zA-Z0-9_]/.test(sql[j])) {
-        j++;
-      }
-      if (j < sql.length && sql[j] === '$') {
-        inDollarQuote = sql.substr(i, j - i + 1);
-        current += inDollarQuote;
-        i = j;
-      } else {
-        current += char;
-      }
-    } else if (char === ';') {
-      current = current.trim();
-      if (current.length > 0) {
-        statements.push(current);
-      }
-      current = '';
-    } else {
-      current += char;
-    }
-
-    i++;
+  // Replace all dollar-quoted strings with placeholders
+  while ((match = dollarQuoteRegex.exec(sql)) !== null) {
+    dollarStrings.push(match[0]);
+    processedSQL = processedSQL.replace(match[0], `__PLACEHOLDER_${dollarStrings.length - 1}__`);
   }
 
-  current = current.trim();
-  if (current.length > 0) {
-    statements.push(current);
-  }
+  // Split on semicolons
+  const statements = processedSQL
+    .split(';')
+    .map(stmt => {
+      // Restore dollar-quoted strings
+      let restored = stmt;
+      dollarStrings.forEach((dollarStr, idx) => {
+        restored = restored.replace(`__PLACEHOLDER_${idx}__`, dollarStr);
+      });
+      return restored.trim();
+    })
+    .filter(stmt => stmt.length > 0);
 
   return statements;
 }
