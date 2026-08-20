@@ -115,23 +115,33 @@ export function ImageGalleryView({ onClose }: { onClose: () => void }) {
                       tabIndex={0}
                     >
                       <div className="gallery-card-number">Card {card.card_number}</div>
-                      <div className="gallery-images">
+                      <div className="gallery-card-images">
                         {card.front_s3_url && (
-                          <img
-                            src={card.front_s3_url}
-                            alt={`Card ${card.card_number} - Front`}
-                            className="gallery-image"
-                          />
+                          <div className="gallery-card-image">
+                            <img
+                              src={card.front_s3_url}
+                              alt={`Card ${card.card_number} - Front`}
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
+                            <span className="gallery-side-label">Front</span>
+                          </div>
                         )}
                         {card.back_s3_url && (
-                          <img
-                            src={card.back_s3_url}
-                            alt={`Card ${card.card_number} - Back`}
-                            className="gallery-image"
-                          />
+                          <div className="gallery-card-image">
+                            <img
+                              src={card.back_s3_url}
+                              alt={`Card ${card.card_number} - Back`}
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
+                            <span className="gallery-side-label">Back</span>
+                          </div>
                         )}
                         {!card.front_s3_url && !card.back_s3_url && (
-                          <p className="gallery-no-image">No images</p>
+                          <p className="gallery-no-images">No images</p>
                         )}
                       </div>
                       {(card.front_grade || card.back_grade || card.condition) && (
