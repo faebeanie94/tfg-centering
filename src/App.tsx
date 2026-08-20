@@ -424,7 +424,11 @@ export default function App() {
     setCardNames({ front: '', back: '' });
     setCurrentSide('front');
     setPhase('capture');
-  }, []);
+    // Reset submission folder state for fresh card
+    if (submissionFolder) {
+      submissionFolder.lastSideSaved = null;
+    }
+  }, [submissionFolder]);
 
   const handleCaptureSideChange = useCallback((side: CardSide) => {
     setCurrentSide(side);
