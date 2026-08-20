@@ -15,23 +15,18 @@ export function CardEditorModal({ card, submissionId, onClose, onSave, onEditIma
   const [backGrade, setBackGrade] = useState(card.back_grade || '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(!card.front_grade && !card.back_grade);
 
   // Fetch full card data on mount to ensure grades are loaded
   useEffect(() => {
-    if (!loading) return;
-
     api.getCard(submissionId, card.card_number)
       .then(fullCard => {
         setFrontGrade(fullCard.front_grade || '');
         setBackGrade(fullCard.back_grade || '');
-        setLoading(false);
       })
       .catch(err => {
         console.error('Failed to load card details:', err);
-        setLoading(false);
       });
-  }, [card.card_number, submissionId, loading]);
+  }, [card.card_number, submissionId]);
 
   const handleSave = async () => {
     setSaving(true);

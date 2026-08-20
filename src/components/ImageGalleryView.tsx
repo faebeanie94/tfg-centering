@@ -147,54 +147,49 @@ export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void
                 {submission.cards.length === 0 ? (
                   <p className="gallery-empty-submission">No images in this submission</p>
                 ) : (
-                  submission.cards.map((card) => (
-                    <div
-                      key={card.card_number}
-                      className="gallery-card"
-                      onClick={() => setEditingCard({ submissionId: submission.id, card })}
-                      role="button"
-                      tabIndex={0}
-                    >
-                      <div className="gallery-card-number">Card {card.card_number}</div>
-                      <div className="gallery-card-images">
-                        {card.front_s3_url && (
-                          <div className="gallery-card-image">
-                            <img
-                              src={card.front_s3_url}
-                              alt={`Card ${card.card_number} - Front`}
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).style.display = 'none';
-                              }}
-                            />
-                            <span className="gallery-side-label">Front</span>
-                          </div>
-                        )}
-                        {card.back_s3_url && (
-                          <div className="gallery-card-image">
-                            <img
-                              src={card.back_s3_url}
-                              alt={`Card ${card.card_number} - Back`}
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).style.display = 'none';
-                              }}
-                            />
-                            <span className="gallery-side-label">Back</span>
-                          </div>
-                        )}
-                        {!card.front_s3_url && !card.back_s3_url && (
-                          <p className="gallery-no-images">No images</p>
-                        )}
+                  submission.cards.map((card) => {
+                    const worstGrade = getWorstGrade(card.front_grade, card.back_grade);
+                    return (
+                      <div
+                        key={card.card_number}
+                        className="gallery-card"
+                        onClick={() => setEditingCard({ submissionId: submission.id, card })}
+                        role="button"
+                        tabIndex={0}
+                      >
+                        <div className="gallery-card-header">
+                          Card {card.card_number} {worstGrade && `- ${worstGrade}`}
+                        </div>
+                        <div className="gallery-card-images">
+                          {card.front_s3_url && (
+                            <div className="gallery-card-image">
+                              <img
+                                src={card.front_s3_url}
+                                alt={`Card ${card.card_number} - Front`}
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                }}
+                              />
+                            </div>
+                          )}
+                          {card.back_s3_url && (
+                            <div className="gallery-card-image">
+                              <img
+                                src={card.back_s3_url}
+                                alt={`Card ${card.card_number} - Back`}
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                }}
+                              />
+                            </div>
+                          )}
+                          {!card.front_s3_url && !card.back_s3_url && (
+                            <p className="gallery-no-images">No images</p>
+                          )}
+                        </div>
                       </div>
-                      {(() => {
-                        const worstGrade = getWorstGrade(card.front_grade, card.back_grade);
-                        return worstGrade ? (
-                          <div className="gallery-card-metadata">
-                            <span className="grade-badge">Grade: {worstGrade}</span>
-                          </div>
-                        ) : null;
-                      })()}
-                    </div>
-                  ))
+                    );
+                  })
                 )}
                 </div>
                 )}
