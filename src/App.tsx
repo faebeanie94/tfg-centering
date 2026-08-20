@@ -467,13 +467,14 @@ export default function App() {
                   const prefilledSession = emptySession();
                   prefilledSession[otherSide] = { imageSrc: 'existing' } as any;
                   setSession(prefilledSession);
-                  setCardNames({ front: '', back: '' });
+                  // Set card names to match the pattern expected by save logic
+                  setCardNames({ front: `temp/${card.card_number}`, back: `temp/${card.card_number}` });
                   setEditorRects({});
                   setSubmissionFolder({
                     type: 'api',
                     submissionId,
-                    name: '',
-                    nextCardNumber: card.card_number,
+                    name: 'temp',
+                    nextCardNumber: card.card_number + 1,
                     currentEdit: { cardNumber: card.card_number, side: side as 'front' | 'back' },
                   } as any);
                   console.log('About to change phase to crop');
