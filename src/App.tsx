@@ -469,11 +469,23 @@ export default function App() {
                   setRawImage(data.data);
                   setWorkingImage(data.data);
                   setCurrentSide(side as CardSide);
-                  // For re-edits, mark the other side as already saved so Save Card button shows
+                  // For re-edits, prefill the other side if it exists
                   const otherSide = side === 'front' ? 'back' : 'front';
                   const prefilledSession = emptySession();
-                  prefilledSession[otherSide] = { imageSrc: 'existing' } as any;
-                  setSession(prefilledSession);
+                  const otherImageUrl = otherSide === 'front' ? card.front_s3_url : card.back_s3_url;
+                  if (otherImageUrl) {
+                    // Fetch the other side's image so we can switch to it
+                    const otherUrl = `/api/submissions/${submissionId}/cards/${card.card_number}/image/${otherSide}`;
+                    fetch(otherUrl)
+                      .then(res => res.json())
+                      .then(otherData => {
+                        if (otherData.data) {
+                          prefilledSession[otherSide] = { imageSrc: otherData.data } as any;
+                          setSession(prev => ({ ...prev, [otherSide]: { imageSrc: otherData.data } as any }));
+                        }
+                      })
+                      .catch(err => console.warn('Failed to prefetch other side:', err));
+                  }
                   // Set card names to match the pattern expected by save logic
                   setCardNames({ front: `temp/${card.card_number}`, back: `temp/${card.card_number}` });
                   setEditorRects({});
