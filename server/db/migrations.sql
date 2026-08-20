@@ -41,7 +41,10 @@ CREATE TABLE IF NOT EXISTS card_metadata (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_card_metadata_card_id ON card_metadata(card_id);
+-- Ensure unique constraint on card_id for ON CONFLICT support
+-- Drop old index if it exists to avoid conflicts
+DROP INDEX IF EXISTS idx_card_metadata_card_id;
+-- Create unique index for ON CONFLICT clause
 CREATE UNIQUE INDEX IF NOT EXISTS uq_card_metadata_card_id ON card_metadata(card_id);
 
 -- Trigger to update updated_at timestamp
