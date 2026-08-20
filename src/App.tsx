@@ -440,18 +440,28 @@ export default function App() {
       <>
         <ImageGalleryView
           onClose={() => setPhase(libraryReturnPhase)}
-          onEditImage={(submissionId, card) => {
+          onEditImage={async (submissionId, card) => {
             if (card.front_s3_url) {
-              setRawImage(card.front_s3_url);
-              setCurrentSide('front');
-              setPhase('crop');
-              setSubmissionFolder({
-                type: 'api',
-                submissionId,
-                name: '',
-                nextCardNumber: card.card_number + 1,
-                currentEdit: { cardNumber: card.card_number, side: 'front' },
-              } as any);
+              try {
+                const response = await fetch(card.front_s3_url);
+                const blob = await response.blob();
+                const reader = new FileReader();
+                reader.onload = () => {
+                  setRawImage(reader.result as string);
+                  setCurrentSide('front');
+                  setSubmissionFolder({
+                    type: 'api',
+                    submissionId,
+                    name: '',
+                    nextCardNumber: card.card_number + 1,
+                    currentEdit: { cardNumber: card.card_number, side: 'front' },
+                  } as any);
+                  setPhase('crop');
+                };
+                reader.readAsDataURL(blob);
+              } catch (err) {
+                console.error('Failed to load image:', err);
+              }
             }
           }}
         />
