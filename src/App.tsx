@@ -48,10 +48,6 @@ export default function App() {
   const { cards, save: saveToLibrary } = useSavedCards();
   const [phase, setPhase] = useState<Phase>('capture');
 
-  // Load saved submissions on mount
-  useEffect(() => {
-    listSubmissionHandles().then(setSavedSubmissions).catch(console.error);
-  }, []);
   const [session, setSession] = useState<GradingSession>(emptySession);
   const [currentSide, setCurrentSide] = useState<CardSide>('front');
   const [rawImage, setRawImage] = useState<string | null>(null);
@@ -78,6 +74,11 @@ export default function App() {
   const [pendingHint, setPendingHint] = useState<CaptureDetectHint | undefined>(undefined);
   const [submissionFolder, setSubmissionFolder] = useState<SubmissionFolder | null>(null);
   const [savedSubmissions, setSavedSubmissions] = useState<Array<{ id: string; name: string; timestamp: number }>>([]);
+
+  // Load saved submissions on mount
+  useEffect(() => {
+    listSubmissionHandles().then(setSavedSubmissions).catch(console.error);
+  }, []);
 
   const activeCardFormat = useMemo(() => {
     const fromSettings = selectionFromSettings(settings);
@@ -440,28 +441,27 @@ export default function App() {
       <>
         <ImageGalleryView
           onClose={() => setPhase(libraryReturnPhase)}
-          onEditImage={async (submissionId, card) => {
+          onEditImage={(submissionId, card) => {
             if (card.front_s3_url) {
-              try {
-                const response = await fetch(card.front_s3_url);
-                const blob = await response.blob();
-                const reader = new FileReader();
-                reader.onload = () => {
-                  setRawImage(reader.result as string);
-                  setCurrentSide('front');
-                  setSubmissionFolder({
-                    type: 'api',
-                    submissionId,
-                    name: '',
-                    nextCardNumber: card.card_number + 1,
-                    currentEdit: { cardNumber: card.card_number, side: 'front' },
-                  } as any);
-                  setPhase('crop');
-                };
-                reader.readAsDataURL(blob);
-              } catch (err) {
-                console.error('Failed to load image:', err);
-              }
+              fetch(card.front_s3_url)
+                .then(res => res.blob())
+                .then(blob => {
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    setRawImage(reader.result as string);
+                    setCurrentSide('front');
+                    setSubmissionFolder({
+                      type: 'api',
+                      submissionId,
+                      name: '',
+                      nextCardNumber: card.card_number + 1,
+                      currentEdit: { cardNumber: card.card_number, side: 'front' },
+                    } as any);
+                    setPhase('crop');
+                  };
+                  reader.readAsDataURL(blob);
+                })
+                .catch(err => console.error('Failed to load image:', err));
             }
           }}
         />
