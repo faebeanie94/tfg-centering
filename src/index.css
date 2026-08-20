@@ -2861,3 +2861,9 @@ body.editor-mode #root {
   margin-bottom: 16px;
 }
 
+.button-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+

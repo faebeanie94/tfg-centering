@@ -441,10 +441,11 @@ export default function App() {
       <>
         <ImageGalleryView
           onClose={() => setPhase(libraryReturnPhase)}
-          onEditImage={(submissionId, card) => {
-            console.log('Edit image clicked for card:', card.card_number);
-            if (card.front_s3_url) {
-              const url = `/api/submissions/${submissionId}/cards/${card.card_number}/image/front`;
+          onEditImage={(submissionId, card, side) => {
+            console.log('Edit image clicked for card:', card.card_number, 'side:', side);
+            const imageUrl = side === 'front' ? card.front_s3_url : card.back_s3_url;
+            if (imageUrl) {
+              const url = `/api/submissions/${submissionId}/cards/${card.card_number}/image/${side}`;
               console.log('Fetching image from:', url);
               fetch(url)
                 .then(res => {
@@ -460,7 +461,7 @@ export default function App() {
                   console.log('Setting workingImage, size:', data.data.length);
                   setRawImage(data.data);
                   setWorkingImage(data.data);
-                  setCurrentSide('front');
+                  setCurrentSide(side as CardSide);
                   setSession(emptySession);
                   setCardNames({ front: '', back: '' });
                   setEditorRects({});
@@ -469,7 +470,7 @@ export default function App() {
                     submissionId,
                     name: '',
                     nextCardNumber: card.card_number,
-                    currentEdit: { cardNumber: card.card_number, side: 'front' },
+                    currentEdit: { cardNumber: card.card_number, side: side as 'front' | 'back' },
                   } as any);
                   console.log('About to change phase to crop');
                   // Small delay to ensure state updates before phase change

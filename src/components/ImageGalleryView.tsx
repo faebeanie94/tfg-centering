@@ -11,7 +11,7 @@ interface SubmissionWithCards {
   cards: Card[];
 }
 
-export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void; onEditImage?: (submissionId: string, card: Card) => void }) {
+export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void; onEditImage?: (submissionId: string, card: Card, side: 'front' | 'back') => void }) {
   const [submissions, setSubmissions] = useState<SubmissionWithCards[]>([]);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState<string | null>(null);
@@ -180,7 +180,7 @@ export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void
             );
             setEditingCard(null);
           }}
-          onEditImage={onEditImage && (() => onEditImage(editingCard.submissionId, editingCard.card))}
+          onEditImage={onEditImage && ((submissionId: string, card: Card, side: 'front' | 'back') => onEditImage(submissionId, card, side))}
         />
       )}
     </div>

@@ -7,7 +7,7 @@ interface CardEditorModalProps {
   submissionId: string;
   onClose: () => void;
   onSave: (updatedCard: Card) => void;
-  onEditImage?: (submissionId: string, card: Card) => void;
+  onEditImage?: (submissionId: string, card: Card, side: 'front' | 'back') => void;
 }
 
 export function CardEditorModal({ card, submissionId, onClose, onSave, onEditImage }: CardEditorModalProps) {
@@ -96,9 +96,18 @@ export function CardEditorModal({ card, submissionId, onClose, onSave, onEditIma
         <div className="modal-footer">
           <button type="button" className="btn btn-secondary" onClick={onClose}>Close</button>
           {onEditImage && (
-            <button type="button" className="btn btn-secondary" onClick={() => { onEditImage(submissionId, card); }}>
-              Edit Images
-            </button>
+            <div className="button-group">
+              {card.front_s3_url && (
+                <button type="button" className="btn btn-secondary" onClick={() => { onEditImage(submissionId, card, 'front'); }}>
+                  Edit Front
+                </button>
+              )}
+              {card.back_s3_url && (
+                <button type="button" className="btn btn-secondary" onClick={() => { onEditImage(submissionId, card, 'back'); }}>
+                  Edit Back
+                </button>
+              )}
+            </div>
           )}
           <button type="button" className="btn btn-primary" onClick={handleSave} disabled={saving}>
             {saving ? 'Saving...' : 'Save'}
