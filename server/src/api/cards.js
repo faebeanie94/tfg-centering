@@ -154,7 +154,7 @@ router.put(
       await pool.query(
         `INSERT INTO card_metadata (card_id, front_grade, back_grade, condition, notes)
          VALUES ($1, $2, $3, $4, $5)
-         ON CONFLICT (card_id) DO UPDATE SET
+         ON CONFLICT ON CONSTRAINT uq_card_metadata_card_id DO UPDATE SET
            front_grade = COALESCE($2, card_metadata.front_grade),
            back_grade = COALESCE($3, card_metadata.back_grade),
            condition = COALESCE($4, card_metadata.condition),
