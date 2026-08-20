@@ -32,7 +32,7 @@ CREATE INDEX idx_cards_card_number ON cards(card_number);
 -- Card metadata table
 CREATE TABLE IF NOT EXISTS card_metadata (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  card_id UUID NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+  card_id UUID NOT NULL UNIQUE REFERENCES cards(id) ON DELETE CASCADE,
   front_grade VARCHAR(50),
   back_grade VARCHAR(50),
   condition VARCHAR(100),
