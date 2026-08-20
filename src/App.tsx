@@ -367,13 +367,19 @@ export default function App() {
 
       const submission = savedSubmissions.find((s) => s.id === id);
       if (submission && handle) {
-        // Fetch existing cards to determine next card number
+        // Fetch existing cards to find lowest available number (handles deleted cards)
         let nextCardNumber = 1;
         try {
           const cards = await api.listCards(id);
           if (cards.length > 0) {
-            const maxCardNumber = Math.max(...cards.map(c => c.card_number));
-            nextCardNumber = maxCardNumber + 1;
+            // Find the first gap - look for missing card numbers
+            const cardNumbers = new Set(cards.map(c => c.card_number));
+            for (let i = 1; i <= 1000; i++) {
+              if (!cardNumbers.has(i)) {
+                nextCardNumber = i;
+                break;
+              }
+            }
           }
         } catch (err) {
           console.warn('Failed to fetch cards, starting from card 1:', err);
