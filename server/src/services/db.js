@@ -12,15 +12,19 @@ function parseSQL(sql) {
 
     if (inDollarQuote) {
       current += char;
-      // Check if we're at the end of a dollar quote
+      // Check if we're at the start of the closing dollar quote
       if (sql.substr(i, inDollarQuote.length) === inDollarQuote) {
-        i += inDollarQuote.length - 1;
+        // Add the rest of the dollar quote (we already added first char)
+        if (inDollarQuote.length > 1) {
+          current += sql.substr(i + 1, inDollarQuote.length - 1);
+          i += inDollarQuote.length - 1;
+        }
         inDollarQuote = null;
       }
     } else if (char === '$') {
       // Look for dollar quote pattern (e.g., $$, $tag$, etc.)
       let j = i + 1;
-      while (j < sql.length && (sql[j].match(/[a-zA-Z0-9_]/))) {
+      while (j < sql.length && /[a-zA-Z0-9_]/.test(sql[j])) {
         j++;
       }
       if (j < sql.length && sql[j] === '$') {
