@@ -457,11 +457,13 @@ export default function App() {
                     console.error('No image data in response');
                     return;
                   }
-                  console.log('Setting rawImage, size:', data.data.length);
+                  console.log('Setting workingImage, size:', data.data.length);
                   setRawImage(data.data);
+                  setWorkingImage(data.data);
                   setCurrentSide('front');
                   setSession(emptySession);
                   setCardNames({ front: '', back: '' });
+                  setEditorRects({});
                   setSubmissionFolder({
                     type: 'api',
                     submissionId,
