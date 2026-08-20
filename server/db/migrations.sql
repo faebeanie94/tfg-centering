@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS card_metadata (
 );
 
 CREATE INDEX IF NOT EXISTS idx_card_metadata_card_id ON card_metadata(card_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_card_metadata_card_id ON card_metadata(card_id);
 
 -- Trigger to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
