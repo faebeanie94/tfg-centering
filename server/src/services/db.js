@@ -2,27 +2,39 @@ const fs = require('fs');
 const path = require('path');
 
 function parseSQL(sql) {
-  // Replace dollar-quoted strings with placeholders, split, then restore
-  const dollarStrings = [];
+  const statements = [];
+  let current = '';
+  let inDollarQuote = false;
+  let i = 0;
 
-  // Match dollar-quoted strings: $tag$...content...$tag$ (tag must match on both ends)
-  const processedSQL = sql.replace(/\$([a-zA-Z0-9_]*)\$[\s\S]*?\$\1\$/g, (match) => {
-    dollarStrings.push(match);
-    return `__PLACEHOLDER_${dollarStrings.length - 1}__`;
-  });
+  while (i < sql.length) {
+    // Check for dollar quote markers
+    if (!inDollarQuote && sql[i] === '$' && sql[i + 1] === '$') {
+      current += '$$';
+      i += 2;
+      inDollarQuote = true;
+    } else if (inDollarQuote && sql[i] === '$' && sql[i + 1] === '$') {
+      current += '$$';
+      i += 2;
+      inDollarQuote = false;
+    } else if (!inDollarQuote && sql[i] === ';') {
+      // Only treat as statement terminator outside dollar quotes
+      current = current.trim();
+      if (current.length > 0) {
+        statements.push(current);
+      }
+      current = '';
+      i++;
+    } else {
+      current += sql[i];
+      i++;
+    }
+  }
 
-  // Split on semicolons
-  const statements = processedSQL
-    .split(';')
-    .map(stmt => {
-      // Restore dollar-quoted strings
-      let restored = stmt;
-      dollarStrings.forEach((dollarStr, idx) => {
-        restored = restored.replace(`__PLACEHOLDER_${idx}__`, dollarStr);
-      });
-      return restored.trim();
-    })
-    .filter(stmt => stmt.length > 0);
+  current = current.trim();
+  if (current.length > 0) {
+    statements.push(current);
+  }
 
   return statements;
 }
