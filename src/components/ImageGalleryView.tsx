@@ -158,8 +158,9 @@ export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void
                         tabIndex={0}
                       >
                         <div className="gallery-card-header">
-                          Card {card.card_number} {worstGrade && `- ${worstGrade}`}
+                          <div className="gallery-card-title">Card {card.card_number} - {worstGrade || '—'}</div>
                         </div>
+
                         <div className="gallery-card-images">
                           {card.front_s3_url || card.back_s3_url ? (
                             <>
@@ -172,9 +173,6 @@ export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void
                                       (e.target as HTMLImageElement).style.display = 'none';
                                     }}
                                   />
-                                  {card.front_grade && (
-                                    <div className="gallery-card-grade">F: {card.front_grade}</div>
-                                  )}
                                 </div>
                               )}
                               {card.back_s3_url && (
@@ -186,15 +184,23 @@ export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void
                                       (e.target as HTMLImageElement).style.display = 'none';
                                     }}
                                   />
-                                  {card.back_grade && (
-                                    <div className="gallery-card-grade">B: {card.back_grade}</div>
-                                  )}
                                 </div>
                               )}
                             </>
                           ) : (
                             <p className="gallery-no-images">No images</p>
                           )}
+                        </div>
+
+                        <div className="gallery-card-grades">
+                          <div className="gallery-card-grade">
+                            <span className="grade-label">Front</span>
+                            <span className="grade-value">{card.front_grade || '—'}</span>
+                          </div>
+                          <div className="gallery-card-grade">
+                            <span className="grade-label">Back</span>
+                            <span className="grade-value">{card.back_grade || '—'}</span>
+                          </div>
                         </div>
                       </div>
                     );
