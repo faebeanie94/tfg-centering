@@ -442,12 +442,22 @@ export default function App() {
         <ImageGalleryView
           onClose={() => setPhase(libraryReturnPhase)}
           onEditImage={(submissionId, card) => {
+            console.log('Edit image clicked for card:', card.card_number);
             if (card.front_s3_url) {
-              fetch(`/api/submissions/${submissionId}/cards/${card.card_number}/image/front`)
-                .then(res => res.json())
+              const url = `/api/submissions/${submissionId}/cards/${card.card_number}/image/front`;
+              console.log('Fetching image from:', url);
+              fetch(url)
+                .then(res => {
+                  console.log('Response status:', res.status);
+                  return res.json();
+                })
                 .then(data => {
                   console.log('Image data received:', data);
-                  // Set all state synchronously before phase change
+                  if (!data.data) {
+                    console.error('No image data in response');
+                    return;
+                  }
+                  console.log('Setting rawImage, size:', data.data.length);
                   setRawImage(data.data);
                   setCurrentSide('front');
                   setSession(emptySession);
@@ -459,10 +469,16 @@ export default function App() {
                     nextCardNumber: card.card_number,
                     currentEdit: { cardNumber: card.card_number, side: 'front' },
                   } as any);
+                  console.log('About to change phase to crop');
                   // Small delay to ensure state updates before phase change
-                  setTimeout(() => setPhase('crop'), 0);
+                  setTimeout(() => {
+                    console.log('Changing phase to crop');
+                    setPhase('crop');
+                  }, 0);
                 })
                 .catch(err => console.error('Failed to load image:', err));
+            } else {
+              console.warn('No front_s3_url for card:', card.card_number);
             }
           }}
         />
