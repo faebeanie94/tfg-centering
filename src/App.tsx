@@ -443,23 +443,19 @@ export default function App() {
           onClose={() => setPhase(libraryReturnPhase)}
           onEditImage={(submissionId, card) => {
             if (card.front_s3_url) {
-              fetch(card.front_s3_url)
-                .then(res => res.blob())
-                .then(blob => {
-                  const reader = new FileReader();
-                  reader.onload = () => {
-                    setRawImage(reader.result as string);
-                    setCurrentSide('front');
-                    setSubmissionFolder({
-                      type: 'api',
-                      submissionId,
-                      name: '',
-                      nextCardNumber: card.card_number + 1,
-                      currentEdit: { cardNumber: card.card_number, side: 'front' },
-                    } as any);
-                    setPhase('crop');
-                  };
-                  reader.readAsDataURL(blob);
+              fetch(`/api/submissions/${submissionId}/cards/${card.card_number}/image/front`)
+                .then(res => res.json())
+                .then(data => {
+                  setRawImage(data.data);
+                  setCurrentSide('front');
+                  setSubmissionFolder({
+                    type: 'api',
+                    submissionId,
+                    name: '',
+                    nextCardNumber: card.card_number + 1,
+                    currentEdit: { cardNumber: card.card_number, side: 'front' },
+                  } as any);
+                  setPhase('crop');
                 })
                 .catch(err => console.error('Failed to load image:', err));
             }

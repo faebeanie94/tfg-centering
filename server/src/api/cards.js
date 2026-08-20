@@ -215,4 +215,56 @@ router.delete(
   })
 );
 
+// Serve image as data (to avoid CORS issues with direct GCS fetch)
+router.get(
+  '/:submissionId/cards/:cardNumber/image/:side',
+  validateUUID('submissionId'),
+  asyncHandler(async (req, res) => {
+    const { submissionId, cardNumber, side } = req.params;
+
+    if (!['front', 'back'].includes(side)) {
+      return res.status(400).json({ error: 'Invalid side' });
+    }
+
+    const result = await pool.query(
+      `SELECT c.id, c.${side}_s3_url FROM cards c WHERE c.submission_id = $1 AND c.card_number = $2`,
+      [submissionId, parseInt(cardNumber)]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Card not found' });
+    }
+
+    const card = result.rows[0];
+    const imageKey = `${side}_s3_url`;
+
+    if (!card[imageKey]) {
+      return res.status(404).json({ error: `${side} image not found` });
+    }
+
+    try {
+      const presignedUrl = await getPresignedUrl(submissionId, parseInt(cardNumber), side);
+
+      // Fetch the image from GCS using the presigned URL
+      const imageResponse = await fetch(presignedUrl);
+
+      if (!imageResponse.ok) {
+        return res.status(404).json({ error: 'Image not found in storage' });
+      }
+
+      const imageBuffer = await imageResponse.arrayBuffer();
+      const base64Data = Buffer.from(imageBuffer).toString('base64');
+      const mimeType = 'image/jpeg'; // Assuming JPEG, could detect from file extension
+
+      res.json({
+        data: `data:${mimeType};base64,${base64Data}`,
+        mimeType
+      });
+    } catch (err) {
+      console.error(`Failed to fetch ${side} image:`, err);
+      res.status(500).json({ error: 'Failed to load image' });
+    }
+  })
+);
+
 module.exports = router;
