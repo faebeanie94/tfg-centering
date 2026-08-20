@@ -462,7 +462,11 @@ export default function App() {
                   setRawImage(data.data);
                   setWorkingImage(data.data);
                   setCurrentSide(side as CardSide);
-                  setSession(emptySession);
+                  // For re-edits, mark the other side as already saved so Save Card button shows
+                  const otherSide = side === 'front' ? 'back' : 'front';
+                  const prefilledSession = emptySession();
+                  prefilledSession[otherSide] = { imageSrc: 'existing' } as any;
+                  setSession(prefilledSession);
                   setCardNames({ front: '', back: '' });
                   setEditorRects({});
                   setSubmissionFolder({
