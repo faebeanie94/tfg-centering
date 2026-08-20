@@ -46,18 +46,9 @@ async function initializeDatabase(pool) {
 
     // Parse SQL while respecting dollar-quoted strings
     const statements = parseSQL(migrations);
-    console.log(`Parsed ${statements.length} SQL statements`);
 
-    for (let i = 0; i < statements.length; i++) {
-      const statement = statements[i];
-      try {
-        await pool.query(statement);
-      } catch (err) {
-        console.error(`Failed on statement ${i + 1}/${statements.length}:`);
-        console.error(statement.substring(0, 300));
-        console.error('Error:', err.message);
-        throw err;
-      }
+    for (const statement of statements) {
+      await pool.query(statement);
     }
 
     console.log('Database migrations completed successfully');
