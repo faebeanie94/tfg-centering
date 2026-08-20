@@ -1,18 +1,21 @@
 import { useState, useEffect } from 'react';
 import * as api from '../lib/api-client';
+import type { Card } from '../lib/api-client';
 import { listSubmissionHandles } from '../lib/submission-persistence';
+import { CardEditorModal } from './CardEditorModal';
 
 interface SubmissionWithCards {
   id: string;
   name: string;
   type: 'api' | 'zip';
-  cards: Array<{ cardNumber: number; frontUrl?: string | null; backUrl?: string | null }>;
+  cards: Card[];
 }
 
 export function ImageGalleryView({ onClose }: { onClose: () => void }) {
   const [submissions, setSubmissions] = useState<SubmissionWithCards[]>([]);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState<string | null>(null);
+  const [editingCard, setEditingCard] = useState<{ submissionId: string; card: Card } | null>(null);
 
   useEffect(() => {
     loadSubmissions();
@@ -32,11 +35,7 @@ export function ImageGalleryView({ onClose }: { onClose: () => void }) {
             id: handle.id,
             name: submission?.name || handle.name,
             type: 'api',
-            cards: cards.map((card) => ({
-              cardNumber: card.card_number,
-              frontUrl: card.front_s3_url,
-              backUrl: card.back_s3_url,
-            })),
+            cards,
           });
         } catch (err) {
           console.warn('Failed to load submission:', handle.id, err);
@@ -108,27 +107,40 @@ export function ImageGalleryView({ onClose }: { onClose: () => void }) {
                   <p className="gallery-empty-submission">No images in this submission</p>
                 ) : (
                   submission.cards.map((card) => (
-                    <div key={card.cardNumber} className="gallery-card">
-                      <div className="gallery-card-number">Card {card.cardNumber}</div>
+                    <div
+                      key={card.card_number}
+                      className="gallery-card"
+                      onClick={() => setEditingCard({ submissionId: submission.id, card })}
+                      role="button"
+                      tabIndex={0}
+                    >
+                      <div className="gallery-card-number">Card {card.card_number}</div>
                       <div className="gallery-images">
-                        {card.frontUrl && (
+                        {card.front_s3_url && (
                           <img
-                            src={card.frontUrl}
-                            alt={`Card ${card.cardNumber} - Front`}
+                            src={card.front_s3_url}
+                            alt={`Card ${card.card_number} - Front`}
                             className="gallery-image"
                           />
                         )}
-                        {card.backUrl && (
+                        {card.back_s3_url && (
                           <img
-                            src={card.backUrl}
-                            alt={`Card ${card.cardNumber} - Back`}
+                            src={card.back_s3_url}
+                            alt={`Card ${card.card_number} - Back`}
                             className="gallery-image"
                           />
                         )}
-                        {!card.frontUrl && !card.backUrl && (
+                        {!card.front_s3_url && !card.back_s3_url && (
                           <p className="gallery-no-image">No images</p>
                         )}
                       </div>
+                      {(card.front_grade || card.back_grade || card.condition) && (
+                        <div className="gallery-card-metadata">
+                          {card.front_grade && <span className="grade-badge">F: {card.front_grade}</span>}
+                          {card.back_grade && <span className="grade-badge">B: {card.back_grade}</span>}
+                          {card.condition && <span className="condition-badge">{card.condition}</span>}
+                        </div>
+                      )}
                     </div>
                   ))
                 )}
@@ -136,6 +148,33 @@ export function ImageGalleryView({ onClose }: { onClose: () => void }) {
             </div>
           ))}
         </div>
+      )}
+
+      {editingCard && (
+        <CardEditorModal
+          card={editingCard.card}
+          submissionId={editingCard.submissionId}
+          onClose={() => setEditingCard(null)}
+          onSave={(updatedCard) => {
+            setSubmissions(
+              submissions.map((sub) =>
+                sub.id === editingCard.submissionId
+                  ? {
+                      ...sub,
+                      cards: sub.cards.map((c) =>
+                        c.card_number === updatedCard.card_number ? updatedCard : c
+                      ),
+                    }
+                  : sub
+              )
+            );
+            setEditingCard(null);
+          }}
+          onEditImage={() => {
+            // TODO: Load card image and open the crop/border editing workflow
+            console.log('Edit image for card:', editingCard.card.card_number);
+          }}
+        />
       )}
     </div>
   );
