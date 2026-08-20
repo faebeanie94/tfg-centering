@@ -6,15 +6,22 @@ function parseSQL(sql) {
   const dollarStrings = [];
   let processedSQL = sql;
 
-  // Match dollar-quoted strings: $tag$...content...$tag$
-  const dollarQuoteRegex = /\$[a-zA-Z0-9_]*\$[\s\S]*?\$[a-zA-Z0-9_]*\$/g;
+  // Match dollar-quoted strings: $tag$...content...$tag$ (tag must match on both ends)
+  const dollarQuoteRegex = /\$([a-zA-Z0-9_]*)\$[\s\S]*?\$\1\$/g;
   let match;
 
   // Replace all dollar-quoted strings with placeholders
   while ((match = dollarQuoteRegex.exec(sql)) !== null) {
     dollarStrings.push(match[0]);
-    processedSQL = processedSQL.replace(match[0], `__PLACEHOLDER_${dollarStrings.length - 1}__`);
   }
+
+  // Sort by length descending to replace longer strings first
+  dollarStrings.sort((a, b) => b.length - a.length);
+
+  // Replace all dollar-quoted strings with placeholders
+  dollarStrings.forEach((dollarStr, idx) => {
+    processedSQL = processedSQL.replace(dollarStr, `__PLACEHOLDER_${idx}__`);
+  });
 
   // Split on semicolons
   const statements = processedSQL
