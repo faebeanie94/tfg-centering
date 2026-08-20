@@ -446,16 +446,21 @@ export default function App() {
               fetch(`/api/submissions/${submissionId}/cards/${card.card_number}/image/front`)
                 .then(res => res.json())
                 .then(data => {
+                  console.log('Image data received:', data);
+                  // Set all state synchronously before phase change
                   setRawImage(data.data);
                   setCurrentSide('front');
+                  setSession(emptySession);
+                  setCardNames({ front: '', back: '' });
                   setSubmissionFolder({
                     type: 'api',
                     submissionId,
                     name: '',
-                    nextCardNumber: card.card_number + 1,
+                    nextCardNumber: card.card_number,
                     currentEdit: { cardNumber: card.card_number, side: 'front' },
                   } as any);
-                  setPhase('crop');
+                  // Small delay to ensure state updates before phase change
+                  setTimeout(() => setPhase('crop'), 0);
                 })
                 .catch(err => console.error('Failed to load image:', err));
             }
