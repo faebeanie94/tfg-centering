@@ -244,24 +244,25 @@ export default function App() {
           await saveToSubmissionFolder(submissionFolder, cleanDataUrl, currentSide);
           setSubmissionFolder((prev) => prev ? { ...prev } : null);
 
-          // Sync grades to backend API if this is an API submission
-          if (submissionFolder.type === 'api' && snapshot.grade) {
-            try {
-              const cardNum = isSubmissionCard
-                ? parseInt(cardNameMatch![2], 10)
-                : submissionFolder.lastCardNumberUsed || submissionFolder.nextCardNumber;
-
-              const gradeLabel = snapshot.grade.label;
-              const metadata = currentSide === 'front'
-                ? { frontGrade: gradeLabel }
-                : { backGrade: gradeLabel };
-
-              await api.updateCard(submissionFolder.submissionId, cardNum, metadata);
-              console.log(`Synced ${currentSide} grade (${gradeLabel}) to API for card ${cardNum}`);
-            } catch (err) {
-              console.error('Failed to sync grade to API:', err);
-            }
-          }
+          // TODO: Sync grades to backend API if this is an API submission
+          // Disabled due to backend constraint error - backend updateCard endpoint needs fixing
+          // if (submissionFolder.type === 'api' && snapshot.grade) {
+          //   try {
+          //     const cardNum = isSubmissionCard
+          //       ? parseInt(cardNameMatch![2], 10)
+          //       : submissionFolder.lastCardNumberUsed || submissionFolder.nextCardNumber;
+          //
+          //     const gradeLabel = snapshot.grade.label;
+          //     const metadata = currentSide === 'front'
+          //       ? { frontGrade: gradeLabel }
+          //       : { backGrade: gradeLabel };
+          //
+          //     await api.updateCard(submissionFolder.submissionId, cardNum, metadata);
+          //     console.log(`Synced ${currentSide} grade (${gradeLabel}) to API for card ${cardNum}`);
+          //   } catch (err) {
+          //     console.error('Failed to sync grade to API:', err);
+          //   }
+          // }
 
           // Auto-save to library when BOTH sides are complete, using submission name + card number
           // Skip auto-save if re-editing existing card (card already in library)
