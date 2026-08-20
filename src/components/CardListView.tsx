@@ -96,17 +96,34 @@ export function CardListView({ submission, onClose, onCardDeleted }: CardListVie
         <div className="card-list-grid">
           {cards.map(card => (
             <div key={card.cardNumber} className="card-list-item">
-              <div className="card-list-thumbnail">
-                {(card.frontUrl || card.backUrl) ? (
-                  <img
-                    src={(card.frontUrl || card.backUrl) as string}
-                    alt={`Card ${card.cardNumber}`}
-                    onError={(e) => {
-                      // If image fails to load, hide it
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
-                ) : null}
+              <div className="card-list-images">
+                {card.frontUrl && (
+                  <div className="card-list-image">
+                    <img
+                      src={card.frontUrl}
+                      alt={`Card ${card.cardNumber} - Front`}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                    <span className="card-list-side-label">Front</span>
+                  </div>
+                )}
+                {card.backUrl && (
+                  <div className="card-list-image">
+                    <img
+                      src={card.backUrl}
+                      alt={`Card ${card.cardNumber} - Back`}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                    <span className="card-list-side-label">Back</span>
+                  </div>
+                )}
+                {!card.frontUrl && !card.backUrl && (
+                  <p className="card-list-no-images">No images</p>
+                )}
               </div>
               <div className="card-list-number">Card {card.cardNumber}</div>
               <button

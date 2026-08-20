@@ -70,7 +70,7 @@ export function ImageCapture({
   onEndSubmission,
   savedSubmissions = [],
   onRestoreSubmission,
-  onDeleteSubmission: _onDeleteSubmission,
+  onDeleteSubmission,
 }: ImageCaptureProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -600,6 +600,20 @@ export function ImageCapture({
               {onEndSubmission && (
                 <button type="button" className="btn btn-secondary btn-small" onClick={onEndSubmission}>
                   End
+                </button>
+              )}
+              {onDeleteSubmission && submissionFolder.type === 'api' && (
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-small"
+                  style={{ color: 'var(--danger)' }}
+                  onClick={() => {
+                    if (confirm(`Delete "${submissionFolder.name}"? This cannot be undone.`)) {
+                      onDeleteSubmission(submissionFolder.submissionId);
+                    }
+                  }}
+                >
+                  Delete
                 </button>
               )}
             </div>
