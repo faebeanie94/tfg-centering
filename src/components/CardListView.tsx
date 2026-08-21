@@ -42,27 +42,21 @@ function CenteringMeasurements({ card }: { card: Card }) {
   }
 
   return (
-    <div className="card-list-centering">
+    <div className="card-list-measurements-section">
       {hasFrontMeasurements && (
-        <div className="centering-side">
-          <span className="centering-label">Front</span>
-          <div className="centering-values">
-            <span title="Left">L: {formatMm(card.frontLeftMm)}</span>
-            <span title="Right">R: {formatMm(card.frontRightMm)}</span>
-            <span title="Top">T: {formatMm(card.frontTopMm)}</span>
-            <span title="Bottom">B: {formatMm(card.frontBottomMm)}</span>
-          </div>
+        <div className="card-list-measurement-side">
+          <span className="card-list-measurement-label">Front</span>
+          <span className="card-list-measurement-values">
+            L: {formatMm(card.frontLeftMm)} | R: {formatMm(card.frontRightMm)} | T: {formatMm(card.frontTopMm)} | B: {formatMm(card.frontBottomMm)}
+          </span>
         </div>
       )}
       {hasBackMeasurements && (
-        <div className="centering-side">
-          <span className="centering-label">Back</span>
-          <div className="centering-values">
-            <span title="Left">L: {formatMm(card.backLeftMm)}</span>
-            <span title="Right">R: {formatMm(card.backRightMm)}</span>
-            <span title="Top">T: {formatMm(card.backTopMm)}</span>
-            <span title="Bottom">B: {formatMm(card.backBottomMm)}</span>
-          </div>
+        <div className="card-list-measurement-side">
+          <span className="card-list-measurement-label">Back</span>
+          <span className="card-list-measurement-values">
+            L: {formatMm(card.backLeftMm)} | R: {formatMm(card.backRightMm)} | T: {formatMm(card.backTopMm)} | B: {formatMm(card.backBottomMm)}
+          </span>
         </div>
       )}
     </div>
