@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { pool } = require('../server');
 const { getSubmissionPath } = require('./localStorage');
+const { getPresignedUrl } = require('./s3');
 
 // Create ZIP of submission
 const createSubmissionZip = async (submissionId, outputStream) => {
@@ -59,8 +60,9 @@ const createSubmissionZip = async (submissionId, outputStream) => {
       // Add front image from S3 or local
       if (card.front_s3_url) {
         try {
-          console.log(`Fetching front S3 URL for card ${card.card_number}: ${card.front_s3_url.substring(0, 80)}...`);
-          const frontResponse = await fetch(card.front_s3_url);
+          const frontUrl = await getPresignedUrl(submissionId, card.card_number, 'front');
+          console.log(`Fetching front image for card ${card.card_number}...`);
+          const frontResponse = await fetch(frontUrl);
           console.log(`Front S3 response: ${frontResponse.status}`);
           if (frontResponse.ok) {
             const buffer = await frontResponse.buffer();
@@ -68,6 +70,8 @@ const createSubmissionZip = async (submissionId, outputStream) => {
             archive.append(buffer, {
               name: `${folderName}/card-${card.card_number}/front.jpg`,
             });
+          } else {
+            console.error(`Front image returned ${frontResponse.status} for card ${card.card_number}`);
           }
         } catch (err) {
           console.error(`Failed to download front image for card ${card.card_number}:`, err.message);
@@ -84,8 +88,9 @@ const createSubmissionZip = async (submissionId, outputStream) => {
       // Add back image from S3 or local
       if (card.back_s3_url) {
         try {
-          console.log(`Fetching back S3 URL for card ${card.card_number}: ${card.back_s3_url.substring(0, 80)}...`);
-          const backResponse = await fetch(card.back_s3_url);
+          const backUrl = await getPresignedUrl(submissionId, card.card_number, 'back');
+          console.log(`Fetching back image for card ${card.card_number}...`);
+          const backResponse = await fetch(backUrl);
           console.log(`Back S3 response: ${backResponse.status}`);
           if (backResponse.ok) {
             const buffer = await backResponse.buffer();
@@ -93,6 +98,8 @@ const createSubmissionZip = async (submissionId, outputStream) => {
             archive.append(buffer, {
               name: `${folderName}/card-${card.card_number}/back.jpg`,
             });
+          } else {
+            console.error(`Back image returned ${backResponse.status} for card ${card.card_number}`);
           }
         } catch (err) {
           console.error(`Failed to download back image for card ${card.card_number}:`, err.message);
