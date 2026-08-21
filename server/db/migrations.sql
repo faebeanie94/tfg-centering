@@ -67,3 +67,13 @@ CREATE TRIGGER update_cards_updated_at BEFORE UPDATE ON cards
 DROP TRIGGER IF EXISTS update_card_metadata_updated_at ON card_metadata;
 CREATE TRIGGER update_card_metadata_updated_at BEFORE UPDATE ON card_metadata
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Add centering measurements to card_metadata
+ALTER TABLE card_metadata ADD COLUMN IF NOT EXISTS front_left_mm NUMERIC(10, 2);
+ALTER TABLE card_metadata ADD COLUMN IF NOT EXISTS front_right_mm NUMERIC(10, 2);
+ALTER TABLE card_metadata ADD COLUMN IF NOT EXISTS front_top_mm NUMERIC(10, 2);
+ALTER TABLE card_metadata ADD COLUMN IF NOT EXISTS front_bottom_mm NUMERIC(10, 2);
+ALTER TABLE card_metadata ADD COLUMN IF NOT EXISTS back_left_mm NUMERIC(10, 2);
+ALTER TABLE card_metadata ADD COLUMN IF NOT EXISTS back_right_mm NUMERIC(10, 2);
+ALTER TABLE card_metadata ADD COLUMN IF NOT EXISTS back_top_mm NUMERIC(10, 2);
+ALTER TABLE card_metadata ADD COLUMN IF NOT EXISTS back_bottom_mm NUMERIC(10, 2);
