@@ -616,6 +616,7 @@ export default function App() {
         invertColors={settings.invertColors}
         initialCorners={perspectiveCorners}
         cardAspect={autoCropOptions.cardAspect}
+        side={currentSide}
         onComplete={handlePerspectiveComplete}
         onSkip={handlePerspectiveSkip}
         onCancel={() => setPhase(workingImage ? 'editor' : 'capture')}

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { CardSide } from '../lib/tfg-standards';
 import {
   type CornerKey,
   type QuadCorners,
@@ -15,6 +16,8 @@ interface PerspectiveCorrectorProps {
   initialCorners?: QuadCorners | null;
   /** Portrait width/height for the selected card format. */
   cardAspect?: number;
+  /** Which side of the card is being corrected. */
+  side?: CardSide;
   onComplete: (correctedSrc: string) => void;
   onSkip: () => void;
   onCancel: () => void;
@@ -65,6 +68,7 @@ export function PerspectiveCorrector({
   invertColors = false,
   initialCorners = null,
   cardAspect,
+  side = 'front',
   onComplete,
   onSkip,
   onCancel,
@@ -489,7 +493,7 @@ export function PerspectiveCorrector({
             {/* Black outline for contrast */}
             <polygon
               points={linePoints}
-              fill="rgba(255, 193, 7, 0.15)"
+              fill={side === 'back' ? 'rgba(255, 193, 7, 0.15)' : 'rgba(59, 130, 246, 0.22)'}
               stroke={isDarkImage ? '#000000' : '#ffffff'}
               strokeWidth={8}
               strokeDasharray="16 8"
