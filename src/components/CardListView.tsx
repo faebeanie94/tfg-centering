@@ -15,8 +15,8 @@ function getOverallGrade(card: Card): string {
   const grades = [card.frontGrade, card.backGrade].filter(Boolean) as string[];
   if (grades.length === 0) return '—';
   if (grades.length === 1) return grades[0];
-  // Simple comparison - assume grades are formatted the same way
-  return grades.sort()[0]; // This sorts alphabetically; adjust if needed for numeric grades
+  // Sort numerically to get the lower grade (TFG 9 < TFG 10)
+  return grades.sort((a, b) => parseFloat(a) - parseFloat(b))[0];
 }
 
 interface CardListViewProps {
