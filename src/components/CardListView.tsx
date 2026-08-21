@@ -27,6 +27,12 @@ function getOverallGrade(card: Card): string {
   return grades.sort((a, b) => parseFloat(a) - parseFloat(b))[0];
 }
 
+function formatMm(value: number | string | null | undefined): string {
+  if (value === null || value === undefined) return '—';
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  return isNaN(num) ? '—' : num.toFixed(2);
+}
+
 function CenteringMeasurements({ card }: { card: Card }) {
   const hasFrontMeasurements = card.frontLeftMm !== null && card.frontLeftMm !== undefined;
   const hasBackMeasurements = card.backLeftMm !== null && card.backLeftMm !== undefined;
@@ -41,10 +47,10 @@ function CenteringMeasurements({ card }: { card: Card }) {
         <div className="centering-side">
           <span className="centering-label">Front</span>
           <div className="centering-values">
-            <span title="Left">L: {card.frontLeftMm?.toFixed(2) || '—'}</span>
-            <span title="Right">R: {card.frontRightMm?.toFixed(2) || '—'}</span>
-            <span title="Top">T: {card.frontTopMm?.toFixed(2) || '—'}</span>
-            <span title="Bottom">B: {card.frontBottomMm?.toFixed(2) || '—'}</span>
+            <span title="Left">L: {formatMm(card.frontLeftMm)}</span>
+            <span title="Right">R: {formatMm(card.frontRightMm)}</span>
+            <span title="Top">T: {formatMm(card.frontTopMm)}</span>
+            <span title="Bottom">B: {formatMm(card.frontBottomMm)}</span>
           </div>
         </div>
       )}
@@ -52,10 +58,10 @@ function CenteringMeasurements({ card }: { card: Card }) {
         <div className="centering-side">
           <span className="centering-label">Back</span>
           <div className="centering-values">
-            <span title="Left">L: {card.backLeftMm?.toFixed(2) || '—'}</span>
-            <span title="Right">R: {card.backRightMm?.toFixed(2) || '—'}</span>
-            <span title="Top">T: {card.backTopMm?.toFixed(2) || '—'}</span>
-            <span title="Bottom">B: {card.backBottomMm?.toFixed(2) || '—'}</span>
+            <span title="Left">L: {formatMm(card.backLeftMm)}</span>
+            <span title="Right">R: {formatMm(card.backRightMm)}</span>
+            <span title="Top">T: {formatMm(card.backTopMm)}</span>
+            <span title="Bottom">B: {formatMm(card.backBottomMm)}</span>
           </div>
         </div>
       )}
