@@ -508,22 +508,6 @@ export function PerspectiveCorrector({
               strokeDasharray="16 8"
             />
 
-            <line
-              x1={active.x}
-              y1={0}
-              x2={active.x}
-              y2={imageSize.height}
-              className="perspective-guide-line"
-              strokeWidth={guideStroke}
-            />
-            <line
-              x1={0}
-              y1={active.y}
-              x2={imageSize.width}
-              y2={active.y}
-              className="perspective-guide-line"
-              strokeWidth={guideStroke}
-            />
 
             {CORNERS.map(({ key }) => {
               const p = corners[key];
