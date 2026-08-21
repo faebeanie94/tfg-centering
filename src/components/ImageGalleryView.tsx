@@ -146,7 +146,13 @@ export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void
                       submission.cards.map((card) => {
                         const overallGrade = getOverallGrade(card.front_grade, card.back_grade);
                         return (
-                          <div key={card.card_number} className="card-list-item">
+                          <div
+                            key={card.card_number}
+                            className="card-list-item"
+                            onClick={() => setEditingCard({ submissionId: submission.id, card })}
+                            role="button"
+                            tabIndex={0}
+                          >
                             <div className="card-list-header-row">
                               <div className="card-list-title">Card {card.card_number} - {overallGrade}</div>
                             </div>
