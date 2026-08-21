@@ -79,6 +79,7 @@ export function PerspectiveCorrector({
   const [selectedCorner, setSelectedCorner] = useState<CornerKey>('tl');
   const [dragging, setDragging] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [isDarkImage, setIsDarkImage] = useState(true);
   const dragStartRef = useRef<{ x: number; y: number; corners: QuadCorners } | null>(null);
 
   useAppShellMode('editor-mode', true);
@@ -119,6 +120,23 @@ export function PerspectiveCorrector({
         bitmapRef.current = await createImageBitmap(img);
       } catch {
         bitmapRef.current = null;
+      }
+
+      // Detect image brightness to choose dash color
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.min(200, img.naturalWidth);
+      canvas.height = Math.min(200, img.naturalHeight);
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        let sum = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          sum += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+        }
+        const avgBrightness = sum / (data.length / 4);
+        setIsDarkImage(avgBrightness < 128);
       }
     };
     img.src = imageSrc;
@@ -471,17 +489,17 @@ export function PerspectiveCorrector({
             {/* Black outline for contrast */}
             <polygon
               points={linePoints}
-              fill="rgba(59,130,246,0.22)"
-              stroke="#000000"
+              fill="rgba(255, 193, 7, 0.15)"
+              stroke={isDarkImage ? '#000000' : '#ffffff'}
               strokeWidth={8}
               strokeDasharray="16 8"
               strokeOpacity={0.4}
             />
-            {/* White dash strokes */}
+            {/* Adaptive dash strokes - white for dark, black for light */}
             <polygon
               points={linePoints}
               fill="none"
-              stroke="#ffffff"
+              stroke={isDarkImage ? '#ffffff' : '#000000'}
               strokeWidth={6}
               strokeDasharray="16 8"
             />
