@@ -203,7 +203,7 @@ export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void
                                   <div className="card-list-measurement-side">
                                     <span className="card-list-measurement-label">Front</span>
                                     <span className="card-list-measurement-values">
-                                      L: {formatMm(card.front_left_mm)} | R: {formatMm(card.front_right_mm)} | T: {formatMm(card.front_top_mm)} | B: {formatMm(card.front_bottom_mm)}
+                                      T: {formatMm(card.front_top_mm)} | B: {formatMm(card.front_bottom_mm)} | L: {formatMm(card.front_left_mm)} | R: {formatMm(card.front_right_mm)}
                                     </span>
                                   </div>
                                 )}
@@ -211,7 +211,7 @@ export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void
                                   <div className="card-list-measurement-side">
                                     <span className="card-list-measurement-label">Back</span>
                                     <span className="card-list-measurement-values">
-                                      L: {formatMm(card.back_left_mm)} | R: {formatMm(card.back_right_mm)} | T: {formatMm(card.back_top_mm)} | B: {formatMm(card.back_bottom_mm)}
+                                      T: {formatMm(card.back_top_mm)} | B: {formatMm(card.back_bottom_mm)} | L: {formatMm(card.back_left_mm)} | R: {formatMm(card.back_right_mm)}
                                     </span>
                                   </div>
                                 )}

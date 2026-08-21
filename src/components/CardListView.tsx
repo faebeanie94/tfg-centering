@@ -47,7 +47,7 @@ function CenteringMeasurements({ card }: { card: Card }) {
         <div className="card-list-measurement-side">
           <span className="card-list-measurement-label">Front</span>
           <span className="card-list-measurement-values">
-            L: {formatMm(card.frontLeftMm)} | R: {formatMm(card.frontRightMm)} | T: {formatMm(card.frontTopMm)} | B: {formatMm(card.frontBottomMm)}
+            T: {formatMm(card.frontTopMm)} | B: {formatMm(card.frontBottomMm)} | L: {formatMm(card.frontLeftMm)} | R: {formatMm(card.frontRightMm)}
           </span>
         </div>
       )}
@@ -55,7 +55,7 @@ function CenteringMeasurements({ card }: { card: Card }) {
         <div className="card-list-measurement-side">
           <span className="card-list-measurement-label">Back</span>
           <span className="card-list-measurement-values">
-            L: {formatMm(card.backLeftMm)} | R: {formatMm(card.backRightMm)} | T: {formatMm(card.backTopMm)} | B: {formatMm(card.backBottomMm)}
+            T: {formatMm(card.backTopMm)} | B: {formatMm(card.backBottomMm)} | L: {formatMm(card.backLeftMm)} | R: {formatMm(card.backRightMm)}
           </span>
         </div>
       )}
