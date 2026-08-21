@@ -6,6 +6,7 @@ const { getSubmissionPath } = require('./localStorage');
 
 // Create ZIP of submission
 const createSubmissionZip = async (submissionId, outputStream) => {
+  console.log(`📦 Starting export for submission: ${submissionId}`);
   const archive = archiver('zip', { zlib: { level: 9 } });
 
   archive.pipe(outputStream);
@@ -22,6 +23,7 @@ const createSubmissionZip = async (submissionId, outputStream) => {
     }
 
     const submission = submissionResult.rows[0];
+    console.log(`📦 Found submission: "${submission.name}"`);
     const submissionDir = getSubmissionPath(submissionId);
     const folderName = submission.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
 
@@ -40,6 +42,7 @@ const createSubmissionZip = async (submissionId, outputStream) => {
        ORDER BY c.card_number ASC`,
       [submissionId]
     );
+    console.log(`📦 Found ${cardsResult.rows.length} cards to export`);
 
     // Add card folders with images and metadata
     for (const card of cardsResult.rows) {
@@ -105,7 +108,9 @@ const createSubmissionZip = async (submissionId, outputStream) => {
     }
 
     // Finalize archive
+    console.log(`📦 Finalizing archive with ${cardsResult.rows.length} cards`);
     await archive.finalize();
+    console.log(`📦 Export complete`);
   } catch (err) {
     archive.destroy();
     throw err;
