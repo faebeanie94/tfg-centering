@@ -222,71 +222,147 @@ export function BorderEditor({
       const dy = (e.clientY - start.y) / imageScale;
       const r = start.rect;
       let next: Rect = { ...r };
+      let nextOther: Rect | null = null;
 
       const isOuter = dragTarget.rect === 'outer';
-      const innerMinX = inner?.x ?? 0;
-      const innerMaxX = inner ? inner.x + inner.width : imageSize.width;
-      const innerMinY = inner?.y ?? 0;
-      const innerMaxY = inner ? inner.y + inner.height : imageSize.height;
+      const outerRect = isOuter ? r : (outer || defaultOuterRect(imageSize.width, imageSize.height));
+      const innerRect = isOuter ? (inner || defaultInnerRect(outerRect)) : r;
+
+      const outerMinX = outerRect.x;
+      const outerMaxX = outerRect.x + outerRect.width;
+      const outerMinY = outerRect.y;
+      const outerMaxY = outerRect.y + outerRect.height;
+      const innerMinX = innerRect.x;
+      const innerMaxX = innerRect.x + innerRect.width;
+      const innerMinY = innerRect.y;
+      const innerMaxY = innerRect.y + innerRect.height;
 
       if ('edge' in dragTarget) {
         switch (dragTarget.edge) {
           case 'left':
-            const leftMax = isOuter ? Math.min(r.x + r.width - 20, innerMinX) : r.x + r.width - 20;
-            next.x = clamp(r.x + dx, 0, leftMax);
-            next.width = r.width - (next.x - r.x);
+            if (isOuter) {
+              const wantX = r.x + dx;
+              if (wantX > innerMinX) {
+                // Moving right (inward) - push inner along
+                next.x = wantX;
+                next.width = r.width - (next.x - r.x);
+                nextOther = { ...innerRect };
+                nextOther.x = wantX;
+                nextOther.width = innerRect.width - (wantX - innerMinX);
+              } else {
+                // Moving left (outward) - normal clamp
+                next.x = clamp(wantX, 0, innerMinX);
+                next.width = r.width - (next.x - r.x);
+              }
+            } else {
+              const wantX = r.x + dx;
+              if (wantX < outerMinX) {
+                // Moving left (outward) - push outer along
+                next.x = wantX;
+                next.width = r.width - (next.x - r.x);
+                nextOther = { ...outerRect };
+                nextOther.x = wantX;
+                nextOther.width = outerRect.width - (wantX - outerMinX);
+              } else {
+                // Moving right (inward) - normal clamp
+                next.x = clamp(wantX, outerMinX, r.x + r.width - 20);
+                next.width = r.width - (next.x - r.x);
+              }
+            }
             break;
           case 'right':
-            const rightMin = isOuter ? Math.max(20, innerMaxX - r.x) : 20;
-            next.width = clamp(r.width + dx, rightMin, imageSize.width - r.x);
+            if (isOuter) {
+              const wantRight = r.x + r.width + dx;
+              if (wantRight < innerMaxX) {
+                // Moving left (inward) - push inner along
+                next.width = wantRight - r.x;
+                nextOther = { ...innerRect };
+                nextOther.width = wantRight - innerRect.x;
+              } else {
+                // Moving right (outward) - normal clamp
+                next.width = clamp(wantRight - r.x, 20, imageSize.width - r.x);
+              }
+            } else {
+              const wantRight = r.x + r.width + dx;
+              if (wantRight > outerMaxX) {
+                // Moving right (outward) - push outer along
+                next.width = wantRight - r.x;
+                nextOther = { ...outerRect };
+                nextOther.width = wantRight - outerRect.x;
+              } else {
+                // Moving left (inward) - normal clamp
+                next.width = clamp(wantRight - r.x, 20, outerMaxX - r.x);
+              }
+            }
             break;
           case 'top':
-            const topMax = isOuter ? Math.min(r.y + r.height - 20, innerMinY) : r.y + r.height - 20;
-            next.y = clamp(r.y + dy, 0, topMax);
-            next.height = r.height - (next.y - r.y);
+            if (isOuter) {
+              const wantY = r.y + dy;
+              if (wantY > innerMinY) {
+                // Moving down (inward) - push inner along
+                next.y = wantY;
+                next.height = r.height - (next.y - r.y);
+                nextOther = { ...innerRect };
+                nextOther.y = wantY;
+                nextOther.height = innerRect.height - (wantY - innerMinY);
+              } else {
+                // Moving up (outward) - normal clamp
+                next.y = clamp(wantY, 0, innerMinY);
+                next.height = r.height - (next.y - r.y);
+              }
+            } else {
+              const wantY = r.y + dy;
+              if (wantY < outerMinY) {
+                // Moving up (outward) - push outer along
+                next.y = wantY;
+                next.height = r.height - (next.y - r.y);
+                nextOther = { ...outerRect };
+                nextOther.y = wantY;
+                nextOther.height = outerRect.height - (wantY - outerMinY);
+              } else {
+                // Moving down (inward) - normal clamp
+                next.y = clamp(wantY, outerMinY, r.y + r.height - 20);
+                next.height = r.height - (next.y - r.y);
+              }
+            }
             break;
           case 'bottom':
-            const bottomMin = isOuter ? Math.max(20, innerMaxY - r.y) : 20;
-            next.height = clamp(r.height + dy, bottomMin, imageSize.height - r.y);
-            break;
-        }
-      } else if ('corner' in dragTarget) {
-        switch (dragTarget.corner) {
-          case 'tl':
-            const tlLeftMax = isOuter ? Math.min(r.x + r.width - 20, innerMinX) : r.x + r.width - 20;
-            const tlTopMax = isOuter ? Math.min(r.y + r.height - 20, innerMinY) : r.y + r.height - 20;
-            next.x = clamp(r.x + dx, 0, tlLeftMax);
-            next.y = clamp(r.y + dy, 0, tlTopMax);
-            next.width = r.width - (next.x - r.x);
-            next.height = r.height - (next.y - r.y);
-            break;
-          case 'tr':
-            const trTopMax = isOuter ? Math.min(r.y + r.height - 20, innerMinY) : r.y + r.height - 20;
-            const trRightMin = isOuter ? Math.max(20, innerMaxX - r.x) : 20;
-            next.y = clamp(r.y + dy, 0, trTopMax);
-            next.width = clamp(r.width + dx, trRightMin, imageSize.width - r.x);
-            next.height = r.height - (next.y - r.y);
-            break;
-          case 'bl':
-            const blLeftMax = isOuter ? Math.min(r.x + r.width - 20, innerMinX) : r.x + r.width - 20;
-            const blBottomMin = isOuter ? Math.max(20, innerMaxY - r.y) : 20;
-            next.x = clamp(r.x + dx, 0, blLeftMax);
-            next.width = r.width - (next.x - r.x);
-            next.height = clamp(r.height + dy, blBottomMin, imageSize.height - r.y);
-            break;
-          case 'br':
-            const brRightMin = isOuter ? Math.max(20, innerMaxX - r.x) : 20;
-            const brBottomMin = isOuter ? Math.max(20, innerMaxY - r.y) : 20;
-            next.width = clamp(r.width + dx, brRightMin, imageSize.width - r.x);
-            next.height = clamp(r.height + dy, brBottomMin, imageSize.height - r.y);
+            if (isOuter) {
+              const wantBottom = r.y + r.height + dy;
+              if (wantBottom < innerMaxY) {
+                // Moving up (inward) - push inner along
+                next.height = wantBottom - r.y;
+                nextOther = { ...innerRect };
+                nextOther.height = wantBottom - innerRect.y;
+              } else {
+                // Moving down (outward) - normal clamp
+                next.height = clamp(wantBottom - r.y, 20, imageSize.height - r.y);
+              }
+            } else {
+              const wantBottom = r.y + r.height + dy;
+              if (wantBottom > outerMaxY) {
+                // Moving down (outward) - push outer along
+                next.height = wantBottom - r.y;
+                nextOther = { ...outerRect };
+                nextOther.height = wantBottom - outerRect.y;
+              } else {
+                // Moving up (inward) - normal clamp
+                next.height = clamp(wantBottom - r.y, 20, outerMaxY - r.y);
+              }
+            }
             break;
         }
       }
 
-      if (dragTarget.rect === 'outer') setOuter(next);
-      else setInner(next);
+      if (dragTarget.rect === 'outer') {
+        setOuter(next);
+        if (nextOther) setInner(nextOther);
+      } else {
+        setInner(next);
+        if (nextOther) setOuter(nextOther);
+      }
     },
-    [dragTarget, displayScale, imageSize],
+    [dragTarget, displayScale, imageSize, outer, inner],
   );
 
   const handlePointerUp = useCallback(() => {
@@ -315,6 +391,7 @@ export function BorderEditor({
         <EdgeArrowHandle
           edge={edge}
           color={color}
+          slot={rectType}
           onPointerDown={(e) => handlePointerDown({ rect: rectType, edge }, e)}
         />
       </div>
@@ -491,13 +568,33 @@ export function BorderEditor({
             <rect x={inner.x} y={inner.y + inner.height} width={inner.width} height={outer.y + outer.height - (inner.y + inner.height)} fill={`url(#${patternId})`} />
 
             <rect x={outer.x} y={outer.y} width={outer.width} height={outer.height} fill="none" stroke={settings.outerEdgeColor} strokeWidth={3} />
-            <rect x={inner.x} y={inner.y} width={inner.width} height={inner.height} fill="none" stroke={settings.handleColor} strokeWidth={2} />
+            <rect x={inner.x} y={inner.y} width={inner.width} height={inner.height} fill="none" stroke={settings.innerEdgeColor} strokeWidth={2} />
+
+            {/* Draggable edge areas for outer rect */}
+            <rect x={outer.x - 8} y={outer.y} width={16} height={outer.height} fill="transparent" cursor="col-resize"
+              onPointerDown={(e) => handlePointerDown({ rect: 'outer', edge: 'left' }, e as any)} />
+            <rect x={outer.x + outer.width - 8} y={outer.y} width={16} height={outer.height} fill="transparent" cursor="col-resize"
+              onPointerDown={(e) => handlePointerDown({ rect: 'outer', edge: 'right' }, e as any)} />
+            <rect x={outer.x} y={outer.y - 8} width={outer.width} height={16} fill="transparent" cursor="row-resize"
+              onPointerDown={(e) => handlePointerDown({ rect: 'outer', edge: 'top' }, e as any)} />
+            <rect x={outer.x} y={outer.y + outer.height - 8} width={outer.width} height={16} fill="transparent" cursor="row-resize"
+              onPointerDown={(e) => handlePointerDown({ rect: 'outer', edge: 'bottom' }, e as any)} />
+
+            {/* Draggable edge areas for inner rect */}
+            <rect x={inner.x - 8} y={inner.y} width={16} height={inner.height} fill="transparent" cursor="col-resize"
+              onPointerDown={(e) => handlePointerDown({ rect: 'inner', edge: 'left' }, e as any)} />
+            <rect x={inner.x + inner.width - 8} y={inner.y} width={16} height={inner.height} fill="transparent" cursor="col-resize"
+              onPointerDown={(e) => handlePointerDown({ rect: 'inner', edge: 'right' }, e as any)} />
+            <rect x={inner.x} y={inner.y - 8} width={inner.width} height={16} fill="transparent" cursor="row-resize"
+              onPointerDown={(e) => handlePointerDown({ rect: 'inner', edge: 'top' }, e as any)} />
+            <rect x={inner.x} y={inner.y + inner.height - 8} width={inner.width} height={16} fill="transparent" cursor="row-resize"
+              onPointerDown={(e) => handlePointerDown({ rect: 'inner', edge: 'bottom' }, e as any)} />
           </svg>
         </div>
 
         <div className="handles-layer">
           {renderEdgeHandles(outer, 'outer', settings.handleColor)}
-          {renderEdgeHandles(inner, 'inner', settings.handleColor)}
+          {renderEdgeHandles(inner, 'inner', settings.innerEdgeColor)}
         </div>
       </div>
       </div>

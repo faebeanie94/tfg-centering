@@ -536,6 +536,19 @@ const RIM_STABLE_AVG_STEP = 8;
 /** Minimum single-pixel luminance jump to count as a real edge, not noise. */
 const RIM_EDGE_THRESHOLD = 35;
 
+function analyzeImageContrast(data: Uint8ClampedArray, w: number, h: number): number {
+  let minLum = 255, maxLum = 0;
+  const step = Math.max(1, Math.floor(Math.min(w, h) / 80));
+  for (let y = 0; y < h; y += step) {
+    for (let x = 0; x < w; x += step) {
+      const lum = 0.299 * data[(y * w + x) * 4] + 0.587 * data[(y * w + x) * 4 + 1] + 0.114 * data[(y * w + x) * 4 + 2];
+      minLum = Math.min(minLum, lum);
+      maxLum = Math.max(maxLum, lum);
+    }
+  }
+  return maxLum - minLum;
+}
+
 /**
  * Refine an integer edge step to a fractional one. Camera blur/JPEG smoothing
  * spreads a real edge over a few pixels, so the strongest single-pixel delta
@@ -582,6 +595,8 @@ function findRimPoint(
   minDist: number,
   maxDist: number,
   expectedDist: number,
+  edgeThreshold: number = RIM_EDGE_THRESHOLD,
+  stableAvgStep: number = RIM_STABLE_AVG_STEP,
 ): Point | null {
   const dx = Math.cos(angle);
   const dy = Math.sin(angle);
@@ -608,7 +623,7 @@ function findRimPoint(
   let farthestStable = -1;
   for (let s = scanStart; s <= maxS; s++) {
     const grad = Math.abs(lums[s] - lums[s - 1]);
-    if (grad < RIM_EDGE_THRESHOLD) continue;
+    if (grad < edgeThreshold) continue;
     const windowEnd = Math.min(maxS, s + RIM_STABLE_WINDOW);
     if (windowEnd - s < RIM_STABLE_WINDOW * 0.6) continue; // too close to the frame edge to judge
     let stepSum = 0;
@@ -617,7 +632,7 @@ function findRimPoint(
       stepSum += Math.abs(lums[k] - lums[k - 1]);
       n++;
     }
-    if (n > 0 && stepSum / n <= RIM_STABLE_AVG_STEP) farthestStable = s;
+    if (n > 0 && stepSum / n <= stableAvgStep) farthestStable = s;
   }
   if (farthestStable >= 0) {
     const refined = subPixelRim(lums, farthestStable, maxS);
@@ -724,6 +739,21 @@ function refineQuadFromSeed(
   const minDist = Math.min(halfW, halfH) * 0.5;
   const maxDist = Math.max(halfW, halfH) * 1.35;
 
+  // Analyze contrast and use adaptive thresholds for light-bordered cards
+  const contrast = analyzeImageContrast(data, w, h);
+  let edgeThreshold = RIM_EDGE_THRESHOLD;
+  let stableAvgStep = RIM_STABLE_AVG_STEP;
+
+  if (contrast < 100) {
+    // Low-contrast (light borders) - use very aggressive thresholds
+    edgeThreshold = Math.max(3, contrast * 0.15);
+    stableAvgStep = Math.max(1, contrast * 0.05);
+  } else if (contrast < 150) {
+    // Medium-contrast - moderate reduction
+    edgeThreshold = Math.max(15, contrast * 0.2);
+    stableAvgStep = Math.max(3, contrast * 0.06);
+  }
+
   const buckets: Point[][] = [[], [], [], []]; // L R T B by dominant axis angle
 
   // Cards are portrait rectangles, not squares — the true corners sit at
@@ -737,7 +767,7 @@ function refineQuadFromSeed(
     // Expected rim distance for a rectangle varies with angle.
     const expectedDist =
       1 / Math.sqrt((Math.cos(angle) / halfW) ** 2 + (Math.sin(angle) / halfH) ** 2);
-    const p = findRimPoint(data, w, h, cx, cy, angle, minDist, maxDist, expectedDist);
+    const p = findRimPoint(data, w, h, cx, cy, angle, minDist, maxDist, expectedDist, edgeThreshold, stableAvgStep);
     if (!p) continue;
 
     // Classify by angle relative to card centre into 4 sides.

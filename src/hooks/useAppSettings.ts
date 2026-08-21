@@ -10,6 +10,7 @@ import {
 
 export interface AppSettings {
   handleColor: string;
+  innerEdgeColor: string;
   borderFillColor: string;
   outerEdgeColor: string;
   autoCapture: boolean;
@@ -42,6 +43,7 @@ export const SCAN_OBSTRUCTION_OPTIONS = [
 
 export const DEFAULT_SETTINGS: AppSettings = {
   handleColor: '#facc15',
+  innerEdgeColor: '#facc15',
   borderFillColor: '#78c285',
   outerEdgeColor: '#78c285',
   autoCapture: true,

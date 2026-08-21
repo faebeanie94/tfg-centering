@@ -88,9 +88,14 @@ export function SettingsPanel({ open, settings, onChange, onClose }: SettingsPan
         <section className="settings-section">
           <h3>Appearance</h3>
           <ColorField
-            label="Arrow handle colour"
+            label="Outer arrow handle colour"
             value={settings.handleColor}
             onChange={(v) => onChange({ handleColor: v })}
+          />
+          <ColorField
+            label="Inner arrow handle colour"
+            value={settings.innerEdgeColor}
+            onChange={(v) => onChange({ innerEdgeColor: v })}
           />
           <ColorField
             label="Border fill colour"
