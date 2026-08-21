@@ -588,6 +588,17 @@ export function ImageCapture({
                   Manage Cards
                 </button>
               )}
+              {submissionFolder.type === 'api' && (
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-small"
+                  onClick={() => {
+                    window.location.href = `/api/submissions/${submissionFolder.submissionId}/export`;
+                  }}
+                >
+                  Export ZIP
+                </button>
+              )}
               {submissionFolder.type === 'zip' && (
                 <button
                   type="button"
