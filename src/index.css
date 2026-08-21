@@ -3139,6 +3139,36 @@ body.editor-mode #root {
   color: var(--text);
 }
 
+.gallery-card-measurements {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-top: 1px solid var(--border);
+  background-color: var(--surface-2);
+  font-size: 0.75rem;
+}
+
+.gallery-measurement-side {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gallery-measurement-label {
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.gallery-measurement-values {
+  color: var(--text);
+  font-family: 'Monaco', 'Courier New', monospace;
+  font-size: 0.75rem;
+}
+
 .grade-badge {
   background-color: var(--primary);
   color: white;

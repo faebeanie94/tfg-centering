@@ -11,6 +11,12 @@ interface SubmissionWithCards {
   cards: Card[];
 }
 
+function formatMm(value: number | string | null | undefined): string {
+  if (value === null || value === undefined) return '—';
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  return isNaN(num) ? '—' : num.toFixed(2);
+}
+
 function extractGradeNumber(grade: string | null | undefined): number | null {
   if (!grade) return null;
   const match = grade.match(/\d+/);
@@ -191,6 +197,28 @@ export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void
                             <p className="gallery-no-images">No images</p>
                           )}
                         </div>
+
+                        {((card.front_left_mm !== null && card.front_left_mm !== undefined) ||
+                          (card.back_left_mm !== null && card.back_left_mm !== undefined)) && (
+                          <div className="gallery-card-measurements">
+                            {(card.front_left_mm !== null && card.front_left_mm !== undefined) && (
+                              <div className="gallery-measurement-side">
+                                <span className="gallery-measurement-label">Front</span>
+                                <span className="gallery-measurement-values">
+                                  L: {formatMm(card.front_left_mm)} | R: {formatMm(card.front_right_mm)} | T: {formatMm(card.front_top_mm)} | B: {formatMm(card.front_bottom_mm)}
+                                </span>
+                              </div>
+                            )}
+                            {(card.back_left_mm !== null && card.back_left_mm !== undefined) && (
+                              <div className="gallery-measurement-side">
+                                <span className="gallery-measurement-label">Back</span>
+                                <span className="gallery-measurement-values">
+                                  L: {formatMm(card.back_left_mm)} | R: {formatMm(card.back_right_mm)} | T: {formatMm(card.back_top_mm)} | B: {formatMm(card.back_bottom_mm)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        )}
 
                         <div className="gallery-card-grades">
                           <div className="gallery-card-grade">
