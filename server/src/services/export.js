@@ -28,11 +28,23 @@ const createSubmissionZip = async (submissionId, outputStream) => {
     const submissionDir = getSubmissionPath(submissionId);
     const folderName = submission.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
 
-    // Add submission metadata
-    const metadataPath = path.join(submissionDir, 'submission.json');
-    if (fs.existsSync(metadataPath)) {
-      archive.file(metadataPath, { name: `${folderName}/submission.json` });
-    }
+    // Add submission summary JSON
+    const submissionSummary = {
+      name: submission.name,
+      id: submissionId,
+      cardCount: cardsResult.rows.length,
+      exportedAt: new Date().toISOString(),
+      cards: cardsResult.rows.map(card => ({
+        cardNumber: card.card_number,
+        frontGrade: card.front_grade || null,
+        backGrade: card.back_grade || null,
+        condition: card.condition || null,
+        notes: card.notes || null,
+      })),
+    };
+    archive.append(JSON.stringify(submissionSummary, null, 2), {
+      name: `${folderName}/submission.json`,
+    });
 
     // Get all cards
     const cardsResult = await pool.query(
@@ -114,6 +126,18 @@ const createSubmissionZip = async (submissionId, outputStream) => {
           });
         }
       }
+
+      // Add card metadata JSON
+      const cardMetadata = {
+        cardNumber: card.card_number,
+        frontGrade: card.front_grade || null,
+        backGrade: card.back_grade || null,
+        condition: card.condition || null,
+        notes: card.notes || null,
+      };
+      archive.append(JSON.stringify(cardMetadata, null, 2), {
+        name: `${folderName}/card-${card.card_number}/metadata.json`,
+      });
     }
 
     // Add grades CSV
