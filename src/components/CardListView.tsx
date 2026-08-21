@@ -42,21 +42,27 @@ function CenteringMeasurements({ card }: { card: Card }) {
   }
 
   return (
-    <div className="card-list-measurements-section">
+    <div className="card-list-centering">
       {hasFrontMeasurements && (
-        <div className="card-list-measurement-side">
-          <span className="card-list-measurement-label">Front</span>
-          <span className="card-list-measurement-values">
-            L: {formatMm(card.frontLeftMm)} | R: {formatMm(card.frontRightMm)} | T: {formatMm(card.frontTopMm)} | B: {formatMm(card.frontBottomMm)}
-          </span>
+        <div className="centering-side">
+          <span className="centering-label">Front</span>
+          <div className="centering-values">
+            <span title="Left">L: {formatMm(card.frontLeftMm)}</span>
+            <span title="Right">R: {formatMm(card.frontRightMm)}</span>
+            <span title="Top">T: {formatMm(card.frontTopMm)}</span>
+            <span title="Bottom">B: {formatMm(card.frontBottomMm)}</span>
+          </div>
         </div>
       )}
       {hasBackMeasurements && (
-        <div className="card-list-measurement-side">
-          <span className="card-list-measurement-label">Back</span>
-          <span className="card-list-measurement-values">
-            L: {formatMm(card.backLeftMm)} | R: {formatMm(card.backRightMm)} | T: {formatMm(card.backTopMm)} | B: {formatMm(card.backBottomMm)}
-          </span>
+        <div className="centering-side">
+          <span className="centering-label">Back</span>
+          <div className="centering-values">
+            <span title="Left">L: {formatMm(card.backLeftMm)}</span>
+            <span title="Right">R: {formatMm(card.backRightMm)}</span>
+            <span title="Top">T: {formatMm(card.backTopMm)}</span>
+            <span title="Bottom">B: {formatMm(card.backBottomMm)}</span>
+          </div>
         </div>
       )}
     </div>
@@ -237,6 +243,17 @@ export function CardListView({ submission, onClose, onCardDeleted }: CardListVie
                           (e.target as HTMLImageElement).style.display = 'none';
                         }}
                       />
+                      {(card.frontLeftMm !== null || card.frontLeftMm !== undefined) && (
+                        <div className="card-list-measurements">
+                          <span className="measurement-label">Front</span>
+                          <div className="measurement-values">
+                            <div>L: {formatMm(card.frontLeftMm)}</div>
+                            <div>R: {formatMm(card.frontRightMm)}</div>
+                            <div>T: {formatMm(card.frontTopMm)}</div>
+                            <div>B: {formatMm(card.frontBottomMm)}</div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                   {card.backUrl && (
@@ -248,6 +265,17 @@ export function CardListView({ submission, onClose, onCardDeleted }: CardListVie
                           (e.target as HTMLImageElement).style.display = 'none';
                         }}
                       />
+                      {(card.backLeftMm !== null || card.backLeftMm !== undefined) && (
+                        <div className="card-list-measurements">
+                          <span className="measurement-label">Back</span>
+                          <div className="measurement-values">
+                            <div>L: {formatMm(card.backLeftMm)}</div>
+                            <div>R: {formatMm(card.backRightMm)}</div>
+                            <div>T: {formatMm(card.backTopMm)}</div>
+                            <div>B: {formatMm(card.backBottomMm)}</div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                   {!card.frontUrl && !card.backUrl && (

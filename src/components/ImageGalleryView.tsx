@@ -17,21 +17,11 @@ function formatMm(value: number | string | null | undefined): string {
   return isNaN(num) ? '—' : num.toFixed(2);
 }
 
-function extractGradeNumber(grade: string | null | undefined): number | null {
-  if (!grade) return null;
-  const match = grade.match(/\d+/);
-  return match ? parseInt(match[0], 10) : null;
-}
-
-function getWorstGrade(frontGrade: string | null | undefined, backGrade: string | null | undefined): string | null {
-  const frontNum = extractGradeNumber(frontGrade);
-  const backNum = extractGradeNumber(backGrade);
-
-  if (frontNum === null && backNum === null) return null;
-  if (frontNum === null) return (backGrade as string | null) || null;
-  if (backNum === null) return (frontGrade as string | null) || null;
-
-  return frontNum <= backNum ? (frontGrade as string) : (backGrade as string);
+function getOverallGrade(frontGrade: string | null | undefined, backGrade: string | null | undefined): string {
+  const grades = [frontGrade, backGrade].filter(Boolean) as string[];
+  if (grades.length === 0) return '—';
+  if (grades.length === 1) return grades[0];
+  return grades.sort((a, b) => parseFloat(a) - parseFloat(b))[0];
 }
 
 export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void; onEditImage?: (submissionId: string, card: Card, side: 'front' | 'back') => void }) {
@@ -112,22 +102,22 @@ export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void
   }
 
   return (
-    <div className="gallery-view">
-      <div className="gallery-header">
-        <button type="button" className="btn btn-secondary btn-small" onClick={onClose}>
+    <div className="card-list">
+      <div className="card-list-header">
+        <button type="button" className="btn btn-secondary btn-small" onClick={onClose} disabled={exporting !== null}>
           ← Back
         </button>
         <h2>Card Images</h2>
       </div>
 
       {submissions.length === 0 ? (
-        <p className="gallery-empty">No submissions with images yet.</p>
+        <p className="card-list-empty">No submissions with images yet.</p>
       ) : (
         <div className="gallery-submissions">
           {submissions.map((submission) => {
             const isExpanded = expandedSubmissions.has(submission.id);
             return (
-              <div key={submission.id} className="gallery-submission">
+              <div key={submission.id}>
                 <div className="gallery-submission-header">
                   <button
                     type="button"
@@ -149,29 +139,21 @@ export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void
                 </div>
 
                 {isExpanded && (
-                  <div className="gallery-grid">
-                {submission.cards.length === 0 ? (
-                  <p className="gallery-empty-submission">No images in this submission</p>
-                ) : (
-                  submission.cards.map((card) => {
-                    const worstGrade = getWorstGrade(card.front_grade, card.back_grade);
-                    return (
-                      <div
-                        key={card.card_number}
-                        className="gallery-card"
-                        onClick={() => setEditingCard({ submissionId: submission.id, card })}
-                        role="button"
-                        tabIndex={0}
-                      >
-                        <div className="gallery-card-header">
-                          <div className="gallery-card-title">Card {card.card_number} - {worstGrade || '—'}</div>
-                        </div>
+                  <div className="card-list-grid">
+                    {submission.cards.length === 0 ? (
+                      <p className="card-list-empty">No images in this submission</p>
+                    ) : (
+                      submission.cards.map((card) => {
+                        const overallGrade = getOverallGrade(card.front_grade, card.back_grade);
+                        return (
+                          <div key={card.card_number} className="card-list-item">
+                            <div className="card-list-header-row">
+                              <div className="card-list-title">Card {card.card_number} - {overallGrade}</div>
+                            </div>
 
-                        <div className="gallery-card-images">
-                          {card.front_s3_url || card.back_s3_url ? (
-                            <>
+                            <div className="card-list-images">
                               {card.front_s3_url && (
-                                <div className="gallery-card-image">
+                                <div className="card-list-image">
                                   <img
                                     src={card.front_s3_url}
                                     alt={`Card ${card.card_number} - Front`}
@@ -182,7 +164,7 @@ export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void
                                 </div>
                               )}
                               {card.back_s3_url && (
-                                <div className="gallery-card-image">
+                                <div className="card-list-image">
                                   <img
                                     src={card.back_s3_url}
                                     alt={`Card ${card.card_number} - Back`}
@@ -192,49 +174,48 @@ export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void
                                   />
                                 </div>
                               )}
-                            </>
-                          ) : (
-                            <p className="gallery-no-images">No images</p>
-                          )}
-                        </div>
+                              {!card.front_s3_url && !card.back_s3_url && (
+                                <p className="card-list-no-images">No images</p>
+                              )}
+                            </div>
 
-                        {((card.front_left_mm !== null && card.front_left_mm !== undefined) ||
-                          (card.back_left_mm !== null && card.back_left_mm !== undefined)) && (
-                          <div className="gallery-card-measurements">
-                            {(card.front_left_mm !== null && card.front_left_mm !== undefined) && (
-                              <div className="gallery-measurement-side">
-                                <span className="gallery-measurement-label">Front</span>
-                                <span className="gallery-measurement-values">
-                                  L: {formatMm(card.front_left_mm)} | R: {formatMm(card.front_right_mm)} | T: {formatMm(card.front_top_mm)} | B: {formatMm(card.front_bottom_mm)}
-                                </span>
+                            <div className="card-list-grades">
+                              <div className="card-list-grade">
+                                <span className="grade-label">Front</span>
+                                <span className="grade-value">{card.front_grade || '—'}</span>
+                              </div>
+                              <div className="card-list-grade">
+                                <span className="grade-label">Back</span>
+                                <span className="grade-value">{card.back_grade || '—'}</span>
+                              </div>
+                            </div>
+
+                            {((card.front_left_mm !== null && card.front_left_mm !== undefined) ||
+                              (card.back_left_mm !== null && card.back_left_mm !== undefined)) && (
+                              <div className="card-list-measurements-section">
+                                {(card.front_left_mm !== null && card.front_left_mm !== undefined) && (
+                                  <div className="card-list-measurement-side">
+                                    <span className="card-list-measurement-label">Front</span>
+                                    <span className="card-list-measurement-values">
+                                      L: {formatMm(card.front_left_mm)} | R: {formatMm(card.front_right_mm)} | T: {formatMm(card.front_top_mm)} | B: {formatMm(card.front_bottom_mm)}
+                                    </span>
+                                  </div>
+                                )}
+                                {(card.back_left_mm !== null && card.back_left_mm !== undefined) && (
+                                  <div className="card-list-measurement-side">
+                                    <span className="card-list-measurement-label">Back</span>
+                                    <span className="card-list-measurement-values">
+                                      L: {formatMm(card.back_left_mm)} | R: {formatMm(card.back_right_mm)} | T: {formatMm(card.back_top_mm)} | B: {formatMm(card.back_bottom_mm)}
+                                    </span>
+                                  </div>
+                                )}
                               </div>
                             )}
-                            {(card.back_left_mm !== null && card.back_left_mm !== undefined) && (
-                              <div className="gallery-measurement-side">
-                                <span className="gallery-measurement-label">Back</span>
-                                <span className="gallery-measurement-values">
-                                  L: {formatMm(card.back_left_mm)} | R: {formatMm(card.back_right_mm)} | T: {formatMm(card.back_top_mm)} | B: {formatMm(card.back_bottom_mm)}
-                                </span>
-                              </div>
-                            )}
                           </div>
-                        )}
-
-                        <div className="gallery-card-grades">
-                          <div className="gallery-card-grade">
-                            <span className="grade-label">Front</span>
-                            <span className="grade-value">{card.front_grade || '—'}</span>
-                          </div>
-                          <div className="gallery-card-grade">
-                            <span className="grade-label">Back</span>
-                            <span className="grade-value">{card.back_grade || '—'}</span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-                </div>
+                        );
+                      })
+                    )}
+                  </div>
                 )}
               </div>
             );
