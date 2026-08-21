@@ -56,15 +56,18 @@ const createSubmissionZip = async (submissionId, outputStream) => {
       // Add front image from S3 or local
       if (card.front_s3_url) {
         try {
+          console.log(`Fetching front S3 URL for card ${card.card_number}: ${card.front_s3_url.substring(0, 80)}...`);
           const frontResponse = await fetch(card.front_s3_url);
+          console.log(`Front S3 response: ${frontResponse.status}`);
           if (frontResponse.ok) {
             const buffer = await frontResponse.buffer();
+            console.log(`Added front image (${buffer.length} bytes) for card ${card.card_number}`);
             archive.append(buffer, {
               name: `${folderName}/card-${card.card_number}/front.jpg`,
             });
           }
         } catch (err) {
-          console.warn(`Failed to download front image for card ${card.card_number}:`, err.message);
+          console.error(`Failed to download front image for card ${card.card_number}:`, err.message);
         }
       } else {
         const frontPath = path.join(cardDir, 'front.jpg');
@@ -78,15 +81,18 @@ const createSubmissionZip = async (submissionId, outputStream) => {
       // Add back image from S3 or local
       if (card.back_s3_url) {
         try {
+          console.log(`Fetching back S3 URL for card ${card.card_number}: ${card.back_s3_url.substring(0, 80)}...`);
           const backResponse = await fetch(card.back_s3_url);
+          console.log(`Back S3 response: ${backResponse.status}`);
           if (backResponse.ok) {
             const buffer = await backResponse.buffer();
+            console.log(`Added back image (${buffer.length} bytes) for card ${card.card_number}`);
             archive.append(buffer, {
               name: `${folderName}/card-${card.card_number}/back.jpg`,
             });
           }
         } catch (err) {
-          console.warn(`Failed to download back image for card ${card.card_number}:`, err.message);
+          console.error(`Failed to download back image for card ${card.card_number}:`, err.message);
         }
       } else {
         const backPath = path.join(cardDir, 'back.jpg');
