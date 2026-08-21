@@ -211,56 +211,6 @@ export function BorderEditor({
     [outer, inner],
   );
 
-  const handleCanvasPointerDown = useCallback(
-    (e: React.PointerEvent) => {
-      if (!imageSize || !outer || !inner) return;
-
-      const rect = containerRef.current?.getBoundingClientRect();
-      if (!rect) return;
-
-      const imageScale = rect.width / imageSize.width;
-      const x = (e.clientX - rect.left) / imageScale;
-      const y = (e.clientY - rect.top) / imageScale;
-      const threshold = 20; // pixels in image space
-
-      // Check if near outer edges
-      if (Math.abs(x - outer.x) < threshold && y >= outer.y - threshold && y <= outer.y + outer.height + threshold) {
-        handlePointerDown({ rect: 'outer', edge: 'left' }, e);
-        return;
-      }
-      if (Math.abs(x - (outer.x + outer.width)) < threshold && y >= outer.y - threshold && y <= outer.y + outer.height + threshold) {
-        handlePointerDown({ rect: 'outer', edge: 'right' }, e);
-        return;
-      }
-      if (Math.abs(y - outer.y) < threshold && x >= outer.x - threshold && x <= outer.x + outer.width + threshold) {
-        handlePointerDown({ rect: 'outer', edge: 'top' }, e);
-        return;
-      }
-      if (Math.abs(y - (outer.y + outer.height)) < threshold && x >= outer.x - threshold && x <= outer.x + outer.width + threshold) {
-        handlePointerDown({ rect: 'outer', edge: 'bottom' }, e);
-        return;
-      }
-
-      // Check if near inner edges
-      if (Math.abs(x - inner.x) < threshold && y >= inner.y - threshold && y <= inner.y + inner.height + threshold) {
-        handlePointerDown({ rect: 'inner', edge: 'left' }, e);
-        return;
-      }
-      if (Math.abs(x - (inner.x + inner.width)) < threshold && y >= inner.y - threshold && y <= inner.y + inner.height + threshold) {
-        handlePointerDown({ rect: 'inner', edge: 'right' }, e);
-        return;
-      }
-      if (Math.abs(y - inner.y) < threshold && x >= inner.x - threshold && x <= inner.x + inner.width + threshold) {
-        handlePointerDown({ rect: 'inner', edge: 'top' }, e);
-        return;
-      }
-      if (Math.abs(y - (inner.y + inner.height)) < threshold && x >= inner.x - threshold && x <= inner.x + inner.width + threshold) {
-        handlePointerDown({ rect: 'inner', edge: 'bottom' }, e);
-        return;
-      }
-    },
-    [imageSize, outer, inner, handlePointerDown],
-  );
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
@@ -589,7 +539,6 @@ export function BorderEditor({
         ref={containerRef}
         className="editor-canvas"
         style={{ width: imageSize.width * displayScale, height: displayHeight }}
-        onPointerDown={handleCanvasPointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
@@ -624,6 +573,17 @@ export function BorderEditor({
             <rect x={inner.x} y={inner.y} width={inner.width} height={inner.height} fill="none" stroke={settings.innerEdgeColor} strokeWidth={2} />
           </svg>
         </div>
+
+        {/* Draggable edge overlays */}
+        <div className="edge-overlay" style={{ left: `${outer.x * displayScale}px`, top: `${outer.y * displayScale}px`, width: `4px`, height: `${outer.height * displayScale}px`, cursor: 'col-resize' }} onPointerDown={(e) => handlePointerDown({ rect: 'outer', edge: 'left' }, e)} />
+        <div className="edge-overlay" style={{ left: `${(outer.x + outer.width - 2) * displayScale}px`, top: `${outer.y * displayScale}px`, width: `4px`, height: `${outer.height * displayScale}px`, cursor: 'col-resize' }} onPointerDown={(e) => handlePointerDown({ rect: 'outer', edge: 'right' }, e)} />
+        <div className="edge-overlay" style={{ left: `${outer.x * displayScale}px`, top: `${outer.y * displayScale}px`, width: `${outer.width * displayScale}px`, height: `4px`, cursor: 'row-resize' }} onPointerDown={(e) => handlePointerDown({ rect: 'outer', edge: 'top' }, e)} />
+        <div className="edge-overlay" style={{ left: `${outer.x * displayScale}px`, top: `${(outer.y + outer.height - 2) * displayScale}px`, width: `${outer.width * displayScale}px`, height: `4px`, cursor: 'row-resize' }} onPointerDown={(e) => handlePointerDown({ rect: 'outer', edge: 'bottom' }, e)} />
+
+        <div className="edge-overlay" style={{ left: `${inner.x * displayScale}px`, top: `${inner.y * displayScale}px`, width: `4px`, height: `${inner.height * displayScale}px`, cursor: 'col-resize' }} onPointerDown={(e) => handlePointerDown({ rect: 'inner', edge: 'left' }, e)} />
+        <div className="edge-overlay" style={{ left: `${(inner.x + inner.width - 2) * displayScale}px`, top: `${inner.y * displayScale}px`, width: `4px`, height: `${inner.height * displayScale}px`, cursor: 'col-resize' }} onPointerDown={(e) => handlePointerDown({ rect: 'inner', edge: 'right' }, e)} />
+        <div className="edge-overlay" style={{ left: `${inner.x * displayScale}px`, top: `${inner.y * displayScale}px`, width: `${inner.width * displayScale}px`, height: `4px`, cursor: 'row-resize' }} onPointerDown={(e) => handlePointerDown({ rect: 'inner', edge: 'top' }, e)} />
+        <div className="edge-overlay" style={{ left: `${inner.x * displayScale}px`, top: `${(inner.y + inner.height - 2) * displayScale}px`, width: `${inner.width * displayScale}px`, height: `4px`, cursor: 'row-resize' }} onPointerDown={(e) => handlePointerDown({ rect: 'inner', edge: 'bottom' }, e)} />
 
         <div className="handles-layer">
           {renderEdgeHandles(outer, 'outer', settings.handleColor)}
