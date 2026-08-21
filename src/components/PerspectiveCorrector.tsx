@@ -471,7 +471,7 @@ export function PerspectiveCorrector({
             <polygon
               points={linePoints}
               fill="rgba(59,130,246,0.22)"
-              stroke="#49a3e1"
+              stroke="#1e5a96"
               strokeWidth={6}
               strokeDasharray="16 8"
             />
