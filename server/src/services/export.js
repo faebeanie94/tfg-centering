@@ -65,7 +65,8 @@ const createSubmissionZip = async (submissionId, outputStream) => {
           const frontResponse = await fetch(frontUrl);
           console.log(`Front S3 response: ${frontResponse.status}`);
           if (frontResponse.ok) {
-            const buffer = await frontResponse.buffer();
+            const arrayBuffer = await frontResponse.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
             console.log(`Added front image (${buffer.length} bytes) for card ${card.card_number}`);
             archive.append(buffer, {
               name: `${folderName}/card-${card.card_number}/front.jpg`,
@@ -93,7 +94,8 @@ const createSubmissionZip = async (submissionId, outputStream) => {
           const backResponse = await fetch(backUrl);
           console.log(`Back S3 response: ${backResponse.status}`);
           if (backResponse.ok) {
-            const buffer = await backResponse.buffer();
+            const arrayBuffer = await backResponse.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
             console.log(`Added back image (${buffer.length} bytes) for card ${card.card_number}`);
             archive.append(buffer, {
               name: `${folderName}/card-${card.card_number}/back.jpg`,
