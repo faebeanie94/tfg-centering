@@ -178,42 +178,66 @@ export function SavedCardsView({ cards, loading, onClose, onOpen, onDelete, onUp
   }
 
   function renderCard(record: SavedCardRecord) {
-    const thumb = thumbSrc(record);
-    const sides = [record.session.front ? 'Front' : null, record.session.back ? 'Back' : null]
-      .filter(Boolean)
-      .join(' · ');
     const isEditing = editingId === record.id;
+    const grade = gradeSummary(record);
 
     return (
-      <li key={record.id} className="library-item">
-        <button type="button" className="library-item-main" onClick={() => onOpen(record)} disabled={busy || isEditing}>
-          {thumb ? (
-            <img src={thumb} alt="" className="library-thumb" />
+      <div key={record.id} className="library-card-item">
+        <div className="library-card-header-row">
+          {isEditing ? (
+            <input
+              type="text"
+              className="library-card-title-input"
+              value={editLabel}
+              onChange={(e) => setEditLabel(e.target.value)}
+              placeholder="Card name"
+              autoFocus
+            />
           ) : (
-            <div className="library-thumb library-thumb-empty">?</div>
+            <div className="library-card-title">{record.label} - {grade}</div>
           )}
-          <div className="library-item-body">
-            {isEditing ? (
-              <input
-                type="text"
-                className="library-item-title-input"
-                value={editLabel}
-                onChange={(e) => setEditLabel(e.target.value)}
-                placeholder="Card name"
-                autoFocus
-              />
-            ) : (
-              <div className="library-item-title">{record.label}</div>
-            )}
-            <div className="library-item-meta">
-              <span className="library-grade">{gradeSummary(record)}</span>
-              <span>{sides}</span>
-            </div>
-            <div className="library-item-date">{formatWhen(record.savedAt)}</div>
-          </div>
-        </button>
+        </div>
 
-        <div className="library-item-actions">
+        <div className="library-card-images">
+          {record.session.front?.imageSrc && (
+            <div className="library-card-image">
+              <img
+                src={record.session.front.imageSrc}
+                alt={`${record.label} - Front`}
+                onClick={() => onOpen(record)}
+              />
+            </div>
+          )}
+          {record.session.back?.imageSrc && (
+            <div className="library-card-image">
+              <img
+                src={record.session.back.imageSrc}
+                alt={`${record.label} - Back`}
+                onClick={() => onOpen(record)}
+              />
+            </div>
+          )}
+          {!record.session.front?.imageSrc && !record.session.back?.imageSrc && (
+            <div className="library-card-no-images">No images</div>
+          )}
+        </div>
+
+        <div className="library-card-grades">
+          {record.session.front && (
+            <div className="library-card-grade">
+              <span className="grade-label">Front</span>
+              <span className="grade-value">{formatGrade(record.session.front.grade.grade)}</span>
+            </div>
+          )}
+          {record.session.back && (
+            <div className="library-card-grade">
+              <span className="grade-label">Back</span>
+              <span className="grade-value">{formatGrade(record.session.back.grade.grade)}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="library-card-actions">
           {isEditing ? (
             <>
               <button
@@ -278,7 +302,7 @@ export function SavedCardsView({ cards, loading, onClose, onOpen, onDelete, onUp
               ) : (
                 <button
                   type="button"
-                  className="btn btn-secondary btn-small library-delete-btn"
+                  className="btn btn-secondary btn-small"
                   disabled={busy}
                   onClick={() => setConfirmDeleteId(record.id)}
                 >
@@ -288,7 +312,7 @@ export function SavedCardsView({ cards, loading, onClose, onOpen, onDelete, onUp
             </>
           )}
         </div>
-      </li>
+      </div>
     );
   }
 
@@ -378,9 +402,9 @@ export function SavedCardsView({ cards, loading, onClose, onOpen, onDelete, onUp
                 </div>
               )}
               {!isCollapsed && (
-                <ul className="library-list" id={`library-group-${id}`}>
+                <div className="library-card-grid" id={`library-group-${id}`}>
                   {group.cards.map(renderCard)}
-                </ul>
+                </div>
               )}
             </section>
           );

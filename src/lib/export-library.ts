@@ -317,7 +317,7 @@ export async function buildLibraryArchive(
         sides[side] = manifestSide(snapshot, imagePath);
         imageCount += 1;
       } catch (err) {
-        console.warn(`Skipping corrupted image for card ${record.label} (${side}):`, err);
+        console.error(`Failed to export image for card ${record.label} (${side}):`, err instanceof Error ? err.message : err);
       }
     }
 
