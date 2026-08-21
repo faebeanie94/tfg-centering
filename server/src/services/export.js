@@ -116,6 +116,27 @@ const createSubmissionZip = async (submissionId, outputStream) => {
       }
     }
 
+    // Add grades CSV
+    const gradesLines = ['Card Number,Front Grade,Back Grade,Overall Grade'];
+    for (const card of cardsResult.rows) {
+      const frontGrade = card.front_grade || '—';
+      const backGrade = card.back_grade || '—';
+      // Overall grade is the lower of the two (limiting grade)
+      let overallGrade = '—';
+      if (frontGrade !== '—' && backGrade !== '—') {
+        overallGrade = [frontGrade, backGrade].sort()[0];
+      } else if (frontGrade !== '—') {
+        overallGrade = frontGrade;
+      } else if (backGrade !== '—') {
+        overallGrade = backGrade;
+      }
+      gradesLines.push(`${card.card_number},${frontGrade},${backGrade},${overallGrade}`);
+    }
+    archive.append(gradesLines.join('\n') + '\n', {
+      name: `${folderName}/grades.csv`,
+    });
+    console.log(`📦 Added grades CSV with ${gradesLines.length - 1} cards`);
+
     // Finalize archive
     console.log(`📦 Finalizing archive with ${cardsResult.rows.length} cards`);
     await archive.finalize();
