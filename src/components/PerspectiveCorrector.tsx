@@ -433,7 +433,6 @@ export function PerspectiveCorrector({
   const crosshairArm = screenPx(9, displayScale);
   const crosshairStroke = screenPx(1.5, displayScale);
   const crosshairStrokeActive = screenPx(2, displayScale);
-  const guideStroke = screenPx(1.25, displayScale);
   const hitRadius = screenPx(26, displayScale);
   const centerDot = screenPx(1.5, displayScale);
   const outlineExtra = screenPx(0.75, displayScale);
