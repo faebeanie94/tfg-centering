@@ -468,10 +468,20 @@ export function PerspectiveCorrector({
             viewBox={`0 0 ${imageSize.width} ${imageSize.height}`}
             preserveAspectRatio="none"
           >
+            {/* Black outline for contrast */}
             <polygon
               points={linePoints}
               fill="rgba(59,130,246,0.22)"
-              stroke="#1e5a96"
+              stroke="#000000"
+              strokeWidth={8}
+              strokeDasharray="16 8"
+              strokeOpacity={0.4}
+            />
+            {/* White dash strokes */}
+            <polygon
+              points={linePoints}
+              fill="none"
+              stroke="#ffffff"
               strokeWidth={6}
               strokeDasharray="16 8"
             />
