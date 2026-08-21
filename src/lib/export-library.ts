@@ -304,13 +304,16 @@ export async function buildLibraryArchive(
   for (const [index, record] of ordered.entries()) {
     const basePath = archiveBasePath(record, usedPaths);
     const sides: Record<string, unknown> = {};
+    console.log(`Processing card "${record.label}": front=${!!record.session.front?.imageSrc}, back=${!!record.session.back?.imageSrc}`);
 
     for (const side of ['front', 'back'] as CardSide[]) {
       const snapshot = record.session[side];
       if (!snapshot) continue;
 
       try {
+        console.log(`  Reading ${side} image for "${record.label}"...`);
         const { bytes, extension } = await readImage(snapshot.imageSrc);
+        console.log(`  ✓ Read ${side} (${bytes.length} bytes)`);
         const imagePath = `${basePath}-${side}.${extension}`;
         entries.push({ name: imagePath, data: bytes, date: new Date(snapshot.savedAt) });
         csvLines.push(csvRowForSide(record, side, snapshot, imagePath));
