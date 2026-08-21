@@ -45,24 +45,50 @@ const createSubmissionZip = async (submissionId, outputStream) => {
     for (const card of cardsResult.rows) {
       const cardDir = path.join(submissionDir, `card-${card.card_number}`);
 
-      if (fs.existsSync(cardDir)) {
-        // Add card.json
-        const cardJsonPath = path.join(cardDir, 'card.json');
-        if (fs.existsSync(cardJsonPath)) {
-          archive.file(cardJsonPath, {
-            name: `${folderName}/card-${card.card_number}/card.json`,
-          });
-        }
+      // Add card.json if it exists locally
+      const cardJsonPath = path.join(cardDir, 'card.json');
+      if (fs.existsSync(cardJsonPath)) {
+        archive.file(cardJsonPath, {
+          name: `${folderName}/card-${card.card_number}/card.json`,
+        });
+      }
 
-        // Add front image
+      // Add front image from S3 or local
+      if (card.front_s3_url) {
+        try {
+          const frontResponse = await fetch(card.front_s3_url);
+          if (frontResponse.ok) {
+            const buffer = await frontResponse.buffer();
+            archive.append(buffer, {
+              name: `${folderName}/card-${card.card_number}/front.jpg`,
+            });
+          }
+        } catch (err) {
+          console.warn(`Failed to download front image for card ${card.card_number}:`, err.message);
+        }
+      } else {
         const frontPath = path.join(cardDir, 'front.jpg');
         if (fs.existsSync(frontPath)) {
           archive.file(frontPath, {
             name: `${folderName}/card-${card.card_number}/front.jpg`,
           });
         }
+      }
 
-        // Add back image
+      // Add back image from S3 or local
+      if (card.back_s3_url) {
+        try {
+          const backResponse = await fetch(card.back_s3_url);
+          if (backResponse.ok) {
+            const buffer = await backResponse.buffer();
+            archive.append(buffer, {
+              name: `${folderName}/card-${card.card_number}/back.jpg`,
+            });
+          }
+        } catch (err) {
+          console.warn(`Failed to download back image for card ${card.card_number}:`, err.message);
+        }
+      } else {
         const backPath = path.join(cardDir, 'back.jpg');
         if (fs.existsSync(backPath)) {
           archive.file(backPath, {
