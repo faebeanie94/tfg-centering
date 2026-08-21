@@ -285,11 +285,13 @@ export async function buildLibraryArchive(
   records: SavedCardRecord[],
   onProgress?: (progress: ArchiveProgress) => void,
 ): Promise<LibraryArchive> {
+  console.log(`📦 Starting export of ${records.length} saved cards`);
   if (records.length === 0) throw new Error('No saved cards to export');
 
   const exportedAt = new Date();
   const groups = groupSavedCards(records);
   const ordered = groups.flatMap((group) => group.cards);
+  console.log(`📦 Organized into ${groups.length} groups, ${ordered.length} total cards`);
   const folders = groups.filter((group) => group.key).map((group) => group.key);
 
   const entries: ZipEntry[] = [];
