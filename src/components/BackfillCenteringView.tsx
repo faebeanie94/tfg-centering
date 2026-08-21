@@ -4,10 +4,11 @@ import * as api from '../lib/api-client';
 
 interface SavedSnapshot {
   label: string;
-  submissionName: string;
+  submissionName: string | null;
   cardNumber: number;
   hasFront: boolean;
   hasBack: boolean;
+  sessionId: string;
 }
 
 interface BackfillResult {
@@ -27,6 +28,7 @@ export function BackfillCenteringView({ submission, onClose }: BackfillCentering
   const [backfilling, setBackfilling] = useState(false);
   const [results, setResults] = useState<BackfillResult[]>([]);
   const [message, setMessage] = useState<string | null>(null);
+  const [selectedCardNumbers, setSelectedCardNumbers] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     if (submission.type !== 'api') {
@@ -45,24 +47,43 @@ export function BackfillCenteringView({ submission, onClose }: BackfillCentering
 
       const extracted: SavedSnapshot[] = [];
       for (const record of allCards) {
-        const match = record.label.match(/^([^/]+)\/(\d+)$/);
-        if (match) {
-          const submissionName = match[1];
-          const cardNumber = parseInt(match[2], 10);
-          const session = record.session;
+        const session = record.session;
+        const hasFront = !!session.front?.result?.bordersMm;
+        const hasBack = !!session.back?.result?.bordersMm;
 
-          const hasFront = !!session.front?.result?.bordersMm;
-          const hasBack = !!session.back?.result?.bordersMm;
+        if (!hasFront && !hasBack) continue;
 
-          if (hasFront || hasBack) {
-            extracted.push({
-              label: record.label,
-              submissionName,
-              cardNumber,
-              hasFront,
-              hasBack,
-            });
+        let submissionName: string | null = null;
+        let cardNumber = 0;
+
+        // Try format: "SubmissionName/CardNumber", "SubmissionId/card1", or "SubmissionId/card-1"
+        const fullMatch = record.label.match(/^([^/]+)\/(?:card[:\-\s]?)?(\d+)$/i);
+        if (fullMatch) {
+          submissionName = fullMatch[1];
+          cardNumber = parseInt(fullMatch[2], 10);
+        } else {
+          // Try format: "Card N" or "Card N - ..."
+          const cardMatch = record.label.match(/[Cc]ard\s+(\d+)/);
+          if (cardMatch) {
+            cardNumber = parseInt(cardMatch[1], 10);
+          } else {
+            // Try to extract just a number from the label
+            const numMatch = record.label.match(/(\d+)/);
+            if (numMatch) {
+              cardNumber = parseInt(numMatch[1], 10);
+            }
           }
+        }
+
+        if (cardNumber > 0) {
+          extracted.push({
+            label: record.label,
+            submissionName,
+            cardNumber,
+            hasFront,
+            hasBack,
+            sessionId: record.id,
+          });
         }
       }
 
@@ -77,36 +98,27 @@ export function BackfillCenteringView({ submission, onClose }: BackfillCentering
 
   async function handleBackfill() {
     if (submission.type !== 'api') return;
+    if (selectedCardNumbers.size === 0) {
+      setMessage('Select at least one card to backfill');
+      return;
+    }
 
     setBackfilling(true);
     setResults([]);
     setMessage(null);
 
     try {
-      // Get submission to match name
-      const submissionData = await api.getSubmission(submission.submissionId);
-      const cardsToSync = snapshots.filter((s) => s.submissionName === submissionData.name);
-
-      if (cardsToSync.length === 0) {
-        setMessage(`No snapshots found for submission "${submissionData.name}"`);
-        setBackfilling(false);
-        return;
-      }
-
-      const backfillResults: BackfillResult[] = [];
       const db = await openDb();
       const allCards = await getSavedCards(db);
       db.close();
 
+      const cardsToSync = snapshots.filter((s) => selectedCardNumbers.has(s.cardNumber));
+      const backfillResults: BackfillResult[] = [];
+
       for (const cardSnapshot of cardsToSync) {
         try {
           // Find the actual snapshot data
-          const record = allCards.find(
-            (r) =>
-              r.label === cardSnapshot.label &&
-              r.session.front?.result?.bordersMm &&
-              r.session.back?.result?.bordersMm
-          );
+          const record = allCards.find((r) => r.id === cardSnapshot.sessionId);
 
           if (!record) continue;
 
@@ -152,6 +164,16 @@ export function BackfillCenteringView({ submission, onClose }: BackfillCentering
     }
   }
 
+  function toggleCard(cardNumber: number) {
+    const newSelected = new Set(selectedCardNumbers);
+    if (newSelected.has(cardNumber)) {
+      newSelected.delete(cardNumber);
+    } else {
+      newSelected.add(cardNumber);
+    }
+    setSelectedCardNumbers(newSelected);
+  }
+
   if (loading) {
     return (
       <div className="backfill-view">
@@ -165,10 +187,6 @@ export function BackfillCenteringView({ submission, onClose }: BackfillCentering
       </div>
     );
   }
-
-  const matchingSnapshots = snapshots.filter(
-    (s) => s.submissionName === submission.name
-  );
 
   return (
     <div className="backfill-view">
@@ -186,30 +204,31 @@ export function BackfillCenteringView({ submission, onClose }: BackfillCentering
           <p>No saved card snapshots found in your library.</p>
           <p>Snapshots are created when you grade cards. Grade some cards first, then return here.</p>
         </div>
-      ) : matchingSnapshots.length === 0 ? (
-        <div className="backfill-empty">
-          <p>No snapshots found matching "{submission.name}".</p>
-          <p>Available submissions in your library:</p>
-          <ul>
-            {[...new Set(snapshots.map((s) => s.submissionName))].map((name) => (
-              <li key={name}>{name}</li>
-            ))}
-          </ul>
-        </div>
       ) : (
         <>
           <div className="backfill-info">
-            <p>Found {matchingSnapshots.length} cards with centering measurements:</p>
+            <p>Select cards to backfill ({snapshots.length} available):</p>
             <div className="backfill-cards-list">
-              {matchingSnapshots.map((snap) => (
-                <div key={snap.cardNumber} className="backfill-card-item">
-                  <span className="backfill-card-number">Card {snap.cardNumber}</span>
-                  <span className="backfill-card-sides">
-                    {snap.hasFront && <span className="backfill-side-badge">Front</span>}
-                    {snap.hasBack && <span className="backfill-side-badge">Back</span>}
-                  </span>
-                </div>
-              ))}
+              {snapshots
+                .sort((a, b) => a.cardNumber - b.cardNumber)
+                .map((snap) => (
+                  <label key={snap.sessionId} className="backfill-card-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={selectedCardNumbers.has(snap.cardNumber)}
+                      onChange={() => toggleCard(snap.cardNumber)}
+                      disabled={backfilling}
+                    />
+                    <span className="backfill-card-info">
+                      <span className="backfill-card-number">Card {snap.cardNumber}</span>
+                      <span className="backfill-card-label">{snap.label}</span>
+                    </span>
+                    <span className="backfill-card-sides">
+                      {snap.hasFront && <span className="backfill-side-badge">Front</span>}
+                      {snap.hasBack && <span className="backfill-side-badge">Back</span>}
+                    </span>
+                  </label>
+                ))}
             </div>
           </div>
 
@@ -233,9 +252,9 @@ export function BackfillCenteringView({ submission, onClose }: BackfillCentering
             type="button"
             className="btn btn-primary"
             onClick={handleBackfill}
-            disabled={backfilling}
+            disabled={backfilling || selectedCardNumbers.size === 0}
           >
-            {backfilling ? 'Backfilling...' : 'Backfill All Cards'}
+            {backfilling ? 'Backfilling...' : `Backfill Selected (${selectedCardNumbers.size})`}
           </button>
         </>
       )}
