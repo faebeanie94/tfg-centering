@@ -29,6 +29,7 @@ export function CardListView({ submission, onClose, onCardDeleted }: CardListVie
   const [cards, setCards] = useState<Card[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<number | null>(null);
+  const [exporting, setExporting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -78,6 +79,54 @@ export function CardListView({ submission, onClose, onCardDeleted }: CardListVie
     }
   };
 
+  const handleExport = async () => {
+    if (submission.type !== 'api') return;
+
+    setExporting(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/submissions/${submission.submissionId}/export`);
+      if (!response.ok) throw new Error('Export failed');
+
+      const blob = await response.blob();
+      const fileName = response.headers.get('content-disposition')?.split('filename="')[1]?.split('"')[0] || 'submission.zip';
+
+      // Use Web API for download when possible, share sheet on mobile
+      if (navigator.share && /iPhone|iPad|Android/.test(navigator.userAgent)) {
+        try {
+          const file = new File([blob], fileName, { type: 'application/zip' });
+          if (navigator.canShare?.({ files: [file] })) {
+            await navigator.share({ files: [file], title: 'TFG submission' });
+            setMessage('Share sheet opened — Save to Files');
+            return;
+          }
+        } catch (err) {
+          if ((err as Error).name !== 'AbortError') {
+            // Fall through to download
+          } else {
+            setMessage('Export cancelled');
+            return;
+          }
+        }
+      }
+
+      // Download
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setMessage(`Saved ${fileName}`);
+    } catch (err) {
+      setMessage('Export failed — try again');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="card-list">
@@ -95,10 +144,21 @@ export function CardListView({ submission, onClose, onCardDeleted }: CardListVie
   return (
     <div className="card-list">
       <div className="card-list-header">
-        <button type="button" className="btn btn-secondary btn-small" onClick={onClose}>
+        <button type="button" className="btn btn-secondary btn-small" onClick={onClose} disabled={exporting}>
           ← Back
         </button>
         <h2>Cards in Submission ({cards.length})</h2>
+        {cards.length > 0 && (
+          <button
+            type="button"
+            className="btn btn-secondary btn-small"
+            disabled={exporting}
+            onClick={() => void handleExport()}
+            title="Download submission as .zip with all card images"
+          >
+            {exporting ? 'Exporting...' : 'Export ZIP'}
+          </button>
+        )}
       </div>
 
       {message && <div className="card-list-message">{message}</div>}

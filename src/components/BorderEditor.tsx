@@ -557,6 +557,7 @@ export function BorderEditor({
             : undefined
         }
         submissionName={submissionFolder?.name}
+        submissionId={submissionFolder?.type === 'api' ? submissionFolder.submissionId : undefined}
         onViewCards={onViewCards}
         onSaveToLibrary={
           onSaveToLibrary

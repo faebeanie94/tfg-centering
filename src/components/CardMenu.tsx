@@ -19,6 +19,7 @@ interface CardMenuProps {
   onSaveToLibrary?: () => Promise<boolean>;
   savingToLibrary?: boolean;
   submissionName?: string;
+  submissionId?: string;
   onViewCards?: () => void;
   onClose: () => void;
 }
@@ -40,10 +41,12 @@ export function CardMenu({
   onSaveToLibrary,
   savingToLibrary = false,
   submissionName,
+  submissionId,
   onViewCards,
   onClose,
 }: CardMenuProps) {
   const [busy, setBusy] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [showNameEdit, setShowNameEdit] = useState(false);
   const [nameDraft, setNameDraft] = useState(cardName);
@@ -79,6 +82,54 @@ export function CardMenu({
     setMessage('Card name updated');
   }
 
+  async function handleExportSubmission() {
+    if (!submissionId) return;
+
+    setExporting(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/submissions/${submissionId}/export`);
+      if (!response.ok) throw new Error('Export failed');
+
+      const blob = await response.blob();
+      const fileName = response.headers.get('content-disposition')?.split('filename="')[1]?.split('"')[0] || 'submission.zip';
+
+      // Use Web API for download when possible, share sheet on mobile
+      if (navigator.share && /iPhone|iPad|Android/.test(navigator.userAgent)) {
+        try {
+          const file = new File([blob], fileName, { type: 'application/zip' });
+          if (navigator.canShare?.({ files: [file] })) {
+            await navigator.share({ files: [file], title: 'TFG submission' });
+            setMessage('Share sheet opened — Save to Files');
+            return;
+          }
+        } catch (err) {
+          if ((err as Error).name !== 'AbortError') {
+            // Fall through to download
+          } else {
+            setMessage('Export cancelled');
+            return;
+          }
+        }
+      }
+
+      // Download
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setMessage(`Saved ${fileName}`);
+    } catch (err) {
+      setMessage('Export failed — try again');
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="action-sheet" onClick={(e) => e.stopPropagation()}>
@@ -102,6 +153,17 @@ export function CardMenu({
                 }}
               >
                 Manage Cards
+              </button>
+            )}
+            {submissionId && (
+              <button
+                type="button"
+                className="action-sheet-item"
+                disabled={exporting}
+                onClick={() => void handleExportSubmission()}
+              >
+                <span className="action-icon">📦</span>
+                {exporting ? 'Exporting…' : 'Export submission'}
               </button>
             )}
           </div>
