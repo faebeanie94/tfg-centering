@@ -3,12 +3,15 @@ import type { AppSettings } from '../hooks/useAppSettings';
 import { DEFAULT_SETTINGS, SCAN_OBSTRUCTION_OPTIONS } from '../hooks/useAppSettings';
 import { getAppBuildLabel, refreshAppToLatest } from '../lib/app-update';
 import { CardSizeFields } from './CardSizeFields';
+import { BackfillCenteringView } from './BackfillCenteringView';
+import type { SubmissionFolder } from '../lib/folder-submission';
 
 interface SettingsPanelProps {
   open: boolean;
   settings: AppSettings;
   onChange: (patch: Partial<AppSettings>) => void;
   onClose: () => void;
+  submission?: SubmissionFolder | null;
 }
 
 const COLOR_PRESETS = [
@@ -58,10 +61,24 @@ function ColorField({
   );
 }
 
-export function SettingsPanel({ open, settings, onChange, onClose }: SettingsPanelProps) {
+export function SettingsPanel({ open, settings, onChange, onClose, submission }: SettingsPanelProps) {
   const [refreshing, setRefreshing] = useState(false);
+  const [showingBackfill, setShowingBackfill] = useState(false);
 
   if (!open) return null;
+
+  if (showingBackfill && submission) {
+    return (
+      <div className="modal-backdrop" onClick={onClose}>
+        <div className="modal settings-modal" onClick={(e) => e.stopPropagation()}>
+          <BackfillCenteringView
+            submission={submission}
+            onClose={() => setShowingBackfill(false)}
+          />
+        </div>
+      </div>
+    );
+  }
 
   async function handleRefreshApp() {
     if (refreshing) return;
@@ -178,6 +195,22 @@ export function SettingsPanel({ open, settings, onChange, onClose }: SettingsPan
           </label>
           <p className="settings-hint">Torch and macro depend on your device. Toggle them during capture too.</p>
         </section>
+
+        {submission && submission.type === 'api' && (
+          <section className="settings-section">
+            <h3>Submission Data</h3>
+            <p className="settings-hint">
+              Backfill centering measurements from your saved card library into this submission.
+            </p>
+            <button
+              type="button"
+              className="btn btn-secondary btn-block"
+              onClick={() => setShowingBackfill(true)}
+            >
+              Backfill Centering Measurements
+            </button>
+          </section>
+        )}
 
         <section className="settings-section">
           <h3>App</h3>

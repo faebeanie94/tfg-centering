@@ -74,7 +74,9 @@ router.get('/:submissionId/cards', validateUUID('submissionId'), asyncHandler(as
   const { submissionId } = req.params;
 
   const result = await pool.query(
-    `SELECT c.*, m.front_grade, m.back_grade, m.condition, m.notes
+    `SELECT c.*, m.front_grade, m.back_grade, m.condition, m.notes,
+            m.front_left_mm, m.front_right_mm, m.front_top_mm, m.front_bottom_mm,
+            m.back_left_mm, m.back_right_mm, m.back_top_mm, m.back_bottom_mm
      FROM cards c
      LEFT JOIN card_metadata m ON c.id = m.card_id
      WHERE c.submission_id = $1
@@ -105,7 +107,9 @@ router.get(
     const { submissionId, cardNumber } = req.params;
 
     const result = await pool.query(
-      `SELECT c.*, m.front_grade, m.back_grade, m.condition, m.notes
+      `SELECT c.*, m.front_grade, m.back_grade, m.condition, m.notes,
+              m.front_left_mm, m.front_right_mm, m.front_top_mm, m.front_bottom_mm,
+              m.back_left_mm, m.back_right_mm, m.back_top_mm, m.back_bottom_mm
        FROM cards c
        LEFT JOIN card_metadata m ON c.id = m.card_id
        WHERE c.submission_id = $1 AND c.card_number = $2`,
@@ -150,21 +154,62 @@ router.put(
     const cardId = cardResult.rows[0].id;
 
     if (metadata) {
-      const { frontGrade, backGrade, condition, notes } = metadata;
+      const {
+        frontGrade,
+        backGrade,
+        condition,
+        notes,
+        frontLeftMm,
+        frontRightMm,
+        frontTopMm,
+        frontBottomMm,
+        backLeftMm,
+        backRightMm,
+        backTopMm,
+        backBottomMm,
+      } = metadata;
       await pool.query(
-        `INSERT INTO card_metadata (card_id, front_grade, back_grade, condition, notes)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO card_metadata (
+          card_id, front_grade, back_grade, condition, notes,
+          front_left_mm, front_right_mm, front_top_mm, front_bottom_mm,
+          back_left_mm, back_right_mm, back_top_mm, back_bottom_mm
+        )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
          ON CONFLICT (card_id) DO UPDATE SET
            front_grade = COALESCE($2, card_metadata.front_grade),
            back_grade = COALESCE($3, card_metadata.back_grade),
            condition = COALESCE($4, card_metadata.condition),
-           notes = COALESCE($5, card_metadata.notes)`,
-        [cardId, frontGrade || null, backGrade || null, condition || null, notes || null]
+           notes = COALESCE($5, card_metadata.notes),
+           front_left_mm = COALESCE($6, card_metadata.front_left_mm),
+           front_right_mm = COALESCE($7, card_metadata.front_right_mm),
+           front_top_mm = COALESCE($8, card_metadata.front_top_mm),
+           front_bottom_mm = COALESCE($9, card_metadata.front_bottom_mm),
+           back_left_mm = COALESCE($10, card_metadata.back_left_mm),
+           back_right_mm = COALESCE($11, card_metadata.back_right_mm),
+           back_top_mm = COALESCE($12, card_metadata.back_top_mm),
+           back_bottom_mm = COALESCE($13, card_metadata.back_bottom_mm)`,
+        [
+          cardId,
+          frontGrade || null,
+          backGrade || null,
+          condition || null,
+          notes || null,
+          frontLeftMm || null,
+          frontRightMm || null,
+          frontTopMm || null,
+          frontBottomMm || null,
+          backLeftMm || null,
+          backRightMm || null,
+          backTopMm || null,
+          backBottomMm || null,
+        ]
       );
     }
 
     const result = await pool.query(
-      `SELECT c.*, m.front_grade, m.back_grade, m.condition, m.notes
+      `SELECT c.*, m.front_grade, m.back_grade, m.condition, m.notes,
+              m.front_left_mm, m.front_right_mm, m.front_top_mm, m.front_bottom_mm,
+              m.back_left_mm, m.back_right_mm, m.back_top_mm, m.back_bottom_mm
        FROM cards c
        LEFT JOIN card_metadata m ON c.id = m.card_id
        WHERE c.id = $1`,

@@ -252,12 +252,19 @@ export default function App() {
                 : submissionFolder.lastCardNumberUsed || submissionFolder.nextCardNumber;
 
               const gradeLabel = snapshot.grade.label;
+              const centeringMeasurements = snapshot.result?.bordersMm ? {
+                [currentSide === 'front' ? 'frontLeftMm' : 'backLeftMm']: snapshot.result.bordersMm.left,
+                [currentSide === 'front' ? 'frontRightMm' : 'backRightMm']: snapshot.result.bordersMm.right,
+                [currentSide === 'front' ? 'frontTopMm' : 'backTopMm']: snapshot.result.bordersMm.top,
+                [currentSide === 'front' ? 'frontBottomMm' : 'backBottomMm']: snapshot.result.bordersMm.bottom,
+              } : {};
+
               const metadata = currentSide === 'front'
-                ? { frontGrade: gradeLabel }
-                : { backGrade: gradeLabel };
+                ? { frontGrade: gradeLabel, ...centeringMeasurements }
+                : { backGrade: gradeLabel, ...centeringMeasurements };
 
               await api.updateCard(submissionFolder.submissionId, cardNum, metadata);
-              console.log(`Synced ${currentSide} grade (${gradeLabel}) to API for card ${cardNum}`);
+              console.log(`Synced ${currentSide} grade (${gradeLabel}) and centering measurements to API for card ${cardNum}`);
             } catch (err) {
               console.error('Failed to sync grade to API:', err);
             }
@@ -528,7 +535,7 @@ export default function App() {
             }
           }}
         />
-        <SettingsPanel open={showSettings} settings={settings} onChange={updateSettings} onClose={() => setShowSettings(false)} />
+        <SettingsPanel open={showSettings} settings={settings} onChange={updateSettings} onClose={() => setShowSettings(false)} submission={submissionFolder} />
       </>
     );
   }
@@ -546,7 +553,7 @@ export default function App() {
             }
           }}
         />
-        <SettingsPanel open={showSettings} settings={settings} onChange={updateSettings} onClose={() => setShowSettings(false)} />
+        <SettingsPanel open={showSettings} settings={settings} onChange={updateSettings} onClose={() => setShowSettings(false)} submission={submissionFolder} />
       </>
     );
   }
@@ -570,7 +577,7 @@ export default function App() {
             else setPhase('capture');
           }}
         />
-        <SettingsPanel open={showSettings} settings={settings} onChange={updateSettings} onClose={() => setShowSettings(false)} />
+        <SettingsPanel open={showSettings} settings={settings} onChange={updateSettings} onClose={() => setShowSettings(false)} submission={submissionFolder} />
       </>
     );
   }
@@ -666,7 +673,7 @@ export default function App() {
             setPhase('cardlist');
           }}
         />
-        <SettingsPanel open={showSettings} settings={settings} onChange={updateSettings} onClose={() => setShowSettings(false)} />
+        <SettingsPanel open={showSettings} settings={settings} onChange={updateSettings} onClose={() => setShowSettings(false)} submission={submissionFolder} />
       </>
     );
   }
@@ -696,7 +703,7 @@ export default function App() {
         onRestoreSubmission={handleRestoreSubmission}
         onDeleteSubmission={handleDeleteSubmission}
       />
-      <SettingsPanel open={showSettings} settings={settings} onChange={updateSettings} onClose={() => setShowSettings(false)} />
+      <SettingsPanel open={showSettings} settings={settings} onChange={updateSettings} onClose={() => setShowSettings(false)} submission={submissionFolder} />
     </>
   );
 }

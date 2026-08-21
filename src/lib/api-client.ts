@@ -67,6 +67,14 @@ export interface Card {
   back_grade?: string | null;
   condition?: string | null;
   notes?: string | null;
+  front_left_mm?: number | null;
+  front_right_mm?: number | null;
+  front_top_mm?: number | null;
+  front_bottom_mm?: number | null;
+  back_left_mm?: number | null;
+  back_right_mm?: number | null;
+  back_top_mm?: number | null;
+  back_bottom_mm?: number | null;
 }
 
 // Submissions
@@ -145,6 +153,14 @@ export async function updateCard(
     backGrade?: string;
     condition?: string;
     notes?: string;
+    frontLeftMm?: number;
+    frontRightMm?: number;
+    frontTopMm?: number;
+    frontBottomMm?: number;
+    backLeftMm?: number;
+    backRightMm?: number;
+    backTopMm?: number;
+    backBottomMm?: number;
   },
 ): Promise<Card> {
   const res = await fetchWithRetry(`${API_BASE}/submissions/${submissionId}/cards/${cardNumber}`, {

@@ -8,6 +8,14 @@ interface Card {
   backUrl?: string | null;
   frontGrade?: string | null;
   backGrade?: string | null;
+  frontLeftMm?: number | null;
+  frontRightMm?: number | null;
+  frontTopMm?: number | null;
+  frontBottomMm?: number | null;
+  backLeftMm?: number | null;
+  backRightMm?: number | null;
+  backTopMm?: number | null;
+  backBottomMm?: number | null;
 }
 
 function getOverallGrade(card: Card): string {
@@ -17,6 +25,42 @@ function getOverallGrade(card: Card): string {
   if (grades.length === 1) return grades[0];
   // Sort numerically to get the lower grade (TFG 9 < TFG 10)
   return grades.sort((a, b) => parseFloat(a) - parseFloat(b))[0];
+}
+
+function CenteringMeasurements({ card }: { card: Card }) {
+  const hasFrontMeasurements = card.frontLeftMm !== null && card.frontLeftMm !== undefined;
+  const hasBackMeasurements = card.backLeftMm !== null && card.backLeftMm !== undefined;
+
+  if (!hasFrontMeasurements && !hasBackMeasurements) {
+    return null;
+  }
+
+  return (
+    <div className="card-list-centering">
+      {hasFrontMeasurements && (
+        <div className="centering-side">
+          <span className="centering-label">Front</span>
+          <div className="centering-values">
+            <span title="Left">L: {card.frontLeftMm?.toFixed(2) || '—'}</span>
+            <span title="Right">R: {card.frontRightMm?.toFixed(2) || '—'}</span>
+            <span title="Top">T: {card.frontTopMm?.toFixed(2) || '—'}</span>
+            <span title="Bottom">B: {card.frontBottomMm?.toFixed(2) || '—'}</span>
+          </div>
+        </div>
+      )}
+      {hasBackMeasurements && (
+        <div className="centering-side">
+          <span className="centering-label">Back</span>
+          <div className="centering-values">
+            <span title="Left">L: {card.backLeftMm?.toFixed(2) || '—'}</span>
+            <span title="Right">R: {card.backRightMm?.toFixed(2) || '—'}</span>
+            <span title="Top">T: {card.backTopMm?.toFixed(2) || '—'}</span>
+            <span title="Bottom">B: {card.backBottomMm?.toFixed(2) || '—'}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 interface CardListViewProps {
@@ -44,6 +88,14 @@ export function CardListView({ submission, onClose, onCardDeleted }: CardListVie
                 backUrl: c.back_s3_url,
                 frontGrade: c.front_grade,
                 backGrade: c.back_grade,
+                frontLeftMm: c.front_left_mm,
+                frontRightMm: c.front_right_mm,
+                frontTopMm: c.front_top_mm,
+                frontBottomMm: c.front_bottom_mm,
+                backLeftMm: c.back_left_mm,
+                backRightMm: c.back_right_mm,
+                backTopMm: c.back_top_mm,
+                backBottomMm: c.back_bottom_mm,
               }))
               .sort((a, b) => a.cardNumber - b.cardNumber)
           );
@@ -213,6 +265,8 @@ export function CardListView({ submission, onClose, onCardDeleted }: CardListVie
                     <span className="grade-value">{card.backGrade || '—'}</span>
                   </div>
                 </div>
+
+                <CenteringMeasurements card={card} />
 
                 <button
                   type="button"
