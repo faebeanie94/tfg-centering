@@ -150,6 +150,34 @@ export function PerspectiveCorrector({
     const y = Math.round(corner.y);
     const scanRadius = 25;
 
+    // Determine brightness threshold adaptively
+    // Sample far outside corner to get background brightness
+    let bgBrightness = 600; // default for dark background
+    const samples = [
+      Math.max(0, y - 50) * imageSize.width + Math.max(0, x - 50),
+      Math.max(0, y + 50) * imageSize.width + Math.min(imageSize.width - 1, x + 50),
+      Math.max(0, y + 50) * imageSize.width + Math.max(0, x - 50),
+      Math.max(0, y - 50) * imageSize.width + Math.min(imageSize.width - 1, x + 50),
+    ];
+    let bgSum = 0, bgCount = 0;
+    for (const idx of samples) {
+      if (idx >= 0 && idx * 4 < data.length) {
+        bgSum += data[idx * 4] + data[idx * 4 + 1] + data[idx * 4 + 2];
+        bgCount++;
+      }
+    }
+    if (bgCount > 0) bgBrightness = bgSum / bgCount;
+
+    // Adaptive threshold: for light backgrounds (>200), look for darker edges; for dark backgrounds, look for any significant change
+    let edgeThreshold: number;
+    if (bgBrightness > 200) {
+      // Light background - detect edges that are noticeably darker
+      edgeThreshold = bgBrightness - 40;
+    } else {
+      // Dark background - detect bright edges
+      edgeThreshold = Math.max(100, bgBrightness - 80);
+    }
+
     // Measure how much the edge curves by checking pixels
     let curvePoints: number[] = [];
     for (let i = 1; i <= scanRadius; i++) {
@@ -159,8 +187,8 @@ export function PerspectiveCorrector({
       if (px >= 0 && px < imageSize.width && py >= 0 && py < imageSize.height) {
         const idx = (py * imageSize.width + px) * 4;
         const brightness = data[idx] + data[idx + 1] + data[idx + 2];
-        // If we hit a dark edge (background), record the distance
-        if (brightness < 300) {
+        // If we hit the edge boundary, record the distance
+        if (brightness < edgeThreshold) {
           curvePoints.push(i);
           break;
         }
@@ -172,7 +200,7 @@ export function PerspectiveCorrector({
       if (px2 >= 0 && px2 < imageSize.width && py2 >= 0 && py2 < imageSize.height) {
         const idx = (py2 * imageSize.width + px2) * 4;
         const brightness = data[idx] + data[idx + 1] + data[idx + 2];
-        if (brightness < 300) {
+        if (brightness < edgeThreshold) {
           curvePoints.push(i);
           break;
         }
@@ -184,7 +212,7 @@ export function PerspectiveCorrector({
       if (px3 >= 0 && px3 < imageSize.width && py3 >= 0 && py3 < imageSize.height) {
         const idx = (py3 * imageSize.width + px3) * 4;
         const brightness = data[idx] + data[idx + 1] + data[idx + 2];
-        if (brightness < 300) {
+        if (brightness < edgeThreshold) {
           // If diagonal reaches edge before edges do, corners are rounded
           if (curvePoints.length < 2) {
             curvePoints.push(i * 0.7); // Discount diagonal
@@ -444,8 +472,8 @@ export function PerspectiveCorrector({
               points={linePoints}
               fill="rgba(59,130,246,0.22)"
               stroke="#49a3e1"
-              strokeWidth={3}
-              strokeDasharray="10 5"
+              strokeWidth={6}
+              strokeDasharray="16 8"
             />
 
             <line
@@ -483,7 +511,7 @@ export function PerspectiveCorrector({
                         r={estimatedRadius}
                         fill="none"
                         stroke="#00FF00"
-                        strokeWidth="3"
+                        strokeWidth="6"
                         pointerEvents="none"
                       />
                     </>
@@ -582,7 +610,7 @@ export function PerspectiveCorrector({
                     d={arcPath}
                     fill="none"
                     stroke="#00FF00"
-                    strokeWidth="3.5"
+                    strokeWidth="6"
                     opacity="0.95"
                     strokeLinecap="round"
                     pointerEvents="none"
