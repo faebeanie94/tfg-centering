@@ -14,26 +14,12 @@ interface SavedCardsViewProps {
   onUpdate?: (id: string, label: string) => Promise<void>;
 }
 
-function formatWhen(savedAt: number): string {
-  return new Date(savedAt).toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-}
-
 function gradeSummary(record: SavedCardRecord): string {
   const limit = limitingGrade(record.session);
   if (limit) return formatGrade(limit.grade);
   if (record.session.front) return formatGrade(record.session.front.grade.grade);
   if (record.session.back) return formatGrade(record.session.back.grade.grade);
   return '—';
-}
-
-function thumbSrc(record: SavedCardRecord): string | null {
-  return record.session.front?.imageSrc ?? record.session.back?.imageSrc ?? null;
 }
 
 function plural(count: number, noun: string): string {
