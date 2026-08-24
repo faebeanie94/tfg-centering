@@ -30,7 +30,9 @@ const createSubmissionZip = async (submissionId, outputStream) => {
 
     // Get all cards
     const cardsResult = await pool.query(
-      `SELECT c.*, m.front_grade, m.back_grade, m.condition, m.notes
+      `SELECT c.*, m.front_grade, m.back_grade, m.condition, m.notes,
+              m.front_left_mm, m.front_right_mm, m.front_top_mm, m.front_bottom_mm,
+              m.back_left_mm, m.back_right_mm, m.back_top_mm, m.back_bottom_mm
        FROM cards c
        LEFT JOIN card_metadata m ON c.id = m.card_id
        WHERE c.submission_id = $1
@@ -51,6 +53,18 @@ const createSubmissionZip = async (submissionId, outputStream) => {
         backGrade: card.back_grade || null,
         condition: card.condition || null,
         notes: card.notes || null,
+        frontMeasurements: {
+          leftMm: card.front_left_mm || null,
+          rightMm: card.front_right_mm || null,
+          topMm: card.front_top_mm || null,
+          bottomMm: card.front_bottom_mm || null,
+        },
+        backMeasurements: {
+          leftMm: card.back_left_mm || null,
+          rightMm: card.back_right_mm || null,
+          topMm: card.back_top_mm || null,
+          bottomMm: card.back_bottom_mm || null,
+        },
       })),
     };
     archive.append(JSON.stringify(submissionSummary, null, 2), {
@@ -134,14 +148,26 @@ const createSubmissionZip = async (submissionId, outputStream) => {
         backGrade: card.back_grade || null,
         condition: card.condition || null,
         notes: card.notes || null,
+        frontMeasurements: {
+          leftMm: card.front_left_mm || null,
+          rightMm: card.front_right_mm || null,
+          topMm: card.front_top_mm || null,
+          bottomMm: card.front_bottom_mm || null,
+        },
+        backMeasurements: {
+          leftMm: card.back_left_mm || null,
+          rightMm: card.back_right_mm || null,
+          topMm: card.back_top_mm || null,
+          bottomMm: card.back_bottom_mm || null,
+        },
       };
       archive.append(JSON.stringify(cardMetadata, null, 2), {
         name: `${folderName}/card-${card.card_number}/metadata.json`,
       });
     }
 
-    // Add grades CSV
-    const gradesLines = ['Card Number,Front Grade,Back Grade,Overall Grade'];
+    // Add grades and measurements CSV
+    const gradesLines = ['Card Number,Front Grade,Back Grade,Overall Grade,Front Left (mm),Front Right (mm),Front Top (mm),Front Bottom (mm),Back Left (mm),Back Right (mm),Back Top (mm),Back Bottom (mm)'];
     for (const card of cardsResult.rows) {
       const frontGrade = card.front_grade || '—';
       const backGrade = card.back_grade || '—';
@@ -154,7 +180,15 @@ const createSubmissionZip = async (submissionId, outputStream) => {
       } else if (backGrade !== '—') {
         overallGrade = backGrade;
       }
-      gradesLines.push(`${card.card_number},${frontGrade},${backGrade},${overallGrade}`);
+      const frontLeft = card.front_left_mm ?? '—';
+      const frontRight = card.front_right_mm ?? '—';
+      const frontTop = card.front_top_mm ?? '—';
+      const frontBottom = card.front_bottom_mm ?? '—';
+      const backLeft = card.back_left_mm ?? '—';
+      const backRight = card.back_right_mm ?? '—';
+      const backTop = card.back_top_mm ?? '—';
+      const backBottom = card.back_bottom_mm ?? '—';
+      gradesLines.push(`${card.card_number},${frontGrade},${backGrade},${overallGrade},${frontLeft},${frontRight},${frontTop},${frontBottom},${backLeft},${backRight},${backTop},${backBottom}`);
     }
     archive.append(gradesLines.join('\n') + '\n', {
       name: `${folderName}/grades.csv`,
