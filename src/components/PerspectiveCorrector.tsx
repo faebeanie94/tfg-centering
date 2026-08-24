@@ -492,7 +492,7 @@ export function PerspectiveCorrector({
             {/* Black outline for contrast */}
             <polygon
               points={linePoints}
-              fill={side === 'back' ? 'rgba(255, 193, 7, 0.15)' : 'rgba(59, 130, 246, 0.22)'}
+              fill={side === 'back' ? 'rgba(255, 193, 7, 0.3)' : 'rgba(59, 130, 246, 0.22)'}
               stroke={isDarkImage ? '#ffffff' : '#000000'}
               strokeWidth={8}
               strokeDasharray="16 8"
