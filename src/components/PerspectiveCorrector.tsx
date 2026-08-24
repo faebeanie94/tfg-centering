@@ -493,16 +493,16 @@ export function PerspectiveCorrector({
             <polygon
               points={linePoints}
               fill={side === 'back' ? 'rgba(255, 193, 7, 0.15)' : 'rgba(59, 130, 246, 0.22)'}
-              stroke={isDarkImage ? '#000000' : '#ffffff'}
+              stroke={isDarkImage ? '#ffffff' : '#000000'}
               strokeWidth={8}
               strokeDasharray="16 8"
               strokeOpacity={0.4}
             />
-            {/* Adaptive dash strokes - white for dark, black for light */}
+            {/* Adaptive dash strokes - black for dark, white for light */}
             <polygon
               points={linePoints}
               fill="none"
-              stroke={isDarkImage ? '#ffffff' : '#000000'}
+              stroke={isDarkImage ? '#000000' : '#ffffff'}
               strokeWidth={6}
               strokeDasharray="16 8"
             />
