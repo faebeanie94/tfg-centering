@@ -28,6 +28,17 @@ const createSubmissionZip = async (submissionId, outputStream) => {
     const submissionDir = getSubmissionPath(submissionId);
     const folderName = submission.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
 
+    // Get all cards
+    const cardsResult = await pool.query(
+      `SELECT c.*, m.front_grade, m.back_grade, m.condition, m.notes
+       FROM cards c
+       LEFT JOIN card_metadata m ON c.id = m.card_id
+       WHERE c.submission_id = $1
+       ORDER BY c.card_number ASC`,
+      [submissionId]
+    );
+    console.log(`📦 Found ${cardsResult.rows.length} cards to export`);
+
     // Add submission summary JSON
     const submissionSummary = {
       name: submission.name,
@@ -45,17 +56,6 @@ const createSubmissionZip = async (submissionId, outputStream) => {
     archive.append(JSON.stringify(submissionSummary, null, 2), {
       name: `${folderName}/submission.json`,
     });
-
-    // Get all cards
-    const cardsResult = await pool.query(
-      `SELECT c.*, m.front_grade, m.back_grade, m.condition, m.notes
-       FROM cards c
-       LEFT JOIN card_metadata m ON c.id = m.card_id
-       WHERE c.submission_id = $1
-       ORDER BY c.card_number ASC`,
-      [submissionId]
-    );
-    console.log(`📦 Found ${cardsResult.rows.length} cards to export`);
 
     // Add card folders with images and metadata
     for (const card of cardsResult.rows) {
