@@ -98,9 +98,9 @@ export function CardSizeFields({
           card edges.
         </p>
       )}
-      {allowAsk && value.cardFormat === 'ask' && (
+      {allowAsk && value.cardFormat === "ask" && (
         <p className="settings-hint">
-          You’ll choose Pokémon, sports, Yu-Gi-Oh!, or a custom size right after each photo.
+          You’ll choose Pokémon, sports, MTG/Lorcana, Yu-Gi-Oh!, or a custom size right after each photo.
         </p>
       )}
     </div>

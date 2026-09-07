@@ -1,7 +1,7 @@
 /** Physical trading-card formats used for absolute mm + aspect. */
 
 /** Concrete size the user has chosen for a session or in settings. */
-export type CardFormatId = 'pokemon' | 'sports' | 'yugioh' | 'custom';
+export type CardFormatId = 'pokemon' | 'sports' | 'mtg' | 'yugioh' | 'custom';
 
 /**
  * Settings value: a concrete format, or `ask` to prompt after each capture.
@@ -20,25 +20,33 @@ export interface CardFormat {
 }
 
 /**
- * Presets. Pokémon and modern sports cards share poker size;
- * Yu-Gi-Oh uses the smaller Japanese size.
+ * Presets. Pokémon uses 63×88; sports cards use 64×89;
+ * MTG/Lorcana use the standard poker size; Yu-Gi-Oh uses the smaller Japanese size.
  */
 export const CARD_FORMAT_PRESETS: Record<Exclude<CardFormatId, 'custom'>, CardFormat> = {
   pokemon: {
     id: 'pokemon',
-    label: 'Pokémon / standard TCG',
+    label: 'Pokémon',
     shortLabel: 'Pokémon',
-    widthMm: 63.5,
-    heightMm: 88.9,
-    description: '63.5 × 88.9 mm (2.5″ × 3.5″) — Pokémon, MTG, One Piece, etc.',
+    widthMm: 63,
+    heightMm: 88,
+    description: '63 × 88 mm — Pokémon, One Piece',
   },
   sports: {
     id: 'sports',
     label: 'Sports cards',
     shortLabel: 'Sports',
+    widthMm: 64,
+    heightMm: 89,
+    description: '64 × 89 mm — Baseball, basketball, football, etc.',
+  },
+  mtg: {
+    id: 'mtg',
+    label: 'MTG / Lorcana',
+    shortLabel: 'MTG',
     widthMm: 63.5,
     heightMm: 88.9,
-    description: '63.5 × 88.9 mm (2.5″ × 3.5″) — baseball, basketball, football, etc.',
+    description: '63.5 × 88.9 mm (2.5″ × 3.5″) — Magic: The Gathering, Lorcana',
   },
   yugioh: {
     id: 'yugioh',
@@ -66,7 +74,7 @@ export const CUSTOM_SIZE_MIN_MM = 40;
 export const CUSTOM_SIZE_MAX_MM = 120;
 
 export function isCardFormatId(value: unknown): value is CardFormatId {
-  return value === 'pokemon' || value === 'sports' || value === 'yugioh' || value === 'custom';
+  return value === 'pokemon' || value === 'sports' || value === 'mtg' || value === 'yugioh' || value === 'custom';
 }
 
 export function isCardFormatSetting(value: unknown): value is CardFormatSetting {
