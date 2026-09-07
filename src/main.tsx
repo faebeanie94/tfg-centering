@@ -5,11 +5,15 @@ import './index.css';
 
 // Unregister any existing service workers to prevent unwanted auto-refreshes
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(registrations => {
-    for (const registration of registrations) {
-      registration.unregister();
-    }
-  });
+  navigator.serviceWorker.getRegistrations()
+    .then(registrations => {
+      for (const registration of registrations) {
+        registration.unregister();
+      }
+    })
+    .catch(err => {
+      console.error('Failed to get service worker registrations:', err);
+    });
 }
 
 createRoot(document.getElementById('root')!).render(

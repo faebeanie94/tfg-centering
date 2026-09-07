@@ -25,48 +25,68 @@ router.post(
 
     let frontS3Url = null;
     let backS3Url = null;
+    const uploadedUrls = [];
 
-    if (req.files?.frontImage) {
-      frontS3Url = await uploadImage(
-        req.files.frontImage.data,
-        req.files.frontImage.name,
-        submissionId,
-        cardNumber,
-        'front'
+    try {
+      if (req.files?.frontImage) {
+        frontS3Url = await uploadImage(
+          req.files.frontImage.data,
+          req.files.frontImage.name,
+          submissionId,
+          cardNumber,
+          'front'
+        );
+        if (frontS3Url) uploadedUrls.push(frontS3Url);
+      }
+
+      if (req.files?.backImage) {
+        backS3Url = await uploadImage(
+          req.files.backImage.data,
+          req.files.backImage.name,
+          submissionId,
+          cardNumber,
+          'back'
+        );
+        if (backS3Url) uploadedUrls.push(backS3Url);
+      }
+
+      const result = await pool.query(
+        `INSERT INTO cards (submission_id, card_number, front_s3_url, back_s3_url)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (submission_id, card_number) DO UPDATE SET
+           front_s3_url = COALESCE($3, cards.front_s3_url),
+           back_s3_url = COALESCE($4, cards.back_s3_url)
+         RETURNING *`,
+        [submissionId, cardNumber, frontS3Url, backS3Url]
       );
+
+      const card = result.rows[0];
+
+      if (req.files?.frontImage) {
+        await saveCardImage(submissionId, cardNumber, 'front', req.files.frontImage.data);
+      }
+      if (req.files?.backImage) {
+        await saveCardImage(submissionId, cardNumber, 'back', req.files.backImage.data);
+      }
+
+      try {
+        await saveCardMetadata(submissionId, card, null);
+      } catch (metadataErr) {
+        console.warn(`Failed to save card metadata for card ${cardNumber}:`, metadataErr);
+        // Continue - metadata is optional, card was already saved to DB
+      }
+      res.status(201).json(card);
+    } catch (err) {
+      // Rollback S3 uploads on any failure
+      for (const url of uploadedUrls) {
+        try {
+          await deleteImage(url);
+        } catch (deleteErr) {
+          console.error('Failed to rollback S3 image:', deleteErr);
+        }
+      }
+      throw err;
     }
-
-    if (req.files?.backImage) {
-      backS3Url = await uploadImage(
-        req.files.backImage.data,
-        req.files.backImage.name,
-        submissionId,
-        cardNumber,
-        'back'
-      );
-    }
-
-    const result = await pool.query(
-      `INSERT INTO cards (submission_id, card_number, front_s3_url, back_s3_url)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (submission_id, card_number) DO UPDATE SET
-         front_s3_url = COALESCE($3, cards.front_s3_url),
-         back_s3_url = COALESCE($4, cards.back_s3_url)
-       RETURNING *`,
-      [submissionId, cardNumber, frontS3Url, backS3Url]
-    );
-
-    const card = result.rows[0];
-
-    if (req.files?.frontImage) {
-      await saveCardImage(submissionId, cardNumber, 'front', req.files.frontImage.data);
-    }
-    if (req.files?.backImage) {
-      await saveCardImage(submissionId, cardNumber, 'back', req.files.backImage.data);
-    }
-
-    await saveCardMetadata(submissionId, card, null);
-    res.status(201).json(card);
   })
 );
 
@@ -216,6 +236,10 @@ router.put(
       [cardId]
     );
 
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Card not found' });
+    }
+
     const updatedCard = result.rows[0];
 
     if (metadata) {
@@ -245,16 +269,27 @@ router.delete(
 
     const card = cardResult.rows[0];
 
-    if (card.front_s3_url) await deleteImage(card.front_s3_url);
-    if (card.back_s3_url) await deleteImage(card.back_s3_url);
-
-    await deleteCardFolder(submissionId, parseInt(cardNumber));
-
+    // Delete from database first (atomic operation) to ensure card is removed even if cleanup fails
     const deleteResult = await pool.query('DELETE FROM cards WHERE submission_id = $1 AND card_number = $2', [
       submissionId,
       parseInt(cardNumber),
     ]);
     console.log(`Deleted card ${cardNumber}: ${deleteResult.rowCount} rows affected`);
+
+    // Cleanup S3 and local files (non-atomic, best-effort)
+    try {
+      if (card.front_s3_url) {
+        const deleted = await deleteImage(card.front_s3_url);
+        if (!deleted) console.warn(`Failed to delete front image from S3 for card ${cardNumber}`);
+      }
+      if (card.back_s3_url) {
+        const deleted = await deleteImage(card.back_s3_url);
+        if (!deleted) console.warn(`Failed to delete back image from S3 for card ${cardNumber}`);
+      }
+      await deleteCardFolder(submissionId, parseInt(cardNumber));
+    } catch (cleanupErr) {
+      console.error(`Cleanup failed for card ${cardNumber} (DB already deleted):`, cleanupErr);
+    }
 
     res.json({ message: 'Card deleted', cardNumber: parseInt(cardNumber) });
   })
@@ -272,7 +307,9 @@ router.get(
     }
 
     const result = await pool.query(
-      `SELECT c.id, c.${side}_s3_url FROM cards c WHERE c.submission_id = $1 AND c.card_number = $2`,
+      side === 'front'
+        ? `SELECT c.id, c.front_s3_url FROM cards c WHERE c.submission_id = $1 AND c.card_number = $2`
+        : `SELECT c.id, c.back_s3_url FROM cards c WHERE c.submission_id = $1 AND c.card_number = $2`,
       [submissionId, parseInt(cardNumber)]
     );
 
@@ -281,17 +318,25 @@ router.get(
     }
 
     const card = result.rows[0];
-    const imageKey = `${side}_s3_url`;
+    const imageUrl = side === 'front' ? card.front_s3_url : card.back_s3_url;
 
-    if (!card[imageKey]) {
+    if (!imageUrl) {
       return res.status(404).json({ error: `${side} image not found` });
     }
 
     try {
       const presignedUrl = await getPresignedUrl(submissionId, parseInt(cardNumber), side);
 
-      // Fetch the image from GCS using the presigned URL
-      const imageResponse = await fetch(presignedUrl);
+      // Fetch the image from GCS using the presigned URL with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+      let imageResponse;
+      try {
+        imageResponse = await fetch(presignedUrl, { signal: controller.signal });
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       if (!imageResponse.ok) {
         return res.status(404).json({ error: 'Image not found in storage' });

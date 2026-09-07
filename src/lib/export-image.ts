@@ -103,8 +103,9 @@ export function downloadBlob(blob: Blob, filename: string): void {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  // Revoke after the browser has a chance to start the download.
-  window.setTimeout(() => URL.revokeObjectURL(url), 2_000);
+  // Revoke after sufficient time for download to start on slow connections.
+  // Use a longer timeout to avoid premature revocation on slow networks.
+  window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
 export function downloadDataUrl(dataUrl: string, filename: string): void {
@@ -118,6 +119,10 @@ export function downloadDataUrl(dataUrl: string, filename: string): void {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      // Clean up data URL after timeout
+      window.setTimeout(() => {
+        // Data URLs can't be revoked like blob URLs, but we remove the link
+      }, 30_000);
     });
 }
 
@@ -147,7 +152,8 @@ export async function exportCleanImage(imageSrc: string): Promise<string> {
   const canvas = document.createElement('canvas');
   canvas.width = img.naturalWidth;
   canvas.height = img.naturalHeight;
-  const ctx = canvas.getContext('2d')!;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Failed to get canvas context');
   ctx.drawImage(img, 0, 0);
   return canvas.toDataURL('image/jpeg', 0.92);
 }

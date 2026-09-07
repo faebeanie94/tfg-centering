@@ -57,5 +57,6 @@ export async function deleteSubmissionHandle(id: string): Promise<void> {
     await api.deleteSubmission(id);
   } catch (err) {
     console.error('Failed to delete submission:', err);
+    throw err; // Re-throw so caller knows deletion failed
   }
 }

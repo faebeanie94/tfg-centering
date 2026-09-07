@@ -39,7 +39,8 @@ async function findLowestAvailableCardNumber(submission: SubmissionFolder): Prom
   }
 
   // Find the first gap in the sequence
-  for (let i = 1; i <= Math.max(...existingCards); i++) {
+  const maxCard = Math.max(...existingCards);
+  for (let i = 1; i <= maxCard; i++) {
     if (!existingCards.includes(i)) {
       console.log('Found gap at', i);
       return i;
@@ -47,7 +48,7 @@ async function findLowestAvailableCardNumber(submission: SubmissionFolder): Prom
   }
 
   // No gaps, return next number after highest
-  const nextNum = Math.max(...existingCards) + 1;
+  const nextNum = maxCard + 1;
   console.log('No gaps, returning next number:', nextNum);
   return nextNum;
 }
@@ -88,12 +89,13 @@ export async function startSubmission(submissionName?: string): Promise<Submissi
 /**
  * Save a clean image to the submission.
  * Front and back of the same card pair use the same card number.
+ * Returns updated submission object.
  */
 export async function saveToSubmissionFolder(
   submission: SubmissionFolder,
   dataUrl: string,
   side: 'front' | 'back',
-): Promise<void> {
+): Promise<SubmissionFolder> {
   console.log(`saveToSubmissionFolder: side=${side}, lastSideSaved=${submission.lastSideSaved}, currentEdit=${submission.currentEdit?.cardNumber}, lastCardNumberUsed=${submission.lastCardNumberUsed}`);
   let cardNumber: number;
 
@@ -112,36 +114,46 @@ export async function saveToSubmissionFolder(
   } else {
     // Same side again - this shouldn't happen in normal flow, but handle it
     console.log('Same side again - incrementing');
-    submission.nextCardNumber += 1;
-    cardNumber = submission.nextCardNumber;
+    cardNumber = submission.nextCardNumber + 1;
   }
   console.log(`Using card number: ${cardNumber}`);
 
-  const response = await fetch(dataUrl);
-  const blob = await response.blob();
+  let blob: Blob;
+  try {
+    const response = await fetch(dataUrl);
+    if (!response.ok) throw new Error(`Failed to fetch data URL: ${response.status}`);
+    blob = await response.blob();
+  } catch (err) {
+    throw new Error(`Invalid data URL or fetch failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+  }
 
   if (submission.type === 'api') {
     const frontBlob = side === 'front' ? blob : undefined;
     const backBlob = side === 'back' ? blob : undefined;
     await api.uploadCard(submission.submissionId, cardNumber, frontBlob, backBlob);
   } else {
-    const filename = `${cardNumber}-${side}.jpg`;
-    submission.images.set(filename, blob);
+    submission.images.set(`${cardNumber}-${side}.jpg`, blob);
   }
 
-  // Track this card number for the opposite side
-  submission.lastCardNumberUsed = cardNumber;
+  // Create updated submission with new state
+  let nextCardNumber = submission.nextCardNumber;
+  let lastCardNumberUsed: number | null = cardNumber;
+  let lastSideSaved: 'front' | 'back' | null = side;
 
   // Only increment when we save back after front (completes the pair)
   if (side === 'back' && submission.lastSideSaved === 'front') {
-    submission.nextCardNumber = Math.max(submission.nextCardNumber, cardNumber + 1);
-    submission.lastCardNumberUsed = null; // Reset for next pair
-    submission.lastSideSaved = null; // Reset so next front is recognized as new pair
-  } else {
-    submission.lastSideSaved = side;
+    nextCardNumber = Math.max(submission.nextCardNumber, cardNumber + 1);
+    lastCardNumberUsed = null;
+    lastSideSaved = null;
   }
 
-  submission.currentEdit = null;
+  return {
+    ...submission,
+    nextCardNumber,
+    lastCardNumberUsed,
+    lastSideSaved,
+    currentEdit: null,
+  };
 }
 
 /**
@@ -163,7 +175,8 @@ export async function downloadSubmissionZip(submission: ZipSubmission): Promise<
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  // Revoke after timeout to allow download to start on slow connections
+  window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
 /**
@@ -180,7 +193,15 @@ export async function listSubmissionCards(submission: SubmissionFolder): Promise
     }
   }
 
-  return Array.from({ length: submission.nextCardNumber - 1 }, (_, i) => i + 1);
+  // For ZIP submissions, extract card numbers from actual files
+  const cardNumbers = new Set<number>();
+  for (const filename of submission.images.keys()) {
+    const match = /^(\d+)-(front|back)\.jpg$/.exec(filename);
+    if (match) {
+      cardNumbers.add(parseInt(match[1], 10));
+    }
+  }
+  return Array.from(cardNumbers).sort((a, b) => a - b);
 }
 
 /**

@@ -15,14 +15,25 @@ export function CardEditorModal({ card, submissionId, onClose, onEditImage }: Ca
 
   // Fetch full card data on mount to ensure grades are loaded
   useEffect(() => {
-    api.getCard(submissionId, card.card_number)
-      .then(fullCard => {
-        setFrontGrade(fullCard.front_grade || '');
-        setBackGrade(fullCard.back_grade || '');
-      })
-      .catch(err => {
-        console.error('Failed to load card details:', err);
-      });
+    let mounted = true;
+
+    (async () => {
+      try {
+        const fullCard = await api.getCard(submissionId, card.card_number);
+        if (mounted) {
+          setFrontGrade(fullCard.front_grade || '');
+          setBackGrade(fullCard.back_grade || '');
+        }
+      } catch (err) {
+        if (mounted) {
+          console.error('Failed to load card details:', err);
+        }
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
   }, [card.card_number, submissionId]);
 
 

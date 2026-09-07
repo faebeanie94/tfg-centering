@@ -190,7 +190,8 @@ export async function exportSubmissionZip(submissionId: string): Promise<void> {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  // Revoke after timeout to allow download to start
+  window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
 // Image download
@@ -205,7 +206,8 @@ export async function downloadCardImage(
 
     if (!url) return null;
 
-    const res = await fetch(url);
+    // Use fetchWithRetry to handle network glitches
+    const res = await fetchWithRetry(url);
     if (!res.ok) return null;
 
     const blob = await res.blob();

@@ -77,37 +77,48 @@ export function CardListView({ submission, onClose, onCardDeleted }: CardListVie
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    if (submission.type === 'api') {
-      api.listCards(submission.submissionId)
-        .then(cardList => {
-          setCards(
-            cardList
-              .map(c => ({
-                cardNumber: c.card_number,
-                frontUrl: c.front_s3_url,
-                backUrl: c.back_s3_url,
-                frontGrade: c.front_grade,
-                backGrade: c.back_grade,
-                frontLeftMm: c.front_left_mm,
-                frontRightMm: c.front_right_mm,
-                frontTopMm: c.front_top_mm,
-                frontBottomMm: c.front_bottom_mm,
-                backLeftMm: c.back_left_mm,
-                backRightMm: c.back_right_mm,
-                backTopMm: c.back_top_mm,
-                backBottomMm: c.back_bottom_mm,
-              }))
-              .sort((a, b) => a.cardNumber - b.cardNumber)
-          );
-          setLoading(false);
-        })
-        .catch(err => {
-          console.error('Failed to load cards:', err);
-          setLoading(false);
-          setMessage('Failed to load cards');
-        });
-    }
-  }, [submission]);
+    if (submission.type !== 'api') return;
+
+    let mounted = true;
+
+    (async () => {
+      try {
+        const cardList = await api.listCards(submission.submissionId);
+          if (mounted) {
+            setCards(
+              cardList
+                .map(c => ({
+                  cardNumber: c.card_number,
+                  frontUrl: c.front_s3_url,
+                  backUrl: c.back_s3_url,
+                  frontGrade: c.front_grade,
+                  backGrade: c.back_grade,
+                  frontLeftMm: c.front_left_mm,
+                  frontRightMm: c.front_right_mm,
+                  frontTopMm: c.front_top_mm,
+                  frontBottomMm: c.front_bottom_mm,
+                  backLeftMm: c.back_left_mm,
+                  backRightMm: c.back_right_mm,
+                  backTopMm: c.back_top_mm,
+                  backBottomMm: c.back_bottom_mm,
+                }))
+                .sort((a, b) => a.cardNumber - b.cardNumber)
+            );
+            setLoading(false);
+          }
+        } catch (err) {
+          if (mounted) {
+            console.error('Failed to load cards:', err);
+            setLoading(false);
+            setMessage('Failed to load cards');
+          }
+        }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [submission.type, ...(submission.type === 'api' ? [submission.submissionId] : [])]);
 
   const handleDelete = async (cardNumber: number) => {
     if (!confirm(`Delete card ${cardNumber}?`)) return;
@@ -119,9 +130,7 @@ export function CardListView({ submission, onClose, onCardDeleted }: CardListVie
         await api.deleteCard(submission.submissionId, cardNumber);
         setCards(cards.filter(c => c.cardNumber !== cardNumber));
         setMessage(`Deleted card ${cardNumber}`);
-        // Reset submission state for proper gap-filling on next capture
-        submission.lastSideSaved = null;
-        submission.lastCardNumberUsed = null;
+        // Notify parent to update submission state - don't mutate prop
         onCardDeleted();
       }
     } catch (err) {
@@ -170,7 +179,8 @@ export function CardListView({ submission, onClose, onCardDeleted }: CardListVie
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      // Revoke after timeout to allow download to start on slow connections
+      window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
       setMessage(`Saved ${fileName}`);
     } catch (err) {
       setMessage('Export failed — try again');

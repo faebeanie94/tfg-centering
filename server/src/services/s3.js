@@ -45,14 +45,17 @@ const uploadImage = async (fileBuffer, fileName, submissionId, cardNumber, side)
 
 // Delete image from Google Cloud Storage
 const deleteImage = async (url) => {
-  if (!url) return;
+  if (!url) return true;
 
   try {
     const filename = url.replace(`https://storage.googleapis.com/${BUCKET_NAME}/`, '');
     const file = bucket.file(filename);
     await file.delete();
+    return true;
   } catch (err) {
     console.error('Error deleting image from GCS:', err);
+    // Return false to indicate deletion failure - caller can decide whether to retry
+    return false;
   }
 };
 

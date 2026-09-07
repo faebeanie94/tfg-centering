@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { CardSide } from '../lib/tfg-standards';
 import { saveCleanImage, shareCleanImage, saveAllCleanImages } from '../lib/export-image';
 
@@ -51,6 +51,11 @@ export function CardMenu({
   const [showNameEdit, setShowNameEdit] = useState(false);
   const [nameDraft, setNameDraft] = useState(cardName);
   const [confirmDelete, setConfirmDelete] = useState(false);
+
+  // Sync nameDraft when cardName prop changes
+  useEffect(() => {
+    setNameDraft(cardName);
+  }, [cardName]);
 
   if (!open) return null;
 
@@ -121,7 +126,8 @@ export function CardMenu({
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      // Revoke after timeout to allow download to start on slow connections
+      window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
       setMessage(`Saved ${fileName}`);
     } catch (err) {
       setMessage('Export failed — try again');

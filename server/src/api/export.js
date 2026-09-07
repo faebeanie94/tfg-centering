@@ -16,7 +16,7 @@ router.get('/:id/export', validateUUID('id'), asyncHandler(async (req, res) => {
   }
 
   const submission = result.rows[0];
-  const fileName = `${submission.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.zip`;
+  const fileName = `${(submission.name || 'submission').replace(/[^a-z0-9]/gi, '_').toLowerCase()}.zip`;
 
   res.setHeader('Content-Type', 'application/zip');
   res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
@@ -37,6 +37,10 @@ router.get('/:id/export-info', validateUUID('id'), asyncHandler(async (req, res)
     'SELECT COUNT(*) as card_count FROM cards WHERE submission_id = $1',
     [id]
   );
+
+  if (cardsResult.rows.length === 0) {
+    return res.status(500).json({ error: 'Failed to count cards' });
+  }
 
   const cardCount = parseInt(cardsResult.rows[0].card_count);
   const estimatedSize = await estimateZipSize(id);

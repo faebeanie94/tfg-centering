@@ -87,18 +87,28 @@ const createSubmissionZip = async (submissionId, outputStream) => {
       if (card.front_s3_url) {
         try {
           const frontUrl = await getPresignedUrl(submissionId, card.card_number, 'front');
-          console.log(`Fetching front image for card ${card.card_number}...`);
-          const frontResponse = await fetch(frontUrl);
-          console.log(`Front S3 response: ${frontResponse.status}`);
-          if (frontResponse.ok) {
-            const arrayBuffer = await frontResponse.arrayBuffer();
-            const buffer = Buffer.from(arrayBuffer);
-            console.log(`Added front image (${buffer.length} bytes) for card ${card.card_number}`);
-            archive.append(buffer, {
-              name: `${folderName}/card-${card.card_number}/front.jpg`,
-            });
+          if (!frontUrl) {
+            console.error(`Failed to get presigned URL for front image of card ${card.card_number}`);
           } else {
-            console.error(`Front image returned ${frontResponse.status} for card ${card.card_number}`);
+            console.log(`Fetching front image for card ${card.card_number}...`);
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000);
+            try {
+              const frontResponse = await fetch(frontUrl, { signal: controller.signal });
+              console.log(`Front S3 response: ${frontResponse.status}`);
+              if (frontResponse.ok) {
+                const arrayBuffer = await frontResponse.arrayBuffer();
+                const buffer = Buffer.from(arrayBuffer);
+                console.log(`Added front image (${buffer.length} bytes) for card ${card.card_number}`);
+                archive.append(buffer, {
+                  name: `${folderName}/card-${card.card_number}/front.jpg`,
+                });
+              } else {
+                console.error(`Front image returned ${frontResponse.status} for card ${card.card_number}`);
+              }
+            } finally {
+              clearTimeout(timeoutId);
+            }
           }
         } catch (err) {
           console.error(`Failed to download front image for card ${card.card_number}:`, err.message);
@@ -117,17 +127,23 @@ const createSubmissionZip = async (submissionId, outputStream) => {
         try {
           const backUrl = await getPresignedUrl(submissionId, card.card_number, 'back');
           console.log(`Fetching back image for card ${card.card_number}...`);
-          const backResponse = await fetch(backUrl);
-          console.log(`Back S3 response: ${backResponse.status}`);
-          if (backResponse.ok) {
-            const arrayBuffer = await backResponse.arrayBuffer();
-            const buffer = Buffer.from(arrayBuffer);
-            console.log(`Added back image (${buffer.length} bytes) for card ${card.card_number}`);
-            archive.append(buffer, {
-              name: `${folderName}/card-${card.card_number}/back.jpg`,
-            });
-          } else {
-            console.error(`Back image returned ${backResponse.status} for card ${card.card_number}`);
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 30000);
+          try {
+            const backResponse = await fetch(backUrl, { signal: controller.signal });
+            console.log(`Back S3 response: ${backResponse.status}`);
+            if (backResponse.ok) {
+              const arrayBuffer = await backResponse.arrayBuffer();
+              const buffer = Buffer.from(arrayBuffer);
+              console.log(`Added back image (${buffer.length} bytes) for card ${card.card_number}`);
+              archive.append(buffer, {
+                name: `${folderName}/card-${card.card_number}/back.jpg`,
+              });
+            } else {
+              console.error(`Back image returned ${backResponse.status} for card ${card.card_number}`);
+            }
+          } finally {
+            clearTimeout(timeoutId);
           }
         } catch (err) {
           console.error(`Failed to download back image for card ${card.card_number}:`, err.message);
@@ -174,7 +190,12 @@ const createSubmissionZip = async (submissionId, outputStream) => {
       // Overall grade is the lower of the two (limiting grade)
       let overallGrade = '—';
       if (frontGrade !== '—' && backGrade !== '—') {
-        overallGrade = [frontGrade, backGrade].sort()[0];
+        const frontNum = parseFloat(frontGrade);
+        const backNum = parseFloat(backGrade);
+        // Validate that parsing succeeded and no NaN values
+        if (!isNaN(frontNum) && !isNaN(backNum)) {
+          overallGrade = [frontNum, backNum].sort((a, b) => a - b)[0].toString();
+        }
       } else if (frontGrade !== '—') {
         overallGrade = frontGrade;
       } else if (backGrade !== '—') {

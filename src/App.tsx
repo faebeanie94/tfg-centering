@@ -94,8 +94,8 @@ export default function App() {
     [activeCardFormat],
   );
 
-  const openLibrary = useCallback((returnTo: Phase = phase) => {
-    setLibraryReturnPhase(returnTo);
+  const openLibrary = useCallback((returnTo?: Phase) => {
+    setLibraryReturnPhase(returnTo || phase);
     setPhase('library');
   }, [phase]);
 
@@ -235,14 +235,15 @@ export default function App() {
         try {
           const cleanDataUrl = await exportCleanImage(snapshot.imageSrc);
 
+          let updatedFolder = { ...submissionFolder };
           if (isSubmissionCard) {
             // Editing an existing submission card - update it in place
             const cardNum = parseInt(cardNameMatch![2], 10);
-            submissionFolder.currentEdit = { cardNumber: cardNum, side: currentSide };
+            updatedFolder.currentEdit = { cardNumber: cardNum, side: currentSide };
           }
 
-          await saveToSubmissionFolder(submissionFolder, cleanDataUrl, currentSide);
-          setSubmissionFolder((prev) => prev ? { ...prev } : null);
+          updatedFolder = await saveToSubmissionFolder(updatedFolder, cleanDataUrl, currentSide);
+          setSubmissionFolder(updatedFolder);
 
           // Sync grades to backend API if this is an API submission
           if (submissionFolder.type === 'api' && snapshot.grade) {
@@ -267,6 +268,8 @@ export default function App() {
               console.log(`Synced ${currentSide} grade (${gradeLabel}) and centering measurements to API for card ${cardNum}`);
             } catch (err) {
               console.error('Failed to sync grade to API:', err);
+              setLibraryMessage('Failed to sync grade to API');
+              window.setTimeout(() => setLibraryMessage(null), 3000);
             }
           }
 
@@ -285,10 +288,14 @@ export default function App() {
               console.log('Auto-save to library succeeded:', libraryLabel);
             } catch (err) {
               console.error('Failed to auto-save to library:', err);
+              setLibraryMessage('Failed to auto-save to library');
+              window.setTimeout(() => setLibraryMessage(null), 3000);
             }
           }
         } catch (err) {
           console.error('Failed to save to submission folder:', err);
+          setLibraryMessage('Failed to save card to submission');
+          window.setTimeout(() => setLibraryMessage(null), 3000);
         }
       }
     },
@@ -407,6 +414,11 @@ export default function App() {
                 break;
               }
             }
+            // If no gaps found up to 1000, use next number after max
+            if (nextCardNumber === 1 && cardNumbers.has(1)) {
+              const maxCard = Math.max(...Array.from(cardNumbers));
+              nextCardNumber = maxCard + 1;
+            }
           }
         } catch (err) {
           console.warn('Failed to fetch cards, starting from card 1:', err);
@@ -447,20 +459,20 @@ export default function App() {
 
   const handleRetakeSubmission = useCallback(() => {
     if (submissionFolder) {
-      submissionFolder.lastSideSaved = null;
+      setSubmissionFolder({ ...submissionFolder, lastSideSaved: null });
     }
     handleCaptureSide(currentSide);
   }, [submissionFolder, currentSide, handleCaptureSide]);
 
   const handleNextCard = useCallback(() => {
     // Reset session and go back to capture for next card
-    setSession(emptySession);
+    setSession(emptySession());
     setCardNames({ front: '', back: '' });
     setCurrentSide('front');
     setPhase('capture');
     // Reset submission folder state for fresh card
     if (submissionFolder) {
-      submissionFolder.lastSideSaved = null;
+      setSubmissionFolder({ ...submissionFolder, lastSideSaved: null });
     }
   }, [submissionFolder]);
 
@@ -474,64 +486,76 @@ export default function App() {
       <>
         <ImageGalleryView
           onClose={() => setPhase(libraryReturnPhase)}
-          onEditImage={(submissionId, card, side) => {
+          onEditImage={async (submissionId, card, side) => {
             console.log('Edit image clicked for card:', card.card_number, 'side:', side);
             const imageUrl = side === 'front' ? card.front_s3_url : card.back_s3_url;
-            if (imageUrl) {
+            if (!imageUrl) {
+              console.warn('No image URL for card:', card.card_number, 'side:', side);
+              return;
+            }
+
+            try {
               const url = `/api/submissions/${submissionId}/cards/${card.card_number}/image/${side}`;
               console.log('Fetching image from:', url);
-              fetch(url)
-                .then(res => {
-                  console.log('Response status:', res.status);
-                  return res.json();
-                })
-                .then(data => {
-                  console.log('Image data received:', data);
-                  if (!data.data) {
-                    console.error('No image data in response');
-                    return;
+              const res = await fetch(url);
+              console.log('Response status:', res.status);
+              if (!res.ok) throw new Error(`Request failed with status ${res.status}`);
+
+              const data = await res.json();
+              console.log('Image data received:', data);
+              if (!data.data) {
+                console.error('No image data in response');
+                return;
+              }
+
+              console.log('Setting workingImage, size:', data.data.length);
+              setRawImage(data.data);
+              setWorkingImage(data.data);
+              setCurrentSide(side as CardSide);
+
+              // For re-edits, prefill the other side if it exists
+              const otherSide = side === 'front' ? 'back' : 'front';
+              const otherImageUrl = otherSide === 'front' ? card.front_s3_url : card.back_s3_url;
+              if (otherImageUrl) {
+                try {
+                  const otherUrl = `/api/submissions/${submissionId}/cards/${card.card_number}/image/${otherSide}`;
+                  const otherRes = await fetch(otherUrl);
+                  if (otherRes.ok) {
+                    const otherData = await otherRes.json();
+                    if (otherData.data) {
+                      const otherSnapshot: SideSnapshot = {
+                        imageSrc: otherData.data,
+                        outer: { x: 0, y: 0, width: 0, height: 0 },
+                        inner: { x: 0, y: 0, width: 0, height: 0 },
+                        result: { bordersPx: { left: 0, right: 0, top: 0, bottom: 0 }, bordersMm: { left: 0, right: 0, top: 0, bottom: 0 }, leftRight: { left: 0, right: 0 }, topBottom: { top: 0, bottom: 0 }, pxPerMm: 0 },
+                        grade: { grade: 0, label: '', ratioLabel: '', lrQualify: 0, tbQualify: 0, worstQualify: 0, worstAxis: 'left-right', ocEligible: false },
+                        savedAt: Date.now(),
+                      };
+                      setSession(prev => ({ ...prev, [otherSide]: otherSnapshot }));
+                    }
                   }
-                  console.log('Setting workingImage, size:', data.data.length);
-                  setRawImage(data.data);
-                  setWorkingImage(data.data);
-                  setCurrentSide(side as CardSide);
-                  // For re-edits, prefill the other side if it exists
-                  const otherSide = side === 'front' ? 'back' : 'front';
-                  const prefilledSession = emptySession();
-                  const otherImageUrl = otherSide === 'front' ? card.front_s3_url : card.back_s3_url;
-                  if (otherImageUrl) {
-                    // Fetch the other side's image so we can switch to it
-                    const otherUrl = `/api/submissions/${submissionId}/cards/${card.card_number}/image/${otherSide}`;
-                    fetch(otherUrl)
-                      .then(res => res.json())
-                      .then(otherData => {
-                        if (otherData.data) {
-                          prefilledSession[otherSide] = { imageSrc: otherData.data } as any;
-                          setSession(prev => ({ ...prev, [otherSide]: { imageSrc: otherData.data } as any }));
-                        }
-                      })
-                      .catch(err => console.warn('Failed to prefetch other side:', err));
-                  }
-                  // Set card names to match the pattern expected by save logic
-                  setCardNames({ front: `temp/${card.card_number}`, back: `temp/${card.card_number}` });
-                  setEditorRects({});
-                  setSubmissionFolder({
-                    type: 'api',
-                    submissionId,
-                    name: 'temp',
-                    nextCardNumber: card.card_number + 1,
-                    currentEdit: { cardNumber: card.card_number, side: side as 'front' | 'back' },
-                  } as any);
-                  console.log('About to change phase to crop');
-                  // Small delay to ensure state updates before phase change
-                  setTimeout(() => {
-                    console.log('Changing phase to crop');
-                    setPhase('crop');
-                  }, 0);
-                })
-                .catch(err => console.error('Failed to load image:', err));
-            } else {
-              console.warn('No front_s3_url for card:', card.card_number);
+                } catch (err) {
+                  console.warn('Failed to prefetch other side:', err);
+                }
+              }
+
+              setCardNames({ front: `temp/${card.card_number}`, back: `temp/${card.card_number}` });
+              setEditorRects({});
+              setSubmissionFolder({
+                type: 'api',
+                submissionId,
+                name: 'temp',
+                nextCardNumber: card.card_number + 1,
+                currentEdit: { cardNumber: card.card_number, side: side as 'front' | 'back' },
+                lastSideSaved: null,
+                lastCardNumberUsed: null,
+              });
+              console.log('About to change phase to crop');
+              setPhase('crop');
+            } catch (err) {
+              console.error('Failed to load image:', err);
+              setLibraryMessage('Failed to load image for editing');
+              window.setTimeout(() => setLibraryMessage(null), 3000);
             }
           }}
         />

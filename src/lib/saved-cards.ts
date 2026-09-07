@@ -58,65 +58,135 @@ export async function saveCardToLibrary(
     throw new Error('Nothing to save');
   }
 
+  // Generate ID with fallback for older browsers
+  const id = crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
   const record: SavedCardRecord = {
-    id: crypto.randomUUID(),
+    id,
     label: label?.trim() || defaultCardLabel(session),
     savedAt: Date.now(),
     session: structuredClone(session),
   };
 
   const db = await openDb();
-  try {
-    return new Promise<SavedCardRecord>((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, 'readwrite');
-      const putRequest = tx.objectStore(STORE_NAME).put(record);
-      putRequest.onerror = () => reject(putRequest.error ?? new Error('Failed to save card'));
-      tx.oncomplete = () => resolve(record);
-      tx.onerror = () => reject(tx.error ?? new Error('Save transaction failed'));
-    });
-  } finally {
-    db.close();
-  }
+  return new Promise<SavedCardRecord>((resolve, reject) => {
+    let completed = false;
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const putRequest = tx.objectStore(STORE_NAME).put(record);
+
+    putRequest.onerror = () => {
+      if (!completed) {
+        completed = true;
+        db.close();
+        reject(putRequest.error ?? new Error('Failed to save card'));
+      }
+    };
+
+    tx.oncomplete = () => {
+      if (!completed) {
+        completed = true;
+        db.close();
+        resolve(record);
+      }
+    };
+
+    tx.onerror = () => {
+      if (!completed) {
+        completed = true;
+        db.close();
+        reject(tx.error ?? new Error('Save transaction failed'));
+      }
+    };
+  });
 }
 
 export async function updateSavedCardLabel(id: string, label: string): Promise<void> {
   const db = await openDb();
-  try {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
+  const tx = db.transaction(STORE_NAME, 'readwrite');
+  const store = tx.objectStore(STORE_NAME);
 
-    return new Promise<void>((resolve, reject) => {
-      const getRequest = store.get(id);
-      getRequest.onsuccess = () => {
-        const record = getRequest.result as SavedCardRecord | undefined;
-        if (!record) {
-          reject(new Error('Card not found'));
-          return;
+  return new Promise<void>((resolve, reject) => {
+    let completed = false;
+
+    const getRequest = store.get(id);
+    getRequest.onsuccess = () => {
+      if (completed) return;
+      const record = getRequest.result as SavedCardRecord | undefined;
+      if (!record) {
+        completed = true;
+        db.close();
+        reject(new Error('Card not found'));
+        return;
+      }
+      record.label = label.trim() || defaultCardLabel(record.session);
+      const putRequest = store.put(record);
+      putRequest.onerror = () => {
+        if (!completed) {
+          completed = true;
+          db.close();
+          reject(putRequest.error ?? new Error('Failed to update card'));
         }
-        record.label = label.trim() || defaultCardLabel(record.session);
-        const putRequest = store.put(record);
-        putRequest.onerror = () => reject(putRequest.error ?? new Error('Failed to update card'));
       };
-      getRequest.onerror = () => reject(getRequest.error ?? new Error('Failed to get card'));
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error ?? new Error('Transaction failed'));
-    });
-  } finally {
-    db.close();
-  }
+      putRequest.onsuccess = () => {
+        // putRequest success is handled by tx.oncomplete
+      };
+    };
+
+    getRequest.onerror = () => {
+      if (!completed) {
+        completed = true;
+        db.close();
+        reject(getRequest.error ?? new Error('Failed to get card'));
+      }
+    };
+
+    tx.oncomplete = () => {
+      if (!completed) {
+        completed = true;
+        db.close();
+        resolve();
+      }
+    };
+
+    tx.onerror = () => {
+      if (!completed) {
+        completed = true;
+        db.close();
+        reject(tx.error ?? new Error('Transaction failed'));
+      }
+    };
+  });
 }
 
 export async function deleteSavedCard(id: string): Promise<void> {
   const db = await openDb();
-  try {
-    return new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, 'readwrite');
-      const deleteRequest = tx.objectStore(STORE_NAME).delete(id);
-      deleteRequest.onerror = () => reject(deleteRequest.error ?? new Error('Failed to delete card'));
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error ?? new Error('Delete transaction failed'));
-    });
-  } finally {
-    db.close();
-  }
+  return new Promise<void>((resolve, reject) => {
+    let completed = false;
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const deleteRequest = tx.objectStore(STORE_NAME).delete(id);
+
+    deleteRequest.onerror = () => {
+      if (!completed) {
+        completed = true;
+        db.close();
+        reject(deleteRequest.error ?? new Error('Failed to delete card'));
+      }
+    };
+
+    tx.oncomplete = () => {
+      if (!completed) {
+        completed = true;
+        db.close();
+        resolve();
+      }
+    };
+
+    tx.onerror = () => {
+      if (!completed) {
+        completed = true;
+        db.close();
+        reject(tx.error ?? new Error('Delete transaction failed'));
+      }
+    };
+  });
 }

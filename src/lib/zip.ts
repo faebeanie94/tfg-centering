@@ -6,7 +6,7 @@
  */
 
 /** Blob rejects views backed by a SharedArrayBuffer, so pin the buffer type. */
-type Bytes = Uint8Array<ArrayBuffer>;
+type Bytes = Uint8Array;
 
 export interface ZipEntry {
   /** Path inside the archive, e.g. "cards/01-charizard/front.jpg". */
@@ -73,7 +73,7 @@ function toBytes(data: Bytes | string): Bytes {
  * than silently writing an unreadable file (ZIP64 is not implemented).
  */
 export function createZip(entries: ZipEntry[]): Blob {
-  const parts: BlobPart[] = [];
+  const parts: Array<BlobPart | Bytes> = [];
   const central: Bytes[] = [];
   let offset = 0;
 
@@ -102,7 +102,7 @@ export function createZip(entries: ZipEntry[]): Blob {
     localView.setUint16(28, 0, true);
     local.set(nameBytes, 30);
 
-    parts.push(local, bytes);
+    parts.push(local as unknown as BlobPart, bytes as unknown as BlobPart);
 
     const entryHeader = new Uint8Array(46 + nameBytes.length);
     const entryView = new DataView(entryHeader.buffer);
@@ -148,5 +148,5 @@ export function createZip(entries: ZipEntry[]): Blob {
   endView.setUint32(16, offset, true);
   endView.setUint16(20, 0, true);
 
-  return new Blob([...parts, ...central, end], { type: 'application/zip' });
+  return new Blob([...parts, ...central, end] as BlobPart[], { type: 'application/zip' });
 }

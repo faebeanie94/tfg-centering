@@ -27,7 +27,7 @@ import {
   fallbackCardFormatForDetection,
   resolveCardFormat,
 } from '../lib/card-sizes';
-import type { SubmissionFolder } from '../lib/folder-submission';
+import type { SubmissionFolder, ZipSubmission } from '../lib/folder-submission';
 import { downloadSubmissionZip } from '../lib/folder-submission';
 import * as api from '../lib/api-client';
 
@@ -144,7 +144,11 @@ export function ImageCapture({
 
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d')!;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        console.error('Failed to get canvas context for photo capture');
+        return;
+      }
       ctx.drawImage(video, 0, 0);
       const liveBox = detectedBoxRef.current;
       onCapture(canvas.toDataURL('image/jpeg', 0.95), {
@@ -262,6 +266,15 @@ export function ImageCapture({
       ro.disconnect();
     };
   }, [cameraActive]);
+
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
+    };
+  }, []);
 
   async function applyCameraOptions(track: MediaStreamTrack, torch: boolean, macro: boolean) {
     const caps = getCameraCapabilities(track);
@@ -603,7 +616,7 @@ export function ImageCapture({
                 <button
                   type="button"
                   className="btn btn-secondary btn-small"
-                  onClick={() => downloadSubmissionZip(submissionFolder as any)}
+                  onClick={() => downloadSubmissionZip(submissionFolder as ZipSubmission)}
                 >
                   Download
                 </button>
@@ -658,8 +671,8 @@ export function ImageCapture({
                           // Update submission name in API if it's an API submission
                           if (submissionFolder.type === 'api') {
                             await api.updateSubmission(submissionFolder.submissionId, submissionNameDraft.trim());
+                            // Don't mutate prop - parent App.tsx should refresh if needed
                           }
-                          submissionFolder.name = submissionNameDraft.trim();
                           setEditingSubmissionName(false);
                         } catch (err) {
                           console.error('Failed to update submission name:', err);

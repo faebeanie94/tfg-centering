@@ -19,7 +19,8 @@ export async function cropImage(imageSrc: string, rect: Rect): Promise<string> {
   const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;
-  const ctx = canvas.getContext('2d')!;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Failed to get canvas context');
   ctx.drawImage(img, x, y, w, h, 0, 0, w, h);
   return canvas.toDataURL('image/jpeg', 0.92);
 }

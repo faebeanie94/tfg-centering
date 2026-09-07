@@ -28,7 +28,7 @@ export interface CardGroup {
 }
 
 interface ArchiveImage {
-  bytes: Uint8Array<ArrayBuffer>;
+  bytes: Uint8Array;
   extension: string;
 }
 
