@@ -9,10 +9,21 @@ const GCS_BUCKET = 'tfg-submissions';
 const SUPABASE_BUCKET = 'tfg-submissions';
 
 // Initialize clients
-const gcsStorage = new Storage({
-  projectId: process.env.GCP_PROJECT_ID,
-  keyFilename: process.env.GCP_KEY_FILE,
-});
+let gcsStorageConfig = { projectId: process.env.GCP_PROJECT_ID };
+
+// Handle credentials - either from keyFilename or credentials JSON
+if (process.env.GCP_CREDENTIALS) {
+  try {
+    gcsStorageConfig.credentials = JSON.parse(process.env.GCP_CREDENTIALS);
+  } catch (e) {
+    console.error('Failed to parse GCP_CREDENTIALS:', e.message);
+    process.exit(1);
+  }
+} else if (process.env.GCP_KEY_FILE) {
+  gcsStorageConfig.keyFilename = path.resolve(process.env.GCP_KEY_FILE);
+}
+
+const gcsStorage = new Storage(gcsStorageConfig);
 
 const supabase = createClient(
   process.env.SUPABASE_URL,

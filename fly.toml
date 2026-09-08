@@ -12,6 +12,7 @@ primary_region = "lhr"
   NODE_ENV = "production"
   PORT = "3001"
   SUPABASE_URL = "https://bmorzawcorhufrmfbyen.supabase.co"
+  GCP_PROJECT_ID = "tfg-centering-506018"
 
 [http_service]
   internal_port = 3001
