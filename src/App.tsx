@@ -488,7 +488,7 @@ export default function App() {
           onClose={() => setPhase(libraryReturnPhase)}
           onEditImage={async (submissionId, card, side) => {
             console.log('Edit image clicked for card:', card.card_number, 'side:', side);
-            const imageUrl = side === 'front' ? card.front_s3_url : card.back_s3_url;
+            const imageUrl = side === 'front' ? card.front_image_url : card.back_image_url;
             if (!imageUrl) {
               console.warn('No image URL for card:', card.card_number, 'side:', side);
               return;
@@ -515,7 +515,7 @@ export default function App() {
 
               // For re-edits, prefill the other side if it exists
               const otherSide = side === 'front' ? 'back' : 'front';
-              const otherImageUrl = otherSide === 'front' ? card.front_s3_url : card.back_s3_url;
+              const otherImageUrl = otherSide === 'front' ? card.front_image_url : card.back_image_url;
               if (otherImageUrl) {
                 try {
                   const otherUrl = `/api/submissions/${submissionId}/cards/${card.card_number}/image/${otherSide}`;

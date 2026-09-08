@@ -89,8 +89,8 @@ export function CardListView({ submission, onClose, onCardDeleted }: CardListVie
               cardList
                 .map(c => ({
                   cardNumber: c.card_number,
-                  frontUrl: c.front_s3_url,
-                  backUrl: c.back_s3_url,
+                  frontUrl: c.front_image_url,
+                  backUrl: c.back_image_url,
                   frontGrade: c.front_grade,
                   backGrade: c.back_grade,
                   frontLeftMm: c.front_left_mm,
