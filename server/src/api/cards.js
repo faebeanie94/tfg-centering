@@ -1,7 +1,7 @@
 const express = require('express');
 const { pool } = require('../server');
-const { uploadImage, deleteImage, getPresignedUrl } = require('../services/s3');
-const { saveCardImage, saveCardMetadata, deleteCardFolder } = require('../services/localStorage');
+const { uploadImage, deleteImage, getPresignedUrl } = require('../services/supabase');
+const { saveCardMetadata, deleteCardFolder } = require('../services/localStorage');
 const { validateCardNumber, validateUUID, validateCardMetadata } = require('../middleware/validation');
 const { asyncHandler } = require('../middleware/errorHandler');
 
@@ -23,31 +23,31 @@ router.post(
       return res.status(404).json({ error: 'Submission not found' });
     }
 
-    let frontS3Url = null;
-    let backS3Url = null;
+    let frontStorageUrl = null;
+    let backStorageUrl = null;
     const uploadedUrls = [];
 
     try {
       if (req.files?.frontImage) {
-        frontS3Url = await uploadImage(
+        frontStorageUrl = await uploadImage(
           req.files.frontImage.data,
           req.files.frontImage.name,
           submissionId,
           cardNumber,
           'front'
         );
-        if (frontS3Url) uploadedUrls.push(frontS3Url);
+        if (frontStorageUrl) uploadedUrls.push(frontStorageUrl);
       }
 
       if (req.files?.backImage) {
-        backS3Url = await uploadImage(
+        backStorageUrl = await uploadImage(
           req.files.backImage.data,
           req.files.backImage.name,
           submissionId,
           cardNumber,
           'back'
         );
-        if (backS3Url) uploadedUrls.push(backS3Url);
+        if (backStorageUrl) uploadedUrls.push(backStorageUrl);
       }
 
       const result = await pool.query(
@@ -57,32 +57,24 @@ router.post(
            front_s3_url = COALESCE($3, cards.front_s3_url),
            back_s3_url = COALESCE($4, cards.back_s3_url)
          RETURNING *`,
-        [submissionId, cardNumber, frontS3Url, backS3Url]
+        [submissionId, cardNumber, frontStorageUrl, backStorageUrl]
       );
 
       const card = result.rows[0];
-
-      if (req.files?.frontImage) {
-        await saveCardImage(submissionId, cardNumber, 'front', req.files.frontImage.data);
-      }
-      if (req.files?.backImage) {
-        await saveCardImage(submissionId, cardNumber, 'back', req.files.backImage.data);
-      }
 
       try {
         await saveCardMetadata(submissionId, card, null);
       } catch (metadataErr) {
         console.warn(`Failed to save card metadata for card ${cardNumber}:`, metadataErr);
-        // Continue - metadata is optional, card was already saved to DB
       }
       res.status(201).json(card);
     } catch (err) {
-      // Rollback S3 uploads on any failure
+      // Rollback storage uploads on any failure
       for (const url of uploadedUrls) {
         try {
           await deleteImage(url);
         } catch (deleteErr) {
-          console.error('Failed to rollback S3 image:', deleteErr);
+          console.error('Failed to rollback storage image:', deleteErr);
         }
       }
       throw err;
@@ -276,15 +268,15 @@ router.delete(
     ]);
     console.log(`Deleted card ${cardNumber}: ${deleteResult.rowCount} rows affected`);
 
-    // Cleanup S3 and local files (non-atomic, best-effort)
+    // Cleanup storage files (non-atomic, best-effort)
     try {
       if (card.front_s3_url) {
         const deleted = await deleteImage(card.front_s3_url);
-        if (!deleted) console.warn(`Failed to delete front image from S3 for card ${cardNumber}`);
+        if (!deleted) console.warn(`Failed to delete front image from storage for card ${cardNumber}`);
       }
       if (card.back_s3_url) {
         const deleted = await deleteImage(card.back_s3_url);
-        if (!deleted) console.warn(`Failed to delete back image from S3 for card ${cardNumber}`);
+        if (!deleted) console.warn(`Failed to delete back image from storage for card ${cardNumber}`);
       }
       await deleteCardFolder(submissionId, parseInt(cardNumber));
     } catch (cleanupErr) {
@@ -295,7 +287,7 @@ router.delete(
   })
 );
 
-// Serve image as data (to avoid CORS issues with direct GCS fetch)
+// Serve image as data (to avoid CORS issues with direct fetch)
 router.get(
   '/:submissionId/cards/:cardNumber/image/:side',
   validateUUID('submissionId'),
@@ -325,9 +317,14 @@ router.get(
     }
 
     try {
+      // Get presigned URL for Supabase storage
       const presignedUrl = await getPresignedUrl(submissionId, parseInt(cardNumber), side);
 
-      // Fetch the image from GCS using the presigned URL with timeout
+      if (!presignedUrl) {
+        return res.status(404).json({ error: 'Image not found in storage' });
+      }
+
+      // Fetch the image from Supabase storage with timeout
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
@@ -344,7 +341,7 @@ router.get(
 
       const imageBuffer = await imageResponse.arrayBuffer();
       const base64Data = Buffer.from(imageBuffer).toString('base64');
-      const mimeType = 'image/jpeg'; // Assuming JPEG, could detect from file extension
+      const mimeType = 'image/jpeg';
 
       res.json({
         data: `data:${mimeType};base64,${base64Data}`,

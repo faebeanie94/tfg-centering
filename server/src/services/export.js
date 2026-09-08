@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { pool } = require('../server');
 const { getSubmissionPath } = require('./localStorage');
-const { getPresignedUrl } = require('./s3');
+const { getPresignedUrl } = require('./supabase');
 
 // Create ZIP of submission
 const createSubmissionZip = async (submissionId, outputStream) => {

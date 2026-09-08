@@ -1,6 +1,5 @@
 const express = require('express');
 const { pool } = require('../server');
-const { deleteSubmissionImages } = require('../services/s3');
 const { saveSubmissionMetadata, deleteSubmissionFolder } = require('../services/localStorage');
 const { validateSubmissionName, validateUUID } = require('../middleware/validation');
 const { asyncHandler } = require('../middleware/errorHandler');
@@ -63,7 +62,6 @@ router.delete('/:id', validateUUID('id'), asyncHandler(async (req, res) => {
     return res.status(404).json({ error: 'Submission not found' });
   }
 
-  await deleteSubmissionImages(id);
   await deleteSubmissionFolder(id);
 
   res.json({ message: 'Submission deleted', id: result.rows[0].id });

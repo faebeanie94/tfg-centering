@@ -2,7 +2,7 @@
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 
 app = "tfg-centering"
-primary_region = "sjc"
+primary_region = "lhr"
 
 [build]
   dockerfile = "Dockerfile"
@@ -11,6 +11,9 @@ primary_region = "sjc"
   # Production environment variables
   NODE_ENV = "production"
   PORT = "3001"
+  SUPABASE_URL = "https://bmorzawcorhufrmfbyen.supabase.co"
+  # Anon key (public)
+  SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtb3J6YXdjb3JodWZybWZieWVuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNjA0NzIsImV4cCI6MjEwMjczNjQ3Mn0.C914zO7kniRjR2kZ5tZeh86QuTFxDO_pcFjFndzfgGs"
 
 [http_service]
   internal_port = 3001
@@ -27,3 +30,7 @@ primary_region = "sjc"
     path = "/health"
     protocol = "http"
     timeout = "5s"
+
+# Secrets (set with: flyctl secrets set SUPABASE_SERVICE_KEY=xxx)
+# [secrets]
+#   SUPABASE_SERVICE_KEY = "your-service-key"
