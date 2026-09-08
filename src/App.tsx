@@ -663,7 +663,7 @@ export default function App() {
     return (
       <>
         <BorderEditor
-          key={`${currentSide}-${workingImage}`}
+          key={currentSide}
           imageSrc={workingImage}
           side={currentSide}
           settings={settings}
