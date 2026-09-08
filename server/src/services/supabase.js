@@ -42,11 +42,13 @@ async function uploadImage(fileBuffer, fileName, submissionId, cardNumber, side)
     if (!bucketReady) throw new Error('Storage bucket not available');
 
     const filePath = `${submissionId}/card-${cardNumber}/${side}.jpg`;
+    console.log(`Uploading ${side} image: ${filePath} (${fileBuffer.length} bytes)`);
     const { data, error } = await supabase.storage.from(BUCKET_NAME).upload(filePath, fileBuffer, { upsert: true });
 
     if (error) throw error;
 
     const { data: publicData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filePath);
+    console.log(`✅ Uploaded ${side} image for card ${cardNumber}: ${publicData.publicUrl}`);
     return publicData.publicUrl;
   } catch (err) {
     console.error(`Error uploading ${side} image:`, err);
