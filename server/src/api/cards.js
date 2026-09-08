@@ -51,11 +51,11 @@ router.post(
       }
 
       const result = await pool.query(
-        `INSERT INTO cards (submission_id, card_number, front_image_url, back_image_url)
+        `INSERT INTO cards (submission_id, card_number, front_s3_url, back_s3_url)
          VALUES ($1, $2, $3, $4)
          ON CONFLICT (submission_id, card_number) DO UPDATE SET
-           front_image_url = COALESCE($3, cards.front_image_url),
-           back_image_url = COALESCE($4, cards.back_image_url)
+           front_s3_url = COALESCE($3, cards.front_s3_url),
+           back_s3_url = COALESCE($4, cards.back_s3_url)
          RETURNING *`,
         [submissionId, cardNumber, frontStorageUrl, backStorageUrl]
       );
@@ -99,12 +99,12 @@ router.get('/:submissionId/cards', validateUUID('submissionId'), asyncHandler(as
   // Generate presigned URLs for images
   const cards = await Promise.all(
     result.rows.map(async (card) => {
-      const front_url = card.front_image_url ? await getPresignedUrl(submissionId, card.card_number, 'front') : null;
-      const back_url = card.back_image_url ? await getPresignedUrl(submissionId, card.card_number, 'back') : null;
+      const front_url = card.front_s3_url ? await getPresignedUrl(submissionId, card.card_number, 'front') : null;
+      const back_url = card.back_s3_url ? await getPresignedUrl(submissionId, card.card_number, 'back') : null;
       return {
         ...card,
-        front_image_url: front_url,
-        back_image_url: back_url,
+        front_s3_url: front_url,
+        back_s3_url: back_url,
       };
     })
   );
@@ -133,13 +133,13 @@ router.get(
     }
 
     const card = result.rows[0];
-    const front_url = card.front_image_url ? await getPresignedUrl(submissionId, card.card_number, 'front') : null;
-    const back_url = card.back_image_url ? await getPresignedUrl(submissionId, card.card_number, 'back') : null;
+    const front_url = card.front_s3_url ? await getPresignedUrl(submissionId, card.card_number, 'front') : null;
+    const back_url = card.back_s3_url ? await getPresignedUrl(submissionId, card.card_number, 'back') : null;
 
     res.json({
       ...card,
-      front_image_url: front_url,
-      back_image_url: back_url,
+      front_s3_url: front_url,
+      back_s3_url: back_url,
     });
   })
 );
@@ -270,12 +270,12 @@ router.delete(
 
     // Cleanup storage files (non-atomic, best-effort)
     try {
-      if (card.front_image_url) {
-        const deleted = await deleteImage(card.front_image_url);
+      if (card.front_s3_url) {
+        const deleted = await deleteImage(card.front_s3_url);
         if (!deleted) console.warn(`Failed to delete front image from storage for card ${cardNumber}`);
       }
-      if (card.back_image_url) {
-        const deleted = await deleteImage(card.back_image_url);
+      if (card.back_s3_url) {
+        const deleted = await deleteImage(card.back_s3_url);
         if (!deleted) console.warn(`Failed to delete back image from storage for card ${cardNumber}`);
       }
       await deleteCardFolder(submissionId, parseInt(cardNumber));
@@ -300,8 +300,8 @@ router.get(
 
     const result = await pool.query(
       side === 'front'
-        ? `SELECT c.id, c.front_image_url FROM cards c WHERE c.submission_id = $1 AND c.card_number = $2`
-        : `SELECT c.id, c.back_image_url FROM cards c WHERE c.submission_id = $1 AND c.card_number = $2`,
+        ? `SELECT c.id, c.front_s3_url FROM cards c WHERE c.submission_id = $1 AND c.card_number = $2`
+        : `SELECT c.id, c.back_s3_url FROM cards c WHERE c.submission_id = $1 AND c.card_number = $2`,
       [submissionId, parseInt(cardNumber)]
     );
 
@@ -310,7 +310,7 @@ router.get(
     }
 
     const card = result.rows[0];
-    const imageUrl = side === 'front' ? card.front_image_url : card.back_image_url;
+    const imageUrl = side === 'front' ? card.front_s3_url : card.back_s3_url;
 
     if (!imageUrl) {
       return res.status(404).json({ error: `${side} image not found` });
