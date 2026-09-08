@@ -1626,6 +1626,18 @@ body.editor-mode #root {
   flex-shrink: 0;
 }
 
+@media (max-width: 480px) {
+  .editor-actions {
+    gap: 3px;
+    flex-wrap: wrap;
+  }
+
+  .editor-actions .btn {
+    padding: 6px 10px !important;
+    font-size: 0.65rem !important;
+  }
+}
+
 .editor-shell .editor-actions .btn,
 .editor-shell .perspective-actions .btn {
   flex: 1;
