@@ -862,6 +862,13 @@ body.editor-mode #root {
 
 @media (max-width: 768px) {
   .editor-toolbar {
+    gap: 3px;
+  }
+
+  /* Hide action buttons on mobile, keep only Library/Settings */
+  .editor-toolbar > button:first-child,
+  .editor-toolbar .side-toggle,
+  .editor-toolbar > button:nth-child(3) {
     display: none !important;
   }
 }
