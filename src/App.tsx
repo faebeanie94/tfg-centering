@@ -360,6 +360,8 @@ export default function App() {
           try {
             await deleteCardFromSubmission(submissionFolder, cardToDelete);
             console.log(`Deleted card ${cardToDelete} before retake`);
+            // Reset submission state after deletion so next save treats it as a new card
+            setSubmissionFolder({ ...submissionFolder, lastCardNumberUsed: null, lastSideSaved: null });
           } catch (err) {
             console.error('Failed to delete card:', err);
             setLibraryMessage('Failed to delete card');
