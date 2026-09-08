@@ -742,7 +742,6 @@ export default function App() {
         onLibrary={() => openLibrary('capture')}
         onRetake={handleRetakeSubmission}
         onCaptureSide={handleCaptureSideChange}
-        onNextCard={handleNextCard}
         onViewCards={() => {
           setCardListReturnPhase('capture');
           setPhase('cardlist');
