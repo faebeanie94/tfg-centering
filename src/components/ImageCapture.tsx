@@ -40,7 +40,6 @@ interface ImageCaptureProps {
   onLibrary?: () => void;
   onRetake?: () => void;
   onCaptureSide?: (side: CardSide) => void;
-  onNextCard?: () => void;
   onViewCards?: () => void;
   savedCount?: number;
   hasSavedSides?: boolean;
@@ -61,7 +60,6 @@ export function ImageCapture({
   onLibrary,
   onRetake,
   onCaptureSide,
-  onNextCard,
   onViewCards,
   savedCount = 0,
   hasSavedSides,
