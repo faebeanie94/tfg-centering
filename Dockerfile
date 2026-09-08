@@ -1,28 +1,41 @@
+# Build frontend
 FROM node:20-alpine AS frontend-build
-WORKDIR /app
 
-COPY package.json package-lock.json ./
-RUN npm ci --prefer-offline --no-audit
+WORKDIR /build
 
-COPY . .
+COPY package*.json ./
+RUN npm ci
+
+COPY src ./src
+COPY public ./public
+COPY tsconfig.json vite.config.ts index.html ./
+
 RUN npm run build
 
+# Build final image
 FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy backend dependencies first (cached layer)
-COPY server/package.json server/package-lock.json ./
-RUN npm ci --prefer-offline --no-audit --omit=dev
+# Copy server files
+COPY server/package*.json ./server/
+WORKDIR /app/server
+RUN npm ci --only=production
 
-# Copy backend source
+# Copy server source
 COPY server/src ./src
-COPY server/db ./db
+COPY server/middleware ./middleware
+COPY server/services ./services
+COPY server/api ./api
 
-# Copy built frontend from previous stage
-COPY --from=frontend-build /app/dist ./dist
+# Copy .env if it exists (optional for secrets)
+COPY server/.env* ./
 
-EXPOSE 8080
+# Copy built frontend from build stage
+COPY --from=frontend-build /build/dist ./dist
 
-# Start backend server with environment variable handling
-CMD ["node", "src/server.js"]
+WORKDIR /app
+
+EXPOSE 3001
+
+CMD ["node", "server/src/server.js"]

@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "bash build.sh && flyctl deploy"
   },
   "dependencies": {
     "jszip": "^3.10.1",
