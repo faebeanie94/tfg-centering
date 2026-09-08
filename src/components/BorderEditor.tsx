@@ -602,7 +602,7 @@ export function BorderEditor({
         </button>
         {!otherSaved ? (
           <>
-            <button type="button" className="btn btn-secondary" onClick={async () => { await handleSave(); onRetake ? await onRetake(side) : onCaptureSide(side); }}>
+            <button type="button" className="btn btn-secondary" onClick={async () => { onRetake ? await onRetake(side) : onCaptureSide(side); }}>
               Retake
             </button>
             <button type="button" className="btn btn-secondary" onClick={async () => { await handleSave(); onCaptureSide(otherSide); }}>
