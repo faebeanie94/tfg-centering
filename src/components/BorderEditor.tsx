@@ -40,6 +40,7 @@ interface BorderEditorProps {
   onSave: (snapshot: SideSnapshot) => void;
   onSideChange: (side: CardSide) => void;
   onCaptureSide: (side: CardSide) => void;
+  onRetake?: (side: CardSide) => Promise<void>;
   onCrop: () => void;
   onPerspectiveFix: () => void;
   onDelete: () => void;
@@ -88,6 +89,7 @@ export function BorderEditor({
   onSave,
   onSideChange,
   onCaptureSide,
+  onRetake,
   onCrop,
   onPerspectiveFix,
   onDelete,
@@ -600,7 +602,7 @@ export function BorderEditor({
         </button>
         {!otherSaved ? (
           <>
-            <button type="button" className="btn btn-secondary" onClick={async () => { await handleSave(); onCaptureSide(side); }}>
+            <button type="button" className="btn btn-secondary" onClick={async () => { await handleSave(); onRetake ? await onRetake(side) : onCaptureSide(side); }}>
               Retake
             </button>
             <button type="button" className="btn btn-secondary" onClick={async () => { await handleSave(); onCaptureSide(otherSide); }}>

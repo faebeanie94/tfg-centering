@@ -28,7 +28,7 @@ import {
   type CardSizeSelection,
 } from './lib/card-sizes';
 import { exportCleanImage } from './lib/export-image';
-import { startSubmission, saveToSubmissionFolder, type SubmissionFolder } from './lib/folder-submission';
+import { startSubmission, saveToSubmissionFolder, deleteCardFromSubmission, type SubmissionFolder } from './lib/folder-submission';
 import { listSubmissionHandles, restoreSubmissionHandle, deleteSubmissionHandle } from './lib/submission-persistence';
 import * as api from './lib/api-client';
 
@@ -348,6 +348,26 @@ export default function App() {
     setAutoCropInfo(null);
     setPhase('capture');
   }, []);
+
+  const handleRetake = useCallback(
+    async (side: CardSide) => {
+      // Delete the current card from submission before retaking
+      if (submissionFolder && submissionFolder.currentEdit) {
+        try {
+          await deleteCardFromSubmission(submissionFolder, submissionFolder.currentEdit.cardNumber);
+          console.log(`Deleted card ${submissionFolder.currentEdit.cardNumber} before retake`);
+        } catch (err) {
+          console.error('Failed to delete card:', err);
+          setLibraryMessage('Failed to delete card');
+          window.setTimeout(() => setLibraryMessage(null), 3000);
+          return; // Don't proceed with retake if delete fails
+        }
+      }
+      // Then go back to capture
+      handleCaptureSide(side);
+    },
+    [submissionFolder, handleCaptureSide],
+  );
 
   const handlePerspectiveFix = useCallback(() => {
     if (!workingImage) return;
@@ -679,6 +699,7 @@ export default function App() {
           onSave={handleSaveSide}
           onSideChange={handleSideChange}
           onCaptureSide={handleCaptureSide}
+          onRetake={handleRetake}
           onCrop={handleCrop}
           onPerspectiveFix={handlePerspectiveFix}
           onDelete={() => handleDeleteSide(currentSide)}

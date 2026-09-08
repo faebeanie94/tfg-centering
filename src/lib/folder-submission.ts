@@ -205,6 +205,29 @@ export async function listSubmissionCards(submission: SubmissionFolder): Promise
 }
 
 /**
+ * Delete a card from the submission.
+ */
+export async function deleteCardFromSubmission(
+  submission: SubmissionFolder,
+  cardNumber: number,
+): Promise<void> {
+  if (submission.type === 'api') {
+    try {
+      await api.deleteCard(submission.submissionId, cardNumber);
+      console.log(`Deleted card ${cardNumber} from API submission`);
+    } catch (err) {
+      console.error('Failed to delete card from API:', err);
+      throw err;
+    }
+  } else {
+    // For ZIP submissions, delete both front and back images if they exist
+    submission.images.delete(`${cardNumber}-front.jpg`);
+    submission.images.delete(`${cardNumber}-back.jpg`);
+    console.log(`Deleted card ${cardNumber} from ZIP submission`);
+  }
+}
+
+/**
  * Load a saved image from the submission.
  */
 export async function loadSubmissionImage(
