@@ -143,7 +143,8 @@ export async function saveToSubmissionFolder(
   // Only increment when we save back after front (completes the pair)
   if (side === 'back' && submission.lastSideSaved === 'front') {
     nextCardNumber = Math.max(submission.nextCardNumber, cardNumber + 1);
-    lastCardNumberUsed = null;
+    // Keep lastCardNumberUsed so retake can delete the current card
+    // Only reset lastSideSaved to indicate we're not in the middle of a pair
     lastSideSaved = null;
   }
 
