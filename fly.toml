@@ -16,8 +16,9 @@ primary_region = "sjc"
   internal_port = 3001
   force_https = true
   auto_start_machines = true
-  auto_stop_machines = false
-  min_machines_running = 1
+  auto_stop_machines = true
+  min_machines_running = 0
+  idle_timeout_seconds = 7200
 
   [[http_service.checks]]
     grace_period = "30s"
