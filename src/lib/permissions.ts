@@ -30,15 +30,19 @@ export function saveStoredPermissions(patch: Partial<StoredPermissions>) {
 
 export async function queryCameraPermission(): Promise<PermissionState> {
   if (!navigator.permissions?.query) {
-    return loadStoredPermissions().camera === 'granted' ? 'granted' : 'prompt';
+    // Fallback: check stored state, default to 'prompt' to let browser handle it
+    const stored = loadStoredPermissions().camera;
+    return stored === 'denied' ? 'denied' : 'prompt';
   }
   try {
     const result = await navigator.permissions.query({ name: 'camera' as PermissionName });
+    // Always sync with system permission state, don't rely only on storage
     saveStoredPermissions({ camera: result.state });
     result.onchange = () => saveStoredPermissions({ camera: result.state });
     return result.state;
   } catch {
-    return loadStoredPermissions().camera === 'granted' ? 'granted' : 'prompt';
+    // If permission query fails, let browser prompt for permission
+    return 'prompt';
   }
 }
 
