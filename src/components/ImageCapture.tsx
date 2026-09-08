@@ -502,8 +502,8 @@ export function ImageCapture({
     <div className="capture capture-idle">
       <div className="capture-top-bar">
         <span className="capture-side-badge">{side === 'front' ? 'Front' : 'Back'} side</span>
-        {side === 'front' && hasSavedSides && (
-          <div className="capture-top-actions">
+        <div className="capture-top-actions">
+          {side === 'front' && hasSavedSides ? (
             <>
               <button type="button" className="btn btn-secondary btn-small" onClick={onSettings}>
                 Standards
@@ -516,16 +516,6 @@ export function ImageCapture({
               {onCaptureSide && (
                 <button type="button" className="btn btn-secondary btn-small" onClick={() => onCaptureSide('back')}>
                   Capture Back
-                </button>
-              )}
-            </>
-          </div>
-        )}
-                </button>
-              )}
-              {onCompare && (
-                <button type="button" className="btn btn-secondary btn-small" onClick={onCompare}>
-                  Compare
                 </button>
               )}
             </>
