@@ -352,15 +352,20 @@ export default function App() {
   const handleRetake = useCallback(
     async (side: CardSide) => {
       // Delete the current card from submission before retaking
-      if (submissionFolder && submissionFolder.currentEdit) {
-        try {
-          await deleteCardFromSubmission(submissionFolder, submissionFolder.currentEdit.cardNumber);
-          console.log(`Deleted card ${submissionFolder.currentEdit.cardNumber} before retake`);
-        } catch (err) {
-          console.error('Failed to delete card:', err);
-          setLibraryMessage('Failed to delete card');
-          window.setTimeout(() => setLibraryMessage(null), 3000);
-          return; // Don't proceed with retake if delete fails
+      if (submissionFolder) {
+        // Determine which card to delete: use lastCardNumberUsed if available
+        const cardToDelete = submissionFolder.currentEdit?.cardNumber || submissionFolder.lastCardNumberUsed;
+
+        if (cardToDelete) {
+          try {
+            await deleteCardFromSubmission(submissionFolder, cardToDelete);
+            console.log(`Deleted card ${cardToDelete} before retake`);
+          } catch (err) {
+            console.error('Failed to delete card:', err);
+            setLibraryMessage('Failed to delete card');
+            window.setTimeout(() => setLibraryMessage(null), 3000);
+            return; // Don't proceed with retake if delete fails
+          }
         }
       }
       // Then go back to capture
