@@ -178,10 +178,10 @@ export function BorderEditor({
     setInner(defaultInnerRect(o));
   }
 
-  function handleSave() {
+  async function handleSave() {
     const snap = buildSnapshot();
     if (!snap) return;
-    onSave(snap);
+    await onSave(snap);
     setSavedFlash(true);
     setTimeout(() => setSavedFlash(false), 1500);
   }
@@ -600,10 +600,10 @@ export function BorderEditor({
         </button>
         {!otherSaved ? (
           <>
-            <button type="button" className="btn btn-secondary" onClick={() => { handleSave(); onCaptureSide(side); }}>
+            <button type="button" className="btn btn-secondary" onClick={async () => { await handleSave(); onCaptureSide(side); }}>
               Retake
             </button>
-            <button type="button" className="btn btn-secondary" onClick={() => { handleSave(); onCaptureSide(otherSide); }}>
+            <button type="button" className="btn btn-secondary" onClick={async () => { await handleSave(); onCaptureSide(otherSide); }}>
               Capture {otherSide}
             </button>
           </>
@@ -612,7 +612,7 @@ export function BorderEditor({
             <button type="button" className={`btn btn-primary ${savedFlash ? 'btn-saved' : ''}`} onClick={handleSave}>
               {savedFlash ? 'Saved ✓' : 'Save Card'}
             </button>
-            <button type="button" className="btn btn-secondary" onClick={() => { handleSave(); onNextCard?.(); }}>
+            <button type="button" className="btn btn-secondary" onClick={async () => { await handleSave(); onNextCard?.(); }}>
               Next Card
             </button>
             <button type="button" className="btn btn-secondary" onClick={onCompare} disabled={!sessionHasAny(session)}>
