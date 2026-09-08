@@ -24,7 +24,11 @@ async function fetchWithRetry(
       return fetchWithRetry(url, options, retries + 1);
     }
 
-    const errorData = await res.json().catch(() => null);
+    let errorData = null;
+    const contentType = res.headers.get('content-type');
+    if (contentType?.includes('application/json')) {
+      errorData = await res.json().catch(() => null);
+    }
     throw new ApiError(
       errorData?.error || `Request failed with status ${res.status}`,
       res.status,
