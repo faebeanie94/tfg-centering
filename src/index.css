@@ -2081,15 +2081,20 @@ body.editor-mode #root {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   margin: 0;
-  padding: 6px 10px;
+  padding: 4px 8px;
   background: rgba(74, 144, 226, 0.1);
   border: 1px solid var(--primary);
-  border-radius: 6px;
-  font-size: 0.75rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
   color: var(--text-primary);
-  flex-wrap: wrap;
+}
+
+@media (max-width: 480px) {
+  .submission-banner .btn {
+    display: none !important;
+  }
 }
 
 .submission-mode-badge {
