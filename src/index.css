@@ -2081,14 +2081,15 @@ body.editor-mode #root {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
-  margin: 0 12px;
-  padding: 10px 14px;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 10px;
   background: rgba(74, 144, 226, 0.1);
   border: 1px solid var(--primary);
-  border-radius: 8px;
-  font-size: 0.85rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
   color: var(--text-primary);
+  flex-wrap: wrap;
 }
 
 .submission-mode-badge {
