@@ -19,12 +19,7 @@ primary_region = "sjc"
   auto_stop_machines = true
   min_machines_running = 0
 
-[[statics]]
-  guest_path = "/dist"
-  url_prefix = "/assets"
-
-[checks]
-  [checks.http]
+  [[http_service.checks]]
     grace_period = "30s"
     interval = "15s"
     method = "get"
