@@ -73,12 +73,12 @@ export function CardEditorModal({ card, submissionId, onClose, onEditImage }: Ca
           <button type="button" className="btn btn-secondary" onClick={onClose}>Close</button>
           {onEditImage && (
             <div className="button-group">
-              {card.front_image_url && (
+              {card.front_s3_url && (
                 <button type="button" className="btn btn-secondary" onClick={() => { onEditImage(submissionId, card, 'front'); }}>
                   Edit Front
                 </button>
               )}
-              {card.back_image_url && (
+              {card.back_s3_url && (
                 <button type="button" className="btn btn-secondary" onClick={() => { onEditImage(submissionId, card, 'back'); }}>
                   Edit Back
                 </button>

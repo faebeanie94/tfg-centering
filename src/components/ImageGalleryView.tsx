@@ -158,10 +158,10 @@ export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void
                             </div>
 
                             <div className="card-list-images">
-                              {card.front_image_url && (
+                              {card.front_s3_url && (
                                 <div className="card-list-image">
                                   <img
-                                    src={card.front_image_url}
+                                    src={card.front_s3_url}
                                     alt={`Card ${card.card_number} - Front`}
                                     onError={(e) => {
                                       (e.target as HTMLImageElement).style.display = 'none';
@@ -169,10 +169,10 @@ export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void
                                   />
                                 </div>
                               )}
-                              {card.back_image_url && (
+                              {card.back_s3_url && (
                                 <div className="card-list-image">
                                   <img
-                                    src={card.back_image_url}
+                                    src={card.back_s3_url}
                                     alt={`Card ${card.card_number} - Back`}
                                     onError={(e) => {
                                       (e.target as HTMLImageElement).style.display = 'none';
@@ -180,7 +180,7 @@ export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void
                                   />
                                 </div>
                               )}
-                              {!card.front_image_url && !card.back_image_url && (
+                              {!card.front_s3_url && !card.back_s3_url && (
                                 <p className="card-list-no-images">No images</p>
                               )}
                             </div>
