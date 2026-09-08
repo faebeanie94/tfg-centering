@@ -61,8 +61,8 @@ export interface Card {
   id: string;
   submission_id: string;
   card_number: number;
-  front_s3_url: string | null;
-  back_s3_url: string | null;
+  front_image_url: string | null;
+  back_image_url: string | null;
   front_local_path: string | null;
   back_local_path: string | null;
   created_at: string;
@@ -206,7 +206,7 @@ export async function downloadCardImage(
 ): Promise<string | null> {
   try {
     const card = await getCard(submissionId, cardNumber);
-    const url = side === 'front' ? card.front_s3_url : card.back_s3_url;
+    const url = side === 'front' ? card.front_image_url : card.back_image_url;
 
     if (!url) return null;
 
