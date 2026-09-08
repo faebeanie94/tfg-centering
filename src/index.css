@@ -512,7 +512,7 @@ body.scanner-mode #root {
   margin-bottom: 8px;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 768px) {
   .submission-status {
     padding: 6px 8px;
     margin-bottom: 4px;
@@ -520,12 +520,12 @@ body.scanner-mode #root {
   }
 
   .submission-folder {
-    font-size: 0.75rem !important;
+    font-size: 0.7rem !important;
     margin: 0 0 2px 0 !important;
   }
 
   .submission-count {
-    font-size: 0.7rem !important;
+    font-size: 0.65rem !important;
   }
 
   .submission-actions {
@@ -860,7 +860,7 @@ body.editor-mode #root {
   flex-shrink: 0;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 768px) {
   .editor-toolbar {
     gap: 3px;
     flex-wrap: wrap;
@@ -868,7 +868,7 @@ body.editor-mode #root {
 
   .editor-toolbar .btn {
     padding: 6px 10px !important;
-    font-size: 0.7rem !important;
+    font-size: 0.65rem !important;
   }
 
   .side-toggle {
@@ -877,7 +877,7 @@ body.editor-mode #root {
 
   .side-btn {
     padding: 6px 8px !important;
-    font-size: 0.7rem !important;
+    font-size: 0.65rem !important;
   }
 }
 
@@ -1626,7 +1626,7 @@ body.editor-mode #root {
   flex-shrink: 0;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 768px) {
   .editor-actions {
     gap: 3px;
     flex-wrap: wrap;
@@ -1634,7 +1634,7 @@ body.editor-mode #root {
 
   .editor-actions .btn {
     padding: 6px 10px !important;
-    font-size: 0.65rem !important;
+    font-size: 0.6rem !important;
   }
 }
 
