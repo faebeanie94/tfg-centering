@@ -84,7 +84,7 @@ const createSubmissionZip = async (submissionId, outputStream) => {
       }
 
       // Add front image from S3 or local
-      if (card.front_s3_url) {
+      if (card.front_image_url) {
         try {
           const frontUrl = await getPresignedUrl(submissionId, card.card_number, 'front');
           if (!frontUrl) {
@@ -123,7 +123,7 @@ const createSubmissionZip = async (submissionId, outputStream) => {
       }
 
       // Add back image from S3 or local
-      if (card.back_s3_url) {
+      if (card.back_image_url) {
         try {
           const backUrl = await getPresignedUrl(submissionId, card.card_number, 'back');
           console.log(`Fetching back image for card ${card.card_number}...`);

@@ -50,8 +50,8 @@ const saveCardMetadata = async (submissionId, card, metadata) => {
 
   const cardData = {
     card_number: card.card_number,
-    front_s3_url: card.front_s3_url,
-    back_s3_url: card.back_s3_url,
+    front_image_url: card.front_image_url,
+    back_image_url: card.back_image_url,
     front_local_path: card.front_local_path,
     back_local_path: card.back_local_path,
     metadata: metadata || {},
