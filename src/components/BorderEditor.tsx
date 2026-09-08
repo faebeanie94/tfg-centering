@@ -187,8 +187,6 @@ export function BorderEditor({
   }
 
   function handleSideSwitch(target: CardSide) {
-    const snap = buildSnapshot();
-    if (snap) onSave(snap);
     onSideChange(target);
   }
 
