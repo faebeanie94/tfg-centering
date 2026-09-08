@@ -472,7 +472,7 @@ export default function App() {
     setPhase('capture');
     // Reset submission folder state for fresh card
     if (submissionFolder) {
-      setSubmissionFolder({ ...submissionFolder, lastSideSaved: null });
+      setSubmissionFolder({ ...submissionFolder, lastSideSaved: null, lastCardNumberUsed: null });
     }
   }, [submissionFolder]);
 
