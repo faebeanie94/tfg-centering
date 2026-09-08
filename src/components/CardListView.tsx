@@ -110,7 +110,8 @@ export function CardListView({ submission, onClose, onCardDeleted }: CardListVie
           if (mounted) {
             console.error('Failed to load cards:', err);
             setLoading(false);
-            setMessage('Failed to load cards');
+            const errorMsg = err instanceof Error ? err.message : 'Failed to load cards';
+            setMessage(`Error: ${errorMsg}`);
           }
         }
     })();
