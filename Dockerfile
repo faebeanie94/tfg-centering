@@ -22,11 +22,8 @@ COPY server/package*.json ./server/
 WORKDIR /app/server
 RUN npm ci --only=production
 
-# Copy server source
+# Copy server source (all subdirectories)
 COPY server/src ./src
-COPY server/middleware ./middleware
-COPY server/services ./services
-COPY server/api ./api
 
 # Copy .env if it exists (optional for secrets)
 COPY server/.env* ./
