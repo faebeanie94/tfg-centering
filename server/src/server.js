@@ -19,9 +19,10 @@ pool.on('error', (err) => {
 });
 
 // Initialize database (run migrations)
+// Log errors but don't exit - allows server to start even if DB is temporarily unavailable
 initializeDatabase(pool).catch(err => {
-  console.error('Failed to initialize database:', err);
-  process.exit(1);
+  console.warn('Failed to initialize database on startup:', err.message);
+  console.warn('Server will continue running - database operations may fail until connection is restored');
 });
 
 // Export pool early to avoid circular dependency issues
