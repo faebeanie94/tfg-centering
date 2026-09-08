@@ -862,22 +862,7 @@ body.editor-mode #root {
 
 @media (max-width: 768px) {
   .editor-toolbar {
-    gap: 3px;
-    flex-wrap: wrap;
-  }
-
-  .editor-toolbar .btn {
-    padding: 6px 10px !important;
-    font-size: 0.65rem !important;
-  }
-
-  .side-toggle {
-    padding: 2px !important;
-  }
-
-  .side-btn {
-    padding: 6px 8px !important;
-    font-size: 0.65rem !important;
+    display: none !important;
   }
 }
 
