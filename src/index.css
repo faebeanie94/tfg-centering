@@ -2079,6 +2079,7 @@ body.editor-mode #root {
 
 .submission-banner {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: 4px;
@@ -2091,9 +2092,20 @@ body.editor-mode #root {
   color: var(--text-primary);
 }
 
+.submission-banner span {
+  flex: 1;
+  min-width: 0;
+}
+
 @media (max-width: 480px) {
+  .submission-banner {
+    gap: 3px;
+    padding: 3px 6px;
+  }
+
   .submission-banner .btn {
-    display: none !important;
+    padding: 4px 8px !important;
+    font-size: 0.65rem !important;
   }
 }
 
