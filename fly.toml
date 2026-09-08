@@ -12,8 +12,6 @@ primary_region = "lhr"
   NODE_ENV = "production"
   PORT = "3001"
   SUPABASE_URL = "https://bmorzawcorhufrmfbyen.supabase.co"
-  # Anon key (public)
-  SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtb3J6YXdjb3JodWZybWZieWVuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNjA0NzIsImV4cCI6MjEwMjczNjQ3Mn0.C914zO7kniRjR2kZ5tZeh86QuTFxDO_pcFjFndzfgGs"
 
 [http_service]
   internal_port = 3001
