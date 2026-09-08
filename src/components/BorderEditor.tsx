@@ -612,7 +612,7 @@ export function BorderEditor({
             <button type="button" className={`btn btn-primary ${savedFlash ? 'btn-saved' : ''}`} onClick={handleSave}>
               {savedFlash ? 'Saved ✓' : 'Save Card'}
             </button>
-            <button type="button" className="btn btn-secondary" onClick={async () => { await handleSave(); onNextCard?.(); }}>
+            <button type="button" className="btn btn-secondary" onClick={onNextCard}>
               Next Card
             </button>
             <button type="button" className="btn btn-secondary" onClick={onCompare} disabled={!sessionHasAny(session)}>
