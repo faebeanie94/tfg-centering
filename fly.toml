@@ -1,4 +1,4 @@
-# fly.toml app configuration file generated for tfg-centering on 2026-09-18T02:58:37Z
+# fly.toml app configuration file generated for tfg-centering on 2026-09-20T01:16:06Z
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
@@ -19,7 +19,7 @@ primary_region = 'lhr'
   internal_port = 3001
   force_https = true
   auto_start_machines = true
-  auto_stop_machines = true
-  min_machines_running = 0
+  auto_stop_machines = 'suspend'
+  min_machines_running = 1
   idle_timeout_seconds = 7200
   checks = [{ grace_period = '30s', interval = '15s', method = 'get', path = '/health', protocol = 'http', timeout = '5s' }]
