@@ -113,8 +113,8 @@ export async function applyMaxCaptureResolution(
     : null;
 }
 
-/** Target optical zoom when macro mode is on (~1.5×). */
-export const MACRO_ZOOM_FACTOR = 1.5;
+/** Target optical zoom when macro mode is on (~2.0×). */
+export const MACRO_ZOOM_FACTOR = 2.0;
 
 function macroZoomTarget(caps: ExtendedCapabilities): number | undefined {
   if (!caps.zoom) return undefined;
