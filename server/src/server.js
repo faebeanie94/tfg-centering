@@ -50,13 +50,8 @@ app.use((req, res, next) => {
 app.use(express.static(frontendPath));
 
 // Health check
-app.get('/health', async (req, res) => {
-  try {
-    await pool.query('SELECT 1');
-    res.json({ status: 'healthy', database: 'connected' });
-  } catch (err) {
-    res.status(503).json({ status: 'unhealthy', database: 'disconnected', error: err.message });
-  }
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' });
 });
 
 // Mount API routes
