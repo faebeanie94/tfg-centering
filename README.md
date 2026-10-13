@@ -5,7 +5,7 @@ A mobile-friendly web app for measuring trading card centering to **TFG (Tree Fr
 ## Features
 
 - **TFG grading standards** — grade thresholds from the official centering tool spreadsheet
-- **Front / Back toggle** — separate thresholds per side (e.g. 50/50 front, 60/40 back for TFG 10)
+- **Front / Back toggle** — separate thresholds per side (e.g. ~51.5/48.5 front, ~55.6/44.4 back for TFG 10)
 - **Level indicators** — crosshairs turn green when the device is parallel to the card
 - **Border editor** — drag green corners (card edge) and yellow handles (artwork border)
 - **Measurements** — border widths in mm, L|R and T|B percentages, qualify ratios
@@ -26,17 +26,19 @@ TFG calculates the ratio between the two worst opposing borders (left/right or t
 
 | Grade | Front (worst axis) | Back (worst axis) |
 |-------|--------------------|-------------------|
-| 10    | 50/50              | 60/40             |
-| 9.5   | 53/47              | 65/35             |
-| 9     | 55/45              | 70/30             |
-| 8     | 60/40              | 75/25             |
-| 7     | 65/35              | 80/20             |
-| 6     | 70/30              | 82.5/17.5         |
-| 5     | 75/25              | 85/15             |
-| 4     | 80/20              | 87.5/12.5         |
-| 3     | 85/15              | 90/10             |
-| 2     | 90/10              | 95/5              |
-| 1     | Any                | Any               |
+| 10    | ~51.5/48.5         | ~55.6/44.4        |
+| 9.5   | ~53.5/46.5         | 60/40             |
+| 9     | ~56.7/43.3         | 70/30             |
+| 8     | 60/40              | 80/20             |
+| 7     | 65/35              | 90/10             |
+| 6     | 70/30              | 95/5              |
+| 5     | 75/25              | Worse than 95/5   |
+| 4     | 80/20              | —                 |
+| 3     | 85/15              | —                 |
+| 2     | 90/10              | —                 |
+| 1     | Worse than 90/10   | —                 |
+
+The back alone never limits a card below TFG 5.
 
 Reference files in `/reference` include the TFG Grading Standards PDF and centering tool spreadsheet.
 
