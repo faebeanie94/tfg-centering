@@ -27,12 +27,16 @@ TFG calculates the ratio between the two worst opposing borders (left/right or t
 | Grade | Front (worst axis) | Back (worst axis) |
 |-------|--------------------|-------------------|
 | 10    | 50/50              | 60/40             |
-| 9.5   | 53/47              | 60/40             |
+| 9.5   | 53/47              | 65/35             |
 | 9     | 55/45              | 70/30             |
-| 8     | 60/40              | 80/20             |
-| 7     | 65/35              | 90/10             |
-| 6     | 70/30              | 90/10             |
-| 5     | 75/25              | 95/5              |
+| 8     | 60/40              | 75/25             |
+| 7     | 65/35              | 80/20             |
+| 6     | 70/30              | 82.5/17.5         |
+| 5     | 75/25              | 85/15             |
+| 4     | 80/20              | 87.5/12.5         |
+| 3     | 85/15              | 90/10             |
+| 2     | 90/10              | 95/5              |
+| 1     | Any                | Any               |
 
 Reference files in `/reference` include the TFG Grading Standards PDF and centering tool spreadsheet.
 

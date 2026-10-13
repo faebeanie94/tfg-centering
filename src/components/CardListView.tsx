@@ -24,7 +24,8 @@ function getOverallGrade(card: Card): string {
   if (grades.length === 0) return '—';
   if (grades.length === 1) return grades[0];
   // Sort numerically to get the lower grade (TFG 9 < TFG 10)
-  return grades.sort((a, b) => parseFloat(a) - parseFloat(b))[0];
+  const gradeValue = (g: string) => parseFloat(g.replace(/[^\d.]/g, ''));
+  return grades.sort((a, b) => gradeValue(a) - gradeValue(b))[0];
 }
 
 function formatMm(value: number | string | null | undefined): string {

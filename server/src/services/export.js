@@ -54,16 +54,16 @@ const createSubmissionZip = async (submissionId, outputStream) => {
         condition: card.condition || null,
         notes: card.notes || null,
         frontMeasurements: {
-          leftMm: card.front_left_mm || null,
-          rightMm: card.front_right_mm || null,
-          topMm: card.front_top_mm || null,
-          bottomMm: card.front_bottom_mm || null,
+          leftMm: card.front_left_mm ?? null,
+          rightMm: card.front_right_mm ?? null,
+          topMm: card.front_top_mm ?? null,
+          bottomMm: card.front_bottom_mm ?? null,
         },
         backMeasurements: {
-          leftMm: card.back_left_mm || null,
-          rightMm: card.back_right_mm || null,
-          topMm: card.back_top_mm || null,
-          bottomMm: card.back_bottom_mm || null,
+          leftMm: card.back_left_mm ?? null,
+          rightMm: card.back_right_mm ?? null,
+          topMm: card.back_top_mm ?? null,
+          bottomMm: card.back_bottom_mm ?? null,
         },
       })),
     };
@@ -126,24 +126,28 @@ const createSubmissionZip = async (submissionId, outputStream) => {
       if (card.back_image_url) {
         try {
           const backUrl = await getPresignedUrl(submissionId, card.card_number, 'back');
-          console.log(`Fetching back image for card ${card.card_number}...`);
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 30000);
-          try {
-            const backResponse = await fetch(backUrl, { signal: controller.signal });
-            console.log(`Back S3 response: ${backResponse.status}`);
-            if (backResponse.ok) {
-              const arrayBuffer = await backResponse.arrayBuffer();
-              const buffer = Buffer.from(arrayBuffer);
-              console.log(`Added back image (${buffer.length} bytes) for card ${card.card_number}`);
-              archive.append(buffer, {
-                name: `${folderName}/card-${card.card_number}/back.jpg`,
-              });
-            } else {
-              console.error(`Back image returned ${backResponse.status} for card ${card.card_number}`);
+          if (!backUrl) {
+            console.error(`Failed to get presigned URL for back image of card ${card.card_number}`);
+          } else {
+            console.log(`Fetching back image for card ${card.card_number}...`);
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000);
+            try {
+              const backResponse = await fetch(backUrl, { signal: controller.signal });
+              console.log(`Back S3 response: ${backResponse.status}`);
+              if (backResponse.ok) {
+                const arrayBuffer = await backResponse.arrayBuffer();
+                const buffer = Buffer.from(arrayBuffer);
+                console.log(`Added back image (${buffer.length} bytes) for card ${card.card_number}`);
+                archive.append(buffer, {
+                  name: `${folderName}/card-${card.card_number}/back.jpg`,
+                });
+              } else {
+                console.error(`Back image returned ${backResponse.status} for card ${card.card_number}`);
+              }
+            } finally {
+              clearTimeout(timeoutId);
             }
-          } finally {
-            clearTimeout(timeoutId);
           }
         } catch (err) {
           console.error(`Failed to download back image for card ${card.card_number}:`, err.message);
@@ -165,16 +169,16 @@ const createSubmissionZip = async (submissionId, outputStream) => {
         condition: card.condition || null,
         notes: card.notes || null,
         frontMeasurements: {
-          leftMm: card.front_left_mm || null,
-          rightMm: card.front_right_mm || null,
-          topMm: card.front_top_mm || null,
-          bottomMm: card.front_bottom_mm || null,
+          leftMm: card.front_left_mm ?? null,
+          rightMm: card.front_right_mm ?? null,
+          topMm: card.front_top_mm ?? null,
+          bottomMm: card.front_bottom_mm ?? null,
         },
         backMeasurements: {
-          leftMm: card.back_left_mm || null,
-          rightMm: card.back_right_mm || null,
-          topMm: card.back_top_mm || null,
-          bottomMm: card.back_bottom_mm || null,
+          leftMm: card.back_left_mm ?? null,
+          rightMm: card.back_right_mm ?? null,
+          topMm: card.back_top_mm ?? null,
+          bottomMm: card.back_bottom_mm ?? null,
         },
       };
       archive.append(JSON.stringify(cardMetadata, null, 2), {
@@ -190,11 +194,11 @@ const createSubmissionZip = async (submissionId, outputStream) => {
       // Overall grade is the lower of the two (limiting grade)
       let overallGrade = '—';
       if (frontGrade !== '—' && backGrade !== '—') {
-        const frontNum = parseFloat(frontGrade);
-        const backNum = parseFloat(backGrade);
+        const frontNum = parseFloat(frontGrade.replace(/[^\d.]/g, ''));
+        const backNum = parseFloat(backGrade.replace(/[^\d.]/g, ''));
         // Validate that parsing succeeded and no NaN values
         if (!isNaN(frontNum) && !isNaN(backNum)) {
-          overallGrade = [frontNum, backNum].sort((a, b) => a - b)[0].toString();
+          overallGrade = frontNum <= backNum ? frontGrade : backGrade;
         }
       } else if (frontGrade !== '—') {
         overallGrade = frontGrade;

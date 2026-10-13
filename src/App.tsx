@@ -250,7 +250,7 @@ export default function App() {
             try {
               const cardNum = isSubmissionCard
                 ? parseInt(cardNameMatch![2], 10)
-                : submissionFolder.lastCardNumberUsed || submissionFolder.nextCardNumber;
+                : updatedFolder.lastCardNumberUsed ?? updatedFolder.nextCardNumber;
 
               const gradeLabel = snapshot.grade.label;
               const centeringMeasurements = snapshot.result?.bordersMm ? {
@@ -278,10 +278,7 @@ export default function App() {
           const updatedSession = { ...session, [currentSide]: snapshot };
           if (updatedSession.front && updatedSession.back && !isSubmissionCard) {
             try {
-              // Determine which card number was just completed
-              const cardNum = submissionFolder.lastSideSaved === 'back'
-                ? submissionFolder.nextCardNumber - 1
-                : submissionFolder.nextCardNumber;
+              const cardNum = updatedFolder.lastCardNumberUsed ?? updatedFolder.nextCardNumber;
               const libraryLabel = `${submissionFolder.name}/${cardNum}`;
               console.log('Auto-saving to library:', libraryLabel);
               await saveToLibrary(updatedSession, libraryLabel);

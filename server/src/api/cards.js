@@ -206,14 +206,14 @@ router.put(
           backGrade || null,
           condition || null,
           notes || null,
-          frontLeftMm || null,
-          frontRightMm || null,
-          frontTopMm || null,
-          frontBottomMm || null,
-          backLeftMm || null,
-          backRightMm || null,
-          backTopMm || null,
-          backBottomMm || null,
+          frontLeftMm ?? null,
+          frontRightMm ?? null,
+          frontTopMm ?? null,
+          frontBottomMm ?? null,
+          backLeftMm ?? null,
+          backRightMm ?? null,
+          backTopMm ?? null,
+          backBottomMm ?? null,
         ]
       );
     }
