@@ -401,10 +401,10 @@ export function BorderEditor({
 
   const mmReadings = (
     [
-      { key: 'left', label: 'Left', value: result.bordersMm.left },
-      { key: 'right', label: 'Right', value: result.bordersMm.right },
       { key: 'top', label: 'Top', value: result.bordersMm.top },
       { key: 'bottom', label: 'Bottom', value: result.bordersMm.bottom },
+      { key: 'left', label: 'Left', value: result.bordersMm.left },
+      { key: 'right', label: 'Right', value: result.bordersMm.right },
     ] as const
   ).map((r) => ({ ...r, estimated: innerSideConfidence ? innerSideConfidence[r.key] === 0 : false }));
 
@@ -494,15 +494,15 @@ export function BorderEditor({
         </div>
         <div className="grade-banner-metrics">
           <div className="metric">
-            <span className="metric-label">L | R</span>
-            <span className="metric-value">
-              {formatPct(result.leftRight.left)} | {formatPct(result.leftRight.right)}
-            </span>
-          </div>
-          <div className="metric">
             <span className="metric-label">T | B</span>
             <span className="metric-value">
               {formatPct(result.topBottom.top)} | {formatPct(result.topBottom.bottom)}
+            </span>
+          </div>
+          <div className="metric">
+            <span className="metric-label">L | R</span>
+            <span className="metric-value">
+              {formatPct(result.leftRight.left)} | {formatPct(result.leftRight.right)}
             </span>
           </div>
         </div>
