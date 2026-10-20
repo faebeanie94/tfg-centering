@@ -8,7 +8,28 @@ interface SubmissionWithCards {
   id: string;
   name: string;
   type: 'api' | 'zip';
+  completed: boolean;
   cards: Card[];
+}
+
+type GalleryFilter = 'in-progress' | 'completed';
+
+const FILTER_KEY = 'tfg-library-filter';
+
+function loadFilter(): GalleryFilter {
+  try {
+    return localStorage.getItem(FILTER_KEY) === 'completed' ? 'completed' : 'in-progress';
+  } catch {
+    return 'in-progress';
+  }
+}
+
+function storeFilter(filter: GalleryFilter): void {
+  try {
+    localStorage.setItem(FILTER_KEY, filter);
+  } catch {
+    // The tab still switches for this visit if storage is unavailable.
+  }
 }
 
 function formatMm(value: number | string | null | undefined): string {
@@ -31,6 +52,31 @@ export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void
   const [exporting, setExporting] = useState<string | null>(null);
   const [editingCard, setEditingCard] = useState<{ submissionId: string; card: Card } | null>(null);
   const [expandedSubmissions, setExpandedSubmissions] = useState<Set<string>>(new Set());
+  const [filter, setFilter] = useState<GalleryFilter>(loadFilter);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+
+  const completedSubmissions = submissions.filter((s) => s.completed);
+  const inProgressSubmissions = submissions.filter((s) => !s.completed);
+  const visibleSubmissions = filter === 'completed' ? completedSubmissions : inProgressSubmissions;
+
+  function changeFilter(next: GalleryFilter) {
+    setFilter(next);
+    storeFilter(next);
+  }
+
+  async function handleToggleCompleted(submission: SubmissionWithCards) {
+    setTogglingId(submission.id);
+    try {
+      const updated = await api.setSubmissionCompleted(submission.id, !submission.completed);
+      setSubmissions((prev) =>
+        prev.map((s) => (s.id === submission.id ? { ...s, completed: Boolean(updated.completed_at) } : s)),
+      );
+    } catch (err) {
+      console.error('Failed to update submission status:', err);
+    } finally {
+      setTogglingId(null);
+    }
+  }
 
   useEffect(() => {
     loadSubmissions();
@@ -50,6 +96,7 @@ export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void
             id: handle.id,
             name: submission?.name || handle.name,
             type: 'api',
+            completed: Boolean(submission?.completed_at),
             cards,
           });
         } catch (err) {
@@ -111,11 +158,40 @@ export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void
         <h2>Card Images</h2>
       </div>
 
+      {submissions.length > 0 && (
+        <div className="library-tabs" role="tablist">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={filter === 'in-progress'}
+            className={`library-tab${filter === 'in-progress' ? ' is-active' : ''}`}
+            onClick={() => changeFilter('in-progress')}
+          >
+            In progress <span className="library-tab-count">{inProgressSubmissions.length}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={filter === 'completed'}
+            className={`library-tab${filter === 'completed' ? ' is-active' : ''}`}
+            onClick={() => changeFilter('completed')}
+          >
+            Completed <span className="library-tab-count">{completedSubmissions.length}</span>
+          </button>
+        </div>
+      )}
+
       {submissions.length === 0 ? (
         <p className="card-list-empty">No submissions with images yet.</p>
+      ) : visibleSubmissions.length === 0 ? (
+        <p className="card-list-empty">
+          {filter === 'completed'
+            ? 'No completed submissions yet. Use Mark complete on a submission to move it here.'
+            : 'Every submission is marked complete.'}
+        </p>
       ) : (
         <div className="gallery-submissions">
-          {submissions.map((submission) => {
+          {visibleSubmissions.map((submission) => {
             const isExpanded = expandedSubmissions.has(submission.id);
             return (
               <div key={submission.id}>
@@ -128,6 +204,14 @@ export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void
                     <span className="toggle-icon">{isExpanded ? '▼' : '▶'}</span>
                     <h3>{submission.name}</h3>
                     <span className="card-count">({submission.cards.length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-small"
+                    disabled={togglingId === submission.id}
+                    onClick={() => void handleToggleCompleted(submission)}
+                  >
+                    {submission.completed ? 'Reopen' : 'Mark complete'}
                   </button>
                   <button
                     type="button"

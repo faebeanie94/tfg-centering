@@ -153,6 +153,54 @@ describe('Submissions API', () => {
     });
   });
 
+  describe('PUT /:id/completed', () => {
+    it('should mark submission complete', async () => {
+      const completed = { ...testSubmission, completed_at: new Date().toISOString() };
+      mockPool.query.mockResolvedValueOnce({ rows: [completed] });
+
+      const res = await request(app)
+        .put(`/${testId}/completed`)
+        .send({ completed: true });
+
+      expect(res.status).toBe(200);
+      expect(res.body.completed_at).toBeTruthy();
+      expect(mockPool.query).toHaveBeenCalledWith(
+        expect.stringContaining('completed_at'),
+        [true, testId]
+      );
+    });
+
+    it('should reopen submission', async () => {
+      mockPool.query.mockResolvedValueOnce({ rows: [{ ...testSubmission, completed_at: null }] });
+
+      const res = await request(app)
+        .put(`/${testId}/completed`)
+        .send({ completed: false });
+
+      expect(res.status).toBe(200);
+      expect(res.body.completed_at).toBeNull();
+    });
+
+    it('should reject non-boolean completed', async () => {
+      const res = await request(app)
+        .put(`/${testId}/completed`)
+        .send({ completed: 'yes' });
+
+      expect(res.status).toBe(400);
+      expect(mockPool.query).not.toHaveBeenCalled();
+    });
+
+    it('should return 404 for non-existent submission', async () => {
+      mockPool.query.mockResolvedValueOnce({ rows: [] });
+
+      const res = await request(app)
+        .put(`/${testId}/completed`)
+        .send({ completed: true });
+
+      expect(res.status).toBe(404);
+    });
+  });
+
   describe('DELETE /:id', () => {
     it('should delete submission', async () => {
       mockPool.query.mockResolvedValueOnce({ rows: [testSubmission] });

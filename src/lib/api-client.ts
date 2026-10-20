@@ -55,6 +55,7 @@ export interface Submission {
   name: string;
   created_at: string;
   updated_at: string;
+  completed_at?: string | null;
 }
 
 export interface Card {
@@ -106,6 +107,15 @@ export async function updateSubmission(id: string, name: string): Promise<Submis
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name }),
+  });
+  return res.json();
+}
+
+export async function setSubmissionCompleted(id: string, completed: boolean): Promise<Submission> {
+  const res = await fetchWithRetry(`${API_BASE}/submissions/${id}/completed`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ completed }),
   });
   return res.json();
 }

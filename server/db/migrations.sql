@@ -77,3 +77,6 @@ ALTER TABLE card_metadata ADD COLUMN IF NOT EXISTS back_left_mm NUMERIC(10, 2);
 ALTER TABLE card_metadata ADD COLUMN IF NOT EXISTS back_right_mm NUMERIC(10, 2);
 ALTER TABLE card_metadata ADD COLUMN IF NOT EXISTS back_top_mm NUMERIC(10, 2);
 ALTER TABLE card_metadata ADD COLUMN IF NOT EXISTS back_bottom_mm NUMERIC(10, 2);
+
+-- Track when a submission was marked complete (NULL = in progress)
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP;

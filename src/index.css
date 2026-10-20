@@ -2224,6 +2224,40 @@ body.editor-mode #root {
   max-width: 280px;
 }
 
+.library-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  background: rgba(222, 226, 230, 0.08);
+  border-radius: 10px;
+  margin-bottom: 16px;
+}
+
+.library-tab {
+  flex: 1;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.library-tab.is-active {
+  background: rgba(222, 226, 230, 0.16);
+  color: var(--text);
+}
+
+.library-tab-count {
+  font-weight: 400;
+  font-size: 0.75rem;
+  opacity: 0.75;
+  margin-left: 4px;
+}
+
 .library-group {
   display: flex;
   flex-direction: column;
@@ -3037,6 +3071,11 @@ body.editor-mode #root {
   align-items: center;
   margin-bottom: 16px;
   gap: 12px;
+}
+
+.gallery-submission-header .btn {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .gallery-submission-header h3 {
