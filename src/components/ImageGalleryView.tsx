@@ -38,6 +38,18 @@ function formatMm(value: number | string | null | undefined): string {
   return isNaN(num) ? '—' : num.toFixed(2);
 }
 
+/** Border pair as a percentage split, e.g. "54.6/45.4". */
+function formatSplit(a: number | string | null | undefined, b: number | string | null | undefined): string {
+  if (a === null || a === undefined || b === null || b === undefined) return '—';
+  const x = typeof a === 'string' ? parseFloat(a) : a;
+  const y = typeof b === 'string' ? parseFloat(b) : b;
+  if (isNaN(x) || isNaN(y)) return '—';
+  const total = x + y;
+  if (total <= 0) return '50.0/50.0';
+  const pct = (x / total) * 100;
+  return `${pct.toFixed(1)}/${(100 - pct).toFixed(1)}`;
+}
+
 function getOverallGrade(frontGrade: string | null | undefined, backGrade: string | null | undefined): string {
   const grades = [frontGrade, backGrade].filter(Boolean) as string[];
   if (grades.length === 0) return '—';
@@ -290,6 +302,9 @@ export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void
                                     <span className="card-list-measurement-values">
                                       T: {formatMm(card.front_top_mm)} | B: {formatMm(card.front_bottom_mm)} | L: {formatMm(card.front_left_mm)} | R: {formatMm(card.front_right_mm)}
                                     </span>
+                                    <span className="card-list-measurement-values">
+                                      T/B: {formatSplit(card.front_top_mm, card.front_bottom_mm)} | L/R: {formatSplit(card.front_left_mm, card.front_right_mm)}
+                                    </span>
                                   </div>
                                 )}
                                 {(card.back_left_mm !== null && card.back_left_mm !== undefined) && (
@@ -297,6 +312,9 @@ export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void
                                     <span className="card-list-measurement-label">Back</span>
                                     <span className="card-list-measurement-values">
                                       T: {formatMm(card.back_top_mm)} | B: {formatMm(card.back_bottom_mm)} | L: {formatMm(card.back_left_mm)} | R: {formatMm(card.back_right_mm)}
+                                    </span>
+                                    <span className="card-list-measurement-values">
+                                      T/B: {formatSplit(card.back_top_mm, card.back_bottom_mm)} | L/R: {formatSplit(card.back_left_mm, card.back_right_mm)}
                                     </span>
                                   </div>
                                 )}
