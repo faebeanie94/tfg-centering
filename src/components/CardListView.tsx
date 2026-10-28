@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { SubmissionFolder } from '../lib/folder-submission';
 import * as api from '../lib/api-client';
+import { CenteringSplits } from './CenteringSplits';
 
 interface Card {
   cardNumber: number;
@@ -34,15 +35,6 @@ function formatMm(value: number | string | null | undefined): string {
   return isNaN(num) ? '—' : num.toFixed(2);
 }
 
-/** Border pair as a percentage split, e.g. "54.6/45.4". */
-function formatSplit(a: number | null | undefined, b: number | null | undefined): string {
-  if (a === null || a === undefined || b === null || b === undefined) return '—';
-  const total = a + b;
-  if (total <= 0) return '50.0/50.0';
-  const pct = (a / total) * 100;
-  return `${pct.toFixed(1)}/${(100 - pct).toFixed(1)}`;
-}
-
 function CenteringMeasurements({ card }: { card: Card }) {
   const hasFrontMeasurements = card.frontLeftMm !== null && card.frontLeftMm !== undefined;
   const hasBackMeasurements = card.backLeftMm !== null && card.backLeftMm !== undefined;
@@ -59,9 +51,7 @@ function CenteringMeasurements({ card }: { card: Card }) {
           <span className="card-list-measurement-values">
             T: {formatMm(card.frontTopMm)} | B: {formatMm(card.frontBottomMm)} | L: {formatMm(card.frontLeftMm)} | R: {formatMm(card.frontRightMm)}
           </span>
-          <span className="card-list-measurement-values">
-            T/B: {formatSplit(card.frontTopMm, card.frontBottomMm)} | L/R: {formatSplit(card.frontLeftMm, card.frontRightMm)}
-          </span>
+          <CenteringSplits top={card.frontTopMm} bottom={card.frontBottomMm} left={card.frontLeftMm} right={card.frontRightMm} />
         </div>
       )}
       {hasBackMeasurements && (
@@ -70,9 +60,7 @@ function CenteringMeasurements({ card }: { card: Card }) {
           <span className="card-list-measurement-values">
             T: {formatMm(card.backTopMm)} | B: {formatMm(card.backBottomMm)} | L: {formatMm(card.backLeftMm)} | R: {formatMm(card.backRightMm)}
           </span>
-          <span className="card-list-measurement-values">
-            T/B: {formatSplit(card.backTopMm, card.backBottomMm)} | L/R: {formatSplit(card.backLeftMm, card.backRightMm)}
-          </span>
+          <CenteringSplits top={card.backTopMm} bottom={card.backBottomMm} left={card.backLeftMm} right={card.backRightMm} />
         </div>
       )}
     </div>
