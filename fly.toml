@@ -1,6 +1,6 @@
-# fly.toml app configuration file generated for tfg-centering on 2026-09-20T01:16:06Z
+# fly.toml app configuration file generated for tfg-centering on 2026-10-28T12:53:16Z
 #
-# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+# See https://docs.fly.io/reference/configuration for information about how to use this file.
 #
 
 app = "tfg-centering"
@@ -23,3 +23,11 @@ primary_region = 'lhr'
   min_machines_running = 1
   idle_timeout_seconds = 7200
   checks = [{ grace_period = '30s', interval = '15s', method = 'get', path = '/health', protocol = 'http', timeout = '10s' }]
+
+[[vm]]
+  cpu_kind = 'shared'
+  cpus = 1
+  memory = '512mb'
+  memory_mb = 512
+  processes = ['app']
+  size = 'shared-cpu-1x'
