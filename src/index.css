@@ -1183,6 +1183,12 @@ body.editor-mode #root {
   touch-action: none;
 }
 
+/* Touches must land on the handle box, not the arrow/"in"/"out" SVG inside it */
+.edge-handle svg,
+.edge-handle svg * {
+  pointer-events: none;
+}
+
 .edge-handle-left,
 .edge-handle-right {
   width: 36px;
