@@ -155,7 +155,12 @@ export async function exportCleanImage(imageSrc: string): Promise<string> {
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Failed to get canvas context');
   ctx.drawImage(img, 0, 0);
-  return canvas.toDataURL('image/jpeg', 0.92);
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+  // Free the canvas memory now; iPad Safari has a hard canvas memory cap and
+  // saves start failing after enough full-size cards in one session.
+  canvas.width = 0;
+  canvas.height = 0;
+  return dataUrl;
 }
 
 /**

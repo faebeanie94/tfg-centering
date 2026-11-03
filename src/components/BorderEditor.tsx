@@ -122,6 +122,7 @@ export function BorderEditor({
   const [savedFlash, setSavedFlash] = useState(false);
   const [savingToLibrary, setSavingToLibrary] = useState(false);
   const dragStartRef = useRef<{ x: number; y: number; rect: Rect } | null>(null);
+  const captureRef = useRef<{ el: HTMLElement; id: number } | null>(null);
   const patternId = useMemo(() => `stripe-${side}-${Math.random().toString(36).slice(2)}`, [side, imageSrc]);
 
   useEffect(() => {
@@ -192,11 +193,45 @@ export function BorderEditor({
     onSideChange(target);
   }
 
+  const releaseCapture = useCallback(() => {
+    const cap = captureRef.current;
+    captureRef.current = null;
+    if (!cap) return;
+    try {
+      if (cap.el.hasPointerCapture(cap.id)) cap.el.releasePointerCapture(cap.id);
+    } catch {
+      /* already released */
+    }
+  }, []);
+
+  // Safety net: iPad Safari can leave a drag's pointer capture stuck (and it
+  // reuses touch ids), which routes every later tap's click to the old handle,
+  // so all buttons go dead. Any new touch first clears a leftover capture.
+  useEffect(() => {
+    const onAnyPointerDown = () => {
+      if (captureRef.current) {
+        releaseCapture();
+        dragStartRef.current = null;
+        setDragTarget(null);
+      }
+    };
+    document.addEventListener('pointerdown', onAnyPointerDown, true);
+    return () => {
+      document.removeEventListener('pointerdown', onAnyPointerDown, true);
+      releaseCapture();
+    };
+  }, [releaseCapture]);
+
   const handlePointerDown = useCallback(
     (target: DragTarget, e: React.PointerEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      // Capture on the handle itself (currentTarget), never on the inner
+      // SVG/text that was touched (e.target).
+      const el = e.currentTarget as HTMLElement;
+      releaseCapture();
+      el.setPointerCapture(e.pointerId);
+      captureRef.current = { el, id: e.pointerId };
 
       const currentRect = target?.rect === 'outer' ? outer : inner;
       if (!currentRect) return;
@@ -208,7 +243,7 @@ export function BorderEditor({
       dragStartRef.current = { x: e.clientX, y: e.clientY, rect: { ...currentRect } };
       setDragTarget(target);
     },
-    [outer, inner],
+    [outer, inner, releaseCapture],
   );
 
 
@@ -367,9 +402,10 @@ export function BorderEditor({
   );
 
   const handlePointerUp = useCallback(() => {
+    releaseCapture();
     dragStartRef.current = null;
     setDragTarget(null);
-  }, []);
+  }, [releaseCapture]);
 
   if (!imageSize || !outer || !inner || !result || !tfgGrade) {
     return <div className="loading">Loading image…</div>;
