@@ -939,7 +939,7 @@ body.editor-mode #root {
   font-size: 0.7rem;
 }
 
-/* Pill toggles match tfg-app .nav-pills */
+/* Pill toggles take their shape from tfg-app .nav-pills, in alpha rather than bravo */
 .side-toggle {
   display: flex;
   background: var(--surface);
@@ -961,7 +961,7 @@ body.editor-mode #root {
 }
 
 .side-btn.active {
-  background: var(--tfg-bravo);
+  background: var(--tfg-alpha);
   color: white;
 }
 
@@ -1679,8 +1679,8 @@ body.editor-mode #root {
 }
 
 .perspective-corner-tab.active {
-  background: var(--tfg-bravo);
-  border-color: var(--tfg-bravo);
+  background: var(--tfg-alpha);
+  border-color: var(--tfg-alpha);
   color: #fff;
 }
 
