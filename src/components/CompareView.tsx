@@ -37,7 +37,9 @@ function SideCard({
     );
   }
 
-  const { grade, result, imageSrc, name } = snapshot;
+  const { grade, result, imageSrc, name, layout } = snapshot;
+  // The grade comes from the adjusted split on a borderless card.
+  const splits = layout?.corrected ?? result;
 
   return (
     <div className="compare-card">
@@ -46,15 +48,15 @@ function SideCard({
       <div className="compare-grade">{formatGrade(grade.grade)}</div>
       <div className="compare-metrics">
         <div className="compare-metric-row">
-          <span className="compare-metric-label">L | R</span>
+          <span className="compare-metric-label">L | R{layout && ' (adj)'}</span>
           <span className="compare-metric-value">
-            {formatPct(result.leftRight.left)} | {formatPct(result.leftRight.right)}
+            {formatPct(splits.leftRight.left)} | {formatPct(splits.leftRight.right)}
           </span>
         </div>
         <div className="compare-metric-row">
-          <span className="compare-metric-label">T | B</span>
+          <span className="compare-metric-label">T | B{layout && ' (adj)'}</span>
           <span className="compare-metric-value">
-            {formatPct(result.topBottom.top)} | {formatPct(result.topBottom.bottom)}
+            {formatPct(splits.topBottom.top)} | {formatPct(splits.topBottom.bottom)}
           </span>
         </div>
       </div>
@@ -76,6 +78,12 @@ function SideCard({
           <span className="compare-mm-value">{result.bordersMm.bottom.toFixed(2)} mm</span>
         </div>
       </div>
+      {layout && (
+        <div className="compare-detail">
+          {layout.label}: raw T|B {formatPct(result.topBottom.top)} | {formatPct(result.topBottom.bottom)}, L|R{' '}
+          {formatPct(result.leftRight.left)} | {formatPct(result.leftRight.right)}
+        </div>
+      )}
       <div className="compare-detail">
         Qualify {grade.worstQualify.toFixed(2)} · {grade.worstAxis === 'left-right' ? 'L/R' : 'T/B'}
       </div>

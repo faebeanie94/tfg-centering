@@ -5,7 +5,7 @@ import { cropImage, defaultCropRect } from '../lib/crop-image';
 interface CropEditorProps {
   imageSrc: string;
   invertColors?: boolean;
-  onComplete: (croppedSrc: string) => void;
+  onComplete: (croppedSrc: string, cropRect?: Rect) => void;
   onCancel: () => void;
 }
 
@@ -124,7 +124,7 @@ export function CropEditor({ imageSrc, invertColors = false, onComplete, onCance
     setProcessing(true);
     try {
       const cropped = await cropImage(imageSrc, crop);
-      onComplete(cropped);
+      onComplete(cropped, crop);
     } catch {
       onComplete(imageSrc);
     } finally {

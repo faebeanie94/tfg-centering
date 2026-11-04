@@ -34,3 +34,27 @@ export function defaultCropRect(imgWidth: number, imgHeight: number): Rect {
     height: imgHeight - margin * 2,
   };
 }
+
+/** Move boxes from full-image coordinates into a crop of it, trimming them to fit. */
+export function rectsInCrop(outer: Rect, inner: Rect, cropRect: Rect): { outer: Rect; inner: Rect } {
+  // cropImage cuts on whole pixels.
+  const crop = {
+    x: Math.round(Math.max(0, cropRect.x)),
+    y: Math.round(Math.max(0, cropRect.y)),
+    width: Math.round(cropRect.width),
+    height: Math.round(cropRect.height),
+  };
+  const trim = (r: Rect, bounds: Rect): Rect => {
+    const x = Math.max(bounds.x, Math.min(r.x, bounds.x + bounds.width - 1));
+    const y = Math.max(bounds.y, Math.min(r.y, bounds.y + bounds.height - 1));
+    return {
+      x,
+      y,
+      width: Math.min(r.x + r.width, bounds.x + bounds.width) - x,
+      height: Math.min(r.y + r.height, bounds.y + bounds.height) - y,
+    };
+  };
+  const shift = (r: Rect): Rect => ({ ...r, x: r.x - crop.x, y: r.y - crop.y });
+  const croppedOuter = shift(trim(outer, crop));
+  return { outer: croppedOuter, inner: trim(shift(inner), croppedOuter) };
+}

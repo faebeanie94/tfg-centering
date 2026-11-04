@@ -90,6 +90,18 @@ export function findLayoutProfile(id: string, custom: LayoutProfile[]): LayoutPr
   return allLayoutProfiles(custom).find((p) => p.id === id) ?? BORDERED_PROFILE;
 }
 
+/** The layout a saved side was graded with, which outlives edits to the profile. */
+export function profileForSnapshot(layout: SnapshotLayout | undefined, custom: LayoutProfile[]): LayoutProfile {
+  if (!layout) return BORDERED_PROFILE;
+  return {
+    ...allLayoutProfiles(custom).find((p) => p.id === layout.profileId),
+    id: layout.profileId,
+    label: layout.label,
+    tbTarget: layout.tbTarget,
+    lrTarget: layout.lrTarget,
+  };
+}
+
 export function correctSplits(result: CenteringResult, profile: LayoutProfile): CorrectedSplits {
   const top = clampPct(50 + (result.topBottom.top - profile.tbTarget));
   const left = clampPct(50 + (result.leftRight.left - profile.lrTarget));

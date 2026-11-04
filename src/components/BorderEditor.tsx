@@ -25,10 +25,25 @@ import {
   allLayoutProfiles,
   bordersForGrading,
   correctSplits,
-  findLayoutProfile,
   isCorrectingProfile,
   newCustomProfileId,
+  type LayoutProfile,
 } from '../lib/layout-profiles';
+
+/** Where the boxes are, kept by App while the editor is unmounted. */
+export interface EditorDraft {
+  outer?: Rect;
+  inner?: Rect;
+  innerSideConfidence?: InnerSideConfidence;
+  /** The boxes were moved by hand, so a new detection must not replace them unasked. */
+  handEdited?: boolean;
+  /** This side differs from its saved snapshot, or has none. */
+  unsaved?: boolean;
+}
+
+function sameRect(a: Rect, b: Rect) {
+  return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
+}
 
 interface BorderEditorProps {
   imageSrc: string;
@@ -42,6 +57,14 @@ interface BorderEditorProps {
   initialInner?: Rect;
   /** Which inner-box sides were actually measured vs estimated from the others. */
   innerSideConfidence?: InnerSideConfidence;
+  initialHandEdited?: boolean;
+  /** Layout for this card. Backs are always bordered. */
+  frontLayout: LayoutProfile;
+  onFrontLayoutChange: (profile: LayoutProfile) => void;
+  /** Layout of the previous card, offered as a one-tap shortcut on a new front. */
+  lastCardLayoutId?: string | null;
+  /** Called before a detour that comes back here, so the boxes survive the remount. */
+  onKeepDraft: (draft: EditorDraft) => void;
   /** Auto-crop applied but wasn't fully confident — dismissible "worth checking" note. */
   autoCropInfo?: { confidence: number; reason: AutoCropSkipReason } | null;
   onDismissAutoCropInfo?: () => void;
@@ -77,6 +100,9 @@ interface ImageSize {
   height: number;
 }
 
+/** Smallest box width or height a drag can leave, in image pixels. */
+const MIN_BOX_PX = 20;
+
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
@@ -90,6 +116,11 @@ export function BorderEditor({
   initialOuter,
   initialInner,
   innerSideConfidence: initialInnerSideConfidence,
+  initialHandEdited = false,
+  frontLayout,
+  onFrontLayoutChange,
+  lastCardLayoutId = null,
+  onKeepDraft,
   autoCropInfo = null,
   onDismissAutoCropInfo,
   onNextCard,
@@ -124,6 +155,9 @@ export function BorderEditor({
   const [innerSideConfidence, setInnerSideConfidence] = useState<InnerSideConfidence | null>(
     initialInnerSideConfidence ?? null,
   );
+  const [handEdited, setHandEdited] = useState(initialHandEdited);
+  /** Where to go once the unsaved-changes dialog is answered. */
+  const [pendingLeave, setPendingLeave] = useState<(() => void) | null>(null);
   const [dragTarget, setDragTarget] = useState<DragTarget>(null);
   const [showStandards, setShowStandards] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -168,13 +202,7 @@ export function BorderEditor({
   }, [outer, inner, cardFormat.widthMm, cardFormat.heightMm]);
 
   // Borderless correction applies to the front only — card backs are bordered.
-  const layoutProfile = useMemo(
-    () =>
-      side === 'front'
-        ? findLayoutProfile(settings.layoutProfileId, settings.customLayoutProfiles)
-        : BORDERED_PROFILE,
-    [side, settings.layoutProfileId, settings.customLayoutProfiles],
-  );
+  const layoutProfile = side === 'front' ? frontLayout : BORDERED_PROFILE;
   const correcting = isCorrectingProfile(layoutProfile);
 
   const corrected = useMemo(() => {
@@ -210,6 +238,19 @@ export function BorderEditor({
     };
   }, [imageSrc, outer, inner, result, tfgGrade, cardName, cardFormat.id, corrected, layoutProfile]);
 
+  const unsaved = useMemo(() => {
+    const saved = session[side];
+    if (!saved || !outer || !inner) return true;
+    const savedLayout = saved.layout;
+    return (
+      saved.imageSrc !== imageSrc ||
+      !sameRect(saved.outer, outer) ||
+      !sameRect(saved.inner, inner) ||
+      (savedLayout?.tbTarget ?? 50) !== layoutProfile.tbTarget ||
+      (savedLayout?.lrTarget ?? 50) !== layoutProfile.lrTarget
+    );
+  }, [session, side, imageSrc, outer, inner, layoutProfile]);
+
   /** Save the current raw yellow-box split as a new borderless target (e.g. from a Scryfall image). */
   function saveCurrentAsLayout() {
     if (!result || newLayoutName === null) return;
@@ -222,10 +263,8 @@ export function BorderEditor({
       lrTarget: Math.round(result.leftRight.left * 10) / 10,
       source: `Set from ${cardName.trim() || 'reference image'} on ${new Date().toLocaleDateString()}`,
     };
-    onSettingsChange({
-      customLayoutProfiles: [...settings.customLayoutProfiles, profile],
-      layoutProfileId: profile.id,
-    });
+    onSettingsChange({ customLayoutProfiles: [...settings.customLayoutProfiles, profile] });
+    onFrontLayoutChange(profile);
     setNewLayoutName(null);
   }
 
@@ -234,6 +273,7 @@ export function BorderEditor({
     const o = defaultOuterRect(imageSize.width, imageSize.height);
     setOuter(o);
     setInner(defaultInnerRect(o));
+    setHandEdited(false);
   }
 
   /** Resolves true only if this call stored the side. */
@@ -257,8 +297,39 @@ export function BorderEditor({
     return true;
   }
 
+  /** Leaving this side for good: ask first if that would drop unsaved work. */
+  function leaveSide(action?: () => void) {
+    if (!action) return;
+    if (unsaved) setPendingLeave(() => action);
+    else action();
+  }
+
+  async function saveAndLeave() {
+    const action = pendingLeave;
+    setPendingLeave(null);
+    await handleSave();
+    action?.();
+  }
+
+  /** A detour that returns to this editor, which remounts from what App keeps. */
+  function detour(action?: () => void) {
+    if (!action) return;
+    onKeepDraft({ outer: outer ?? undefined, inner: inner ?? undefined, innerSideConfidence: innerSideConfidence ?? undefined, handEdited, unsaved });
+    action();
+  }
+
+  function openPerspectiveFix() {
+    if (
+      handEdited &&
+      !window.confirm('Applying Perspective Fix re-detects the boxes and replaces your adjustments. Cancelling it there keeps them.')
+    ) {
+      return;
+    }
+    detour(onPerspectiveFix);
+  }
+
   function handleSideSwitch(target: CardSide) {
-    onSideChange(target);
+    if (target !== side) leaveSide(() => onSideChange(target));
   }
 
   const releaseCapture = useCallback(() => {
@@ -307,6 +378,7 @@ export function BorderEditor({
       // Once the user starts adjusting the inner box by hand, whatever was
       // estimated vs measured no longer applies — they're setting it now.
       if (target?.rect === 'inner') setInnerSideConfidence(null);
+      setHandEdited(true);
 
       dragStartRef.current = { x: e.clientX, y: e.clientY, rect: { ...currentRect } };
       setDragTarget(target);
@@ -347,12 +419,13 @@ export function BorderEditor({
             if (isOuter) {
               const wantX = r.x + dx;
               if (wantX > innerMinX) {
-                // Moving right (inward) - push inner along
-                next.x = wantX;
+                // Moving right (inward) - push inner along, down to its minimum size
+                const pushX = Math.min(wantX, innerMaxX - MIN_BOX_PX);
+                next.x = pushX;
                 next.width = r.width - (next.x - r.x);
                 nextOther = { ...innerRect };
-                nextOther.x = wantX;
-                nextOther.width = innerRect.width - (wantX - innerMinX);
+                nextOther.x = pushX;
+                nextOther.width = innerMaxX - pushX;
               } else {
                 // Moving left (outward) - normal clamp
                 next.x = clamp(wantX, 0, innerMinX);
@@ -361,15 +434,16 @@ export function BorderEditor({
             } else {
               const wantX = r.x + dx;
               if (wantX < outerMinX) {
-                // Moving left (outward) - push outer along
-                next.x = wantX;
+                // Moving left (outward) - push outer along, up to the image edge
+                const pushX = Math.max(wantX, 0);
+                next.x = pushX;
                 next.width = r.width - (next.x - r.x);
                 nextOther = { ...outerRect };
-                nextOther.x = wantX;
-                nextOther.width = outerRect.width - (wantX - outerMinX);
+                nextOther.x = pushX;
+                nextOther.width = outerMaxX - pushX;
               } else {
                 // Moving right (inward) - normal clamp
-                next.x = clamp(wantX, outerMinX, r.x + r.width - 20);
+                next.x = clamp(wantX, outerMinX, r.x + r.width - MIN_BOX_PX);
                 next.width = r.width - (next.x - r.x);
               }
             }
@@ -378,24 +452,26 @@ export function BorderEditor({
             if (isOuter) {
               const wantRight = r.x + r.width + dx;
               if (wantRight < innerMaxX) {
-                // Moving left (inward) - push inner along
-                next.width = wantRight - r.x;
+                // Moving left (inward) - push inner along, down to its minimum size
+                const pushRight = Math.max(wantRight, innerMinX + MIN_BOX_PX);
+                next.width = pushRight - r.x;
                 nextOther = { ...innerRect };
-                nextOther.width = wantRight - innerRect.x;
+                nextOther.width = pushRight - innerMinX;
               } else {
                 // Moving right (outward) - normal clamp
-                next.width = clamp(wantRight - r.x, 20, imageSize.width - r.x);
+                next.width = clamp(wantRight - r.x, MIN_BOX_PX, imageSize.width - r.x);
               }
             } else {
               const wantRight = r.x + r.width + dx;
               if (wantRight > outerMaxX) {
-                // Moving right (outward) - push outer along
-                next.width = wantRight - r.x;
+                // Moving right (outward) - push outer along, up to the image edge
+                const pushRight = Math.min(wantRight, imageSize.width);
+                next.width = pushRight - r.x;
                 nextOther = { ...outerRect };
-                nextOther.width = wantRight - outerRect.x;
+                nextOther.width = pushRight - outerMinX;
               } else {
                 // Moving left (inward) - normal clamp
-                next.width = clamp(wantRight - r.x, 20, outerMaxX - r.x);
+                next.width = clamp(wantRight - r.x, MIN_BOX_PX, outerMaxX - r.x);
               }
             }
             break;
@@ -403,12 +479,13 @@ export function BorderEditor({
             if (isOuter) {
               const wantY = r.y + dy;
               if (wantY > innerMinY) {
-                // Moving down (inward) - push inner along
-                next.y = wantY;
+                // Moving down (inward) - push inner along, down to its minimum size
+                const pushY = Math.min(wantY, innerMaxY - MIN_BOX_PX);
+                next.y = pushY;
                 next.height = r.height - (next.y - r.y);
                 nextOther = { ...innerRect };
-                nextOther.y = wantY;
-                nextOther.height = innerRect.height - (wantY - innerMinY);
+                nextOther.y = pushY;
+                nextOther.height = innerMaxY - pushY;
               } else {
                 // Moving up (outward) - normal clamp
                 next.y = clamp(wantY, 0, innerMinY);
@@ -417,15 +494,16 @@ export function BorderEditor({
             } else {
               const wantY = r.y + dy;
               if (wantY < outerMinY) {
-                // Moving up (outward) - push outer along
-                next.y = wantY;
+                // Moving up (outward) - push outer along, up to the image edge
+                const pushY = Math.max(wantY, 0);
+                next.y = pushY;
                 next.height = r.height - (next.y - r.y);
                 nextOther = { ...outerRect };
-                nextOther.y = wantY;
-                nextOther.height = outerRect.height - (wantY - outerMinY);
+                nextOther.y = pushY;
+                nextOther.height = outerMaxY - pushY;
               } else {
                 // Moving down (inward) - normal clamp
-                next.y = clamp(wantY, outerMinY, r.y + r.height - 20);
+                next.y = clamp(wantY, outerMinY, r.y + r.height - MIN_BOX_PX);
                 next.height = r.height - (next.y - r.y);
               }
             }
@@ -434,24 +512,26 @@ export function BorderEditor({
             if (isOuter) {
               const wantBottom = r.y + r.height + dy;
               if (wantBottom < innerMaxY) {
-                // Moving up (inward) - push inner along
-                next.height = wantBottom - r.y;
+                // Moving up (inward) - push inner along, down to its minimum size
+                const pushBottom = Math.max(wantBottom, innerMinY + MIN_BOX_PX);
+                next.height = pushBottom - r.y;
                 nextOther = { ...innerRect };
-                nextOther.height = wantBottom - innerRect.y;
+                nextOther.height = pushBottom - innerMinY;
               } else {
                 // Moving down (outward) - normal clamp
-                next.height = clamp(wantBottom - r.y, 20, imageSize.height - r.y);
+                next.height = clamp(wantBottom - r.y, MIN_BOX_PX, imageSize.height - r.y);
               }
             } else {
               const wantBottom = r.y + r.height + dy;
               if (wantBottom > outerMaxY) {
-                // Moving down (outward) - push outer along
-                next.height = wantBottom - r.y;
+                // Moving down (outward) - push outer along, up to the image edge
+                const pushBottom = Math.min(wantBottom, imageSize.height);
+                next.height = pushBottom - r.y;
                 nextOther = { ...outerRect };
-                nextOther.height = wantBottom - outerRect.y;
+                nextOther.height = pushBottom - outerMinY;
               } else {
                 // Moving up (inward) - normal clamp
-                next.height = clamp(wantBottom - r.y, 20, outerMaxY - r.y);
+                next.height = clamp(wantBottom - r.y, MIN_BOX_PX, outerMaxY - r.y);
               }
             }
             break;
@@ -483,6 +563,14 @@ export function BorderEditor({
   const fillStroke = hexToRgba(settings.borderFillColor, 0.55);
   const otherSide: CardSide = side === 'front' ? 'back' : 'front';
   const otherSaved = session[otherSide] !== null;
+  const layoutOptions = allLayoutProfiles(settings.customLayoutProfiles);
+  // A reopened card can use a custom layout that has since been deleted.
+  if (!layoutOptions.some((p) => p.id === layoutProfile.id)) layoutOptions.push(layoutProfile);
+  // Looked up live, so a layout deleted or retargeted in Settings isn't reused as it was.
+  const lastCardLayout =
+    !session.front && lastCardLayoutId !== layoutProfile.id
+      ? layoutOptions.find((p) => p.id === lastCardLayoutId)
+      : undefined;
 
   function renderEdgeHandles(rect: Rect, rectType: 'outer' | 'inner', color: string) {
     const edges: Array<'left' | 'right' | 'top' | 'bottom'> = ['left', 'right', 'top', 'bottom'];
@@ -516,7 +604,7 @@ export function BorderEditor({
     // Inert while saving: leaving mid-save would let it land on the next card.
     <div className="editor editor-shell" inert={saving}>
       <div className="editor-toolbar">
-        <button type="button" className="btn btn-secondary btn-small" onClick={onReset}>
+        <button type="button" className="btn btn-secondary btn-small" onClick={() => leaveSide(onReset)}>
           ← New
         </button>
         <div className="side-toggle">
@@ -539,7 +627,7 @@ export function BorderEditor({
           ⋯
         </button>
         {onLibrary && (
-          <button type="button" className="btn btn-secondary btn-small" onClick={onLibrary}>
+          <button type="button" className="btn btn-secondary btn-small" onClick={() => detour(onLibrary)}>
             Library
           </button>
         )}
@@ -572,7 +660,7 @@ export function BorderEditor({
         <div className="autocrop-note">
           <span>
             Unsure if level. Worth a check via{' '}
-            <button type="button" className="autocrop-note-link" onClick={onPerspectiveFix}>
+            <button type="button" className="autocrop-note-link" onClick={openPerspectiveFix}>
               Fix perspective
             </button>{' '}
             if it looks off.
@@ -625,9 +713,12 @@ export function BorderEditor({
               id="layout-profile-select"
               className="layout-bar-select"
               value={layoutProfile.id}
-              onChange={(e) => onSettingsChange({ layoutProfileId: e.target.value })}
+              onChange={(e) => {
+                const picked = layoutOptions.find((p) => p.id === e.target.value);
+                if (picked) onFrontLayoutChange(picked);
+              }}
             >
-              {allLayoutProfiles(settings.customLayoutProfiles).map((p) => (
+              {layoutOptions.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.label}
                 </option>
@@ -644,6 +735,17 @@ export function BorderEditor({
               </button>
             )}
           </div>
+          {lastCardLayout && (
+            <div className="layout-bar-row">
+              <button
+                type="button"
+                className="btn btn-secondary btn-small"
+                onClick={() => onFrontLayoutChange(lastCardLayout)}
+              >
+                Same as last card: {lastCardLayout.label}
+              </button>
+            </div>
+          )}
           {newLayoutName !== null && (
             <div className="layout-bar-row">
               <input
@@ -793,15 +895,52 @@ export function BorderEditor({
             <button type="button" className={`btn btn-primary ${savedFlash ? 'btn-saved' : ''}`} onClick={handleSave}>
               {saving ? 'Saving…' : savedFlash ? 'Saved ✓' : 'Save Card'}
             </button>
-            <button type="button" className="btn btn-secondary" onClick={onNextCard}>
+            <button type="button" className="btn btn-secondary" onClick={() => leaveSide(onNextCard)}>
               Next Card
             </button>
-            <button type="button" className="btn btn-secondary" onClick={onCompare} disabled={!sessionHasAny(session)}>
+            <button type="button" className="btn btn-secondary" onClick={() => leaveSide(onCompare)} disabled={!sessionHasAny(session)}>
               Compare
             </button>
           </>
         )}
       </div>
+
+      {pendingLeave && (
+        <div className="modal-backdrop" onClick={() => setPendingLeave(null)}>
+          <div
+            className="modal unsaved-dialog"
+            role="alertdialog"
+            aria-labelledby="unsaved-dialog-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="unsaved-dialog-title">Save this {side}?</h2>
+            <p>
+              This {side} has changes that aren't saved. Grade {formatGrade(tfgGrade.grade)}, T|B{' '}
+              {formatPct((corrected ?? result).topBottom.top)} | {formatPct((corrected ?? result).topBottom.bottom)}, L|R{' '}
+              {formatPct((corrected ?? result).leftRight.left)} | {formatPct((corrected ?? result).leftRight.right)}.
+            </p>
+            <div className="unsaved-dialog-actions">
+              <button type="button" className="btn btn-primary" onClick={() => void saveAndLeave()}>
+                Save and continue
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  const action = pendingLeave;
+                  setPendingLeave(null);
+                  action();
+                }}
+              >
+                Discard changes
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={() => setPendingLeave(null)}>
+                Keep editing
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <StandardsPanel open={showStandards} onClose={() => setShowStandards(false)} />
       <CardMenu
@@ -812,8 +951,8 @@ export function BorderEditor({
         invertColors={settings.invertColors}
         onInvertColorsChange={(invertColors) => onSettingsChange({ invertColors })}
         onNameChange={onNameChange}
-        onCrop={onCrop}
-        onPerspectiveFix={onPerspectiveFix}
+        onCrop={() => detour(onCrop)}
+        onPerspectiveFix={openPerspectiveFix}
         onFlipSide={() => handleSideSwitch(side === 'front' ? 'back' : 'front')}
         onResetLines={resetLines}
         onDelete={onDelete}
@@ -827,7 +966,7 @@ export function BorderEditor({
         }
         submissionName={submissionFolder?.name}
         submissionId={submissionFolder?.type === 'api' ? submissionFolder.submissionId : undefined}
-        onViewCards={onViewCards}
+        onViewCards={onViewCards ? () => detour(onViewCards) : undefined}
         onSaveToLibrary={
           onSaveToLibrary
             ? async () => {

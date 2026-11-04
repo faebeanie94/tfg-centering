@@ -5,7 +5,7 @@ import { emptySession, sessionHasAny, type GradingSession, type SideSnapshot } f
 import { ImageCapture } from './components/ImageCapture';
 import { PerspectiveCorrector } from './components/PerspectiveCorrector';
 import { CropEditor } from './components/CropEditor';
-import { BorderEditor } from './components/BorderEditor';
+import { BorderEditor, type EditorDraft } from './components/BorderEditor';
 import { CompareView } from './components/CompareView';
 import { CardListView } from './components/CardListView';
 import { ImageGalleryView } from './components/ImageGalleryView';
@@ -18,7 +18,6 @@ import {
   rectsAfterCropWithInnerSeed,
   type CaptureDetectHint,
   type AutoCropSkipReason,
-  type InnerSideConfidence,
 } from './lib/auto-crop';
 import type { QuadCorners } from './lib/perspective';
 import {
@@ -27,8 +26,10 @@ import {
   resolveCardFormat,
   type CardSizeSelection,
 } from './lib/card-sizes';
-import { computeCentering } from './lib/centering';
+import { computeCentering, type Rect } from './lib/centering';
+import { rectsInCrop } from './lib/crop-image';
 import { exportCleanImage } from './lib/export-image';
+import { BORDERED_PROFILE, profileForSnapshot, type LayoutProfile } from './lib/layout-profiles';
 import { getTfgGrade } from './lib/tfg-standards';
 import { startSubmission, saveToSubmissionFolder, startNewCard, type SubmissionFolder } from './lib/folder-submission';
 import { libraryErrorMessage } from './lib/saved-cards';
@@ -55,11 +56,13 @@ export default function App() {
   const [currentSide, setCurrentSide] = useState<CardSide>('front');
   const [rawImage, setRawImage] = useState<string | null>(null);
   const [workingImage, setWorkingImage] = useState<string | null>(null);
-  const [editorRects, setEditorRects] = useState<{
-    outer?: SideSnapshot['outer'];
-    inner?: SideSnapshot['inner'];
-    innerSideConfidence?: InnerSideConfidence;
-  }>({});
+  const [editorRects, setEditorRects] = useState<EditorDraft>({});
+  /** Layout of the card in hand. It belongs to the card, so each new card starts bordered. */
+  const [frontLayout, setFrontLayout] = useState<LayoutProfile>(BORDERED_PROFILE);
+  /** Layout the previous card's front was saved with, offered as a shortcut on the next card. */
+  const [lastCardLayoutId, setLastCardLayoutId] = useState<string | null>(null);
+  /** Layout this card's front was saved with, if it has been saved. */
+  const savedFrontLayoutIdRef = useRef<string | null>(null);
   const [cardNames, setCardNames] = useState<{ front: string; back: string }>({ front: '', back: '' });
   const [showSettings, setShowSettings] = useState(false);
   const [returnPhaseAfterEdit, setReturnPhaseAfterEdit] = useState<Phase>('editor');
@@ -83,6 +86,17 @@ export default function App() {
   // Load saved submissions on mount
   useEffect(() => {
     listSubmissionHandles().then(setSavedSubmissions).catch(console.error);
+  }, []);
+
+  // Editing a custom layout's target in Settings updates the card using it.
+  useEffect(() => {
+    setFrontLayout((prev) => settings.customLayoutProfiles.find((p) => p.id === prev.id) ?? prev);
+  }, [settings.customLayoutProfiles]);
+
+  /** Call when moving to another card. A front that was never saved doesn't count. */
+  const rememberCardLayout = useCallback(() => {
+    if (savedFrontLayoutIdRef.current) setLastCardLayoutId(savedFrontLayoutIdRef.current);
+    savedFrontLayoutIdRef.current = null;
   }, []);
 
   const activeCardFormat = useMemo(() => {
@@ -213,8 +227,16 @@ export default function App() {
     setPhase(returnPhaseAfterEdit === 'crop' ? 'crop' : 'editor');
   }, [rawImage, returnPhaseAfterEdit, autoCropOptions, perspectiveCorners, pendingHint]);
 
-  const handleCropComplete = useCallback(async (cropped: string) => {
+  const handleCropComplete = useCallback(async (cropped: string, cropRect?: Rect) => {
     setWorkingImage(cropped);
+    // Hand-placed boxes stay where they are on the card; only untouched ones are re-detected.
+    if (editorRects.handEdited && editorRects.outer && editorRects.inner) {
+      if (cropRect) {
+        setEditorRects({ ...editorRects, ...rectsInCrop(editorRects.outer, editorRects.inner, cropRect) });
+      }
+      setPhase('editor');
+      return;
+    }
     try {
       const rects = await seedEditorRectsFromImage(cropped, autoCropOptions);
       setEditorRects({ outer: rects.outer, inner: rects.inner, innerSideConfidence: rects.innerSideConfidence });
@@ -222,7 +244,7 @@ export default function App() {
       setEditorRects({});
     }
     setPhase('editor');
-  }, [autoCropOptions]);
+  }, [autoCropOptions, editorRects]);
 
   /** Rejects with a message for the user if the side was not stored. */
   const handleSaveSide = useCallback(
@@ -301,6 +323,9 @@ export default function App() {
       // Only now does the side count as saved: a failed save leaves the session
       // as it was, so the other side can't pair with something that isn't stored.
       setSession((prev) => ({ ...prev, [currentSide]: snapshot }));
+      if (currentSide === 'front') {
+        savedFrontLayoutIdRef.current = snapshot.layout?.profileId ?? BORDERED_PROFILE.id;
+      }
       if (snapshot.name) {
         setCardNames((prev) => ({ ...prev, [currentSide]: snapshot.name! }));
       }
@@ -313,8 +338,9 @@ export default function App() {
     setAutoCropInfo(null);
     if (snap) {
       setWorkingImage(snap.imageSrc);
-      setEditorRects({ outer: snap.outer, inner: snap.inner });
+      setEditorRects({ outer: snap.outer, inner: snap.inner, handEdited: true });
       setCardNames((prev) => ({ ...prev, [side]: snap.name ?? prev[side] }));
+      if (side === 'front') setFrontLayout(profileForSnapshot(snap.layout, settings.customLayoutProfiles));
       setCurrentSide(side);
       setPhase('editor');
     } else {
@@ -324,7 +350,7 @@ export default function App() {
       setEditorRects({});
       setPhase('capture');
     }
-  }, [session]);
+  }, [session, settings.customLayoutProfiles]);
 
   const handleSideChange = useCallback(
     (side: CardSide) => {
@@ -350,6 +376,10 @@ export default function App() {
       setSubmissionFolder((prev) => prev && startNewCard(prev));
     }
     setCardNames((prev) => ({ ...prev, [side]: '' }));
+    if (side === 'front') {
+      setFrontLayout(BORDERED_PROFILE);
+      savedFrontLayoutIdRef.current = null;
+    }
     setCurrentSide(side);
     setRawImage(null);
     setWorkingImage(null);
@@ -374,18 +404,20 @@ export default function App() {
   }, []);
 
   const handleReset = useCallback(() => {
+    rememberCardLayout();
     setSession(emptySession());
     setSubmissionFolder((prev) => prev && startNewCard(prev));
     setRawImage(null);
     setWorkingImage(null);
     setEditorRects({});
     setCardNames({ front: '', back: '' });
+    setFrontLayout(BORDERED_PROFILE);
     setCurrentSide('front');
     setSessionCardSize(null);
     setPendingHint(undefined);
     setAutoCropInfo(null);
     setPhase('capture');
-  }, []);
+  }, [rememberCardLayout]);
 
   const handleStartSubmission = useCallback(async () => {
     try {
@@ -481,12 +513,14 @@ export default function App() {
 
   const handleNextCard = useCallback(() => {
     // Reset session and go back to capture for next card
+    rememberCardLayout();
     setSession(emptySession());
     setCardNames({ front: '', back: '' });
+    setFrontLayout(BORDERED_PROFILE);
     setCurrentSide('front');
     setPhase('capture');
     setSubmissionFolder((prev) => prev && startNewCard(prev));
-  }, []);
+  }, [rememberCardLayout]);
 
   const handleCaptureSideChange = useCallback((side: CardSide) => {
     setCurrentSide(side);
@@ -507,6 +541,14 @@ export default function App() {
             }
 
             try {
+              if (
+                libraryReturnPhase === 'editor' &&
+                editorRects.unsaved &&
+                !window.confirm(`Opening this card drops the unsaved changes to the ${currentSide} you were editing.`)
+              ) {
+                return;
+              }
+
               if (
                 submissionFolder?.type === 'zip' &&
                 submissionFolder.images.size > 0 &&
@@ -572,6 +614,9 @@ export default function App() {
               const cardName = `${submissionName}/${card.card_number}`;
               setSession(nextSession);
               setCardNames({ front: cardName, back: cardName });
+              // The backend doesn't store the layout, so re-edits start bordered.
+              rememberCardLayout();
+              setFrontLayout(BORDERED_PROFILE);
               setEditorRects({});
               setSubmissionFolder({
                 type: 'api',
@@ -705,6 +750,11 @@ export default function App() {
           initialOuter={editorRects.outer}
           initialInner={editorRects.inner}
           innerSideConfidence={editorRects.innerSideConfidence}
+          initialHandEdited={editorRects.handEdited}
+          frontLayout={frontLayout}
+          onFrontLayoutChange={setFrontLayout}
+          lastCardLayoutId={lastCardLayoutId}
+          onKeepDraft={setEditorRects}
           autoCropInfo={autoCropInfo}
           onDismissAutoCropInfo={() => setAutoCropInfo(null)}
           onNameChange={(name) => setCardNames((prev) => ({ ...prev, [currentSide]: name }))}

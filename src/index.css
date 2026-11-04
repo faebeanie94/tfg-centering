@@ -3755,3 +3755,17 @@ body:has(.capture-idle) {
 .gallery-submission-header {
   flex-wrap: wrap;
 }
+
+.unsaved-dialog h2 {
+  margin: 0 0 8px;
+}
+
+.unsaved-dialog p {
+  margin: 0 0 16px;
+}
+
+.unsaved-dialog-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
