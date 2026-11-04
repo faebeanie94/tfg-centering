@@ -113,6 +113,24 @@ export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void
     }
   }
 
+  const LIBRARY_EXPORT = '__library__';
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  /** One ZIP of every submission (both tabs), with library.csv listing every card. */
+  async function handleExportLibrary() {
+    if (submissions.length === 0) return;
+    setExporting(LIBRARY_EXPORT);
+    setExportError(null);
+    try {
+      await api.exportLibraryZip(submissions.map((s) => s.id));
+    } catch (err) {
+      console.error('Failed to export library:', err);
+      setExportError('Export failed — try again.');
+    } finally {
+      setExporting(null);
+    }
+  }
+
   async function handleExportSubmission(submissionId: string) {
     setExporting(submissionId);
     try {
@@ -157,7 +175,19 @@ export function ImageGalleryView({ onClose, onEditImage }: { onClose: () => void
           ← Back
         </button>
         <h2>Card Images</h2>
+        {submissions.length > 0 && (
+          <button
+            type="button"
+            className="btn btn-secondary btn-small"
+            disabled={exporting !== null}
+            onClick={() => void handleExportLibrary()}
+            title="Every submission, in progress and completed, in one ZIP with a library.csv of all cards"
+          >
+            {exporting === LIBRARY_EXPORT ? 'Exporting…' : 'Export all (ZIP)'}
+          </button>
+        )}
       </div>
+      {exportError && <div className="library-feedback">{exportError}</div>}
 
       {submissions.length > 0 && (
         <div className="library-tabs" role="tablist">

@@ -263,6 +263,26 @@ export async function exportSubmissionZip(submissionId: string): Promise<void> {
   window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
+/** Every given submission in one ZIP, plus library.csv with one row per card. */
+export async function exportLibraryZip(submissionIds: string[]): Promise<void> {
+  const res = await fetchWithRetry(`${API_BASE}/submissions/export-all`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids: submissionIds }),
+  });
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const fileName = res.headers.get('content-disposition')?.split('filename="')[1]?.split('"')[0];
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName || 'tfg_library.zip';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+}
+
 // Image download
 export async function downloadCardImage(
   submissionId: string,
