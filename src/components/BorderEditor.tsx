@@ -773,7 +773,7 @@ export function BorderEditor({
           </>
         ) : (
           <>
-            <button type="button" className={`btn btn-primary ${savedFlash ? 'btn-saved' : ''}`} onClick={handleSave}>
+            <button type="button" className={`btn btn-grade ${savedFlash ? 'btn-saved' : ''}`} onClick={handleSave}>
               {savedFlash ? 'Saved ✓' : 'Save Card'}
             </button>
             <button type="button" className="btn btn-secondary" onClick={onNextCard}>

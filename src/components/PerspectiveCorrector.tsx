@@ -671,7 +671,7 @@ export function PerspectiveCorrector({
         <button type="button" className="btn btn-secondary" onClick={onSkip} disabled={processing}>
           Skip
         </button>
-        <button type="button" className="btn btn-primary btn-large" onClick={applyCorrection} disabled={processing}>
+        <button type="button" className="btn btn-grade btn-large" onClick={applyCorrection} disabled={processing}>
           {processing ? 'Processing…' : 'Apply & Continue'}
         </button>
       </div>
