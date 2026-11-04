@@ -131,7 +131,7 @@ flyctl secrets list -a tfg-centering
 
 ### Images not uploading
 - ✅ Verify Supabase Storage bucket exists
-- ✅ Check bucket permissions are public
+- ✅ Check the bucket is private. The API hands out signed image URLs
 
 ## Configuration
 

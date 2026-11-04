@@ -122,7 +122,7 @@ For production, use the **service role key** (more permissions) on the backend.
 
 ### Images Not Uploading
 - ✅ Verify Supabase Storage bucket `tfg-submissions` exists
-- ✅ Check bucket permissions are public
+- ✅ Check the bucket is private. The API hands out signed image URLs
 
 ### Frontend Can't Reach Backend
 - ✅ Update proxy URL in `vite.config.ts`

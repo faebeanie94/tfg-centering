@@ -1,6 +1,6 @@
 const express = require('express');
 const { pool } = require('../server');
-const { uploadImage, deleteImage, getPresignedUrl } = require('../services/supabase');
+const { uploadImage, deleteImage, getPresignedUrl, signCardImageUrls } = require('../services/supabase');
 const { saveCardMetadata, deleteCardFolder } = require('../services/localStorage');
 const { validateCardNumber, validateUUID, validateCardMetadata } = require('../middleware/validation');
 const { asyncHandler } = require('../middleware/errorHandler');
@@ -67,7 +67,8 @@ router.post(
       } catch (metadataErr) {
         console.warn(`Failed to save card metadata for card ${cardNumber}:`, metadataErr);
       }
-      res.status(201).json(card);
+      const [signedCard] = await signCardImageUrls(submissionId, [card]);
+      res.status(201).json(signedCard);
     } catch (err) {
       // Rollback storage uploads on any failure
       for (const url of uploadedUrls) {
@@ -96,20 +97,7 @@ router.get('/:submissionId/cards', validateUUID('submissionId'), asyncHandler(as
     [submissionId]
   );
 
-  // Generate presigned URLs for images
-  const cards = await Promise.all(
-    result.rows.map(async (card) => {
-      const front_url = card.front_image_url ? await getPresignedUrl(submissionId, card.card_number, 'front') : null;
-      const back_url = card.back_image_url ? await getPresignedUrl(submissionId, card.card_number, 'back') : null;
-      return {
-        ...card,
-        front_image_url: front_url,
-        back_image_url: back_url,
-      };
-    })
-  );
-
-  res.json(cards);
+  res.json(await signCardImageUrls(submissionId, result.rows));
 }));
 
 router.get(
@@ -132,15 +120,8 @@ router.get(
       return res.status(404).json({ error: 'Card not found' });
     }
 
-    const card = result.rows[0];
-    const front_url = card.front_image_url ? await getPresignedUrl(submissionId, card.card_number, 'front') : null;
-    const back_url = card.back_image_url ? await getPresignedUrl(submissionId, card.card_number, 'back') : null;
-
-    res.json({
-      ...card,
-      front_image_url: front_url,
-      back_image_url: back_url,
-    });
+    const [card] = await signCardImageUrls(submissionId, result.rows);
+    res.json(card);
   })
 );
 
@@ -238,7 +219,8 @@ router.put(
       await saveCardMetadata(submissionId, updatedCard, metadata);
     }
 
-    res.json(updatedCard);
+    const [signedCard] = await signCardImageUrls(submissionId, [updatedCard]);
+    res.json(signedCard);
   })
 );
 

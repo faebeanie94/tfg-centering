@@ -12,7 +12,14 @@ jest.mock('../../server', () => ({
 jest.mock('../../services/supabase', () => ({
   uploadImage: jest.fn().mockResolvedValue('https://storage.example.com/image.jpg'),
   deleteImage: jest.fn().mockResolvedValue(true),
-  getPresignedUrl: jest.fn(async (submissionId, cardNumber, side) => `https://s3.example.com/${side}.jpg`),
+  getPresignedUrl: jest.fn(async (submissionId, cardNumber, side) => `https://storage.example.com/signed/${side}.jpg`),
+  signCardImageUrls: jest.fn(async (submissionId, cards) =>
+    cards.map((card) => ({
+      ...card,
+      front_image_url: card.front_image_url && 'https://storage.example.com/signed/front.jpg',
+      back_image_url: card.back_image_url && 'https://storage.example.com/signed/back.jpg',
+    }))
+  ),
 }));
 
 jest.mock('../../services/localStorage', () => ({
@@ -23,6 +30,7 @@ jest.mock('../../services/localStorage', () => ({
 
 // NOW import after mocks are defined
 const cardsRouter = require('../../api/cards');
+const { saveCardMetadata } = require('../../services/localStorage');
 const { uuidv4 } = require('../setup');
 
 const createApp = () => {
@@ -50,6 +58,12 @@ describe('Cards API', () => {
     updated_at: new Date().toISOString(),
   };
 
+  const signedCard = {
+    ...testCard,
+    front_image_url: 'https://storage.example.com/signed/front.jpg',
+    back_image_url: 'https://storage.example.com/signed/back.jpg',
+  };
+
   beforeEach(() => {
     app = createApp();
     jest.clearAllMocks();
@@ -68,6 +82,20 @@ describe('Cards API', () => {
 
       expect(res.status).toBe(201);
       expect(res.body.card_number).toBe(1);
+    });
+
+    it('should return signed URLs but keep the stored ones in card.json', async () => {
+      mockPool.query
+        .mockResolvedValueOnce({ rows: [{ id: submissionId }] })
+        .mockResolvedValueOnce({ rows: [testCard] });
+
+      const res = await request(app)
+        .post(`/${submissionId}/cards`)
+        .field('cardNumber', '1')
+        .attach('frontImage', Buffer.from('fake image'), 'front.jpg');
+
+      expect(res.body.front_image_url).toBe(signedCard.front_image_url);
+      expect(saveCardMetadata).toHaveBeenCalledWith(submissionId, testCard, null);
     });
 
     it('should reject missing card number', async () => {
@@ -97,7 +125,7 @@ describe('Cards API', () => {
       const res = await request(app).get(`/${submissionId}/cards`);
 
       expect(res.status).toBe(200);
-      expect(res.body).toEqual([testCard]);
+      expect(res.body).toEqual([signedCard]);
     });
   });
 
@@ -108,7 +136,7 @@ describe('Cards API', () => {
       const res = await request(app).get(`/${submissionId}/cards/1`);
 
       expect(res.status).toBe(200);
-      expect(res.body.card_number).toBe(1);
+      expect(res.body).toEqual(signedCard);
     });
 
     it('should return 404 for non-existent card', async () => {
@@ -121,7 +149,40 @@ describe('Cards API', () => {
     });
   });
 
+  describe('GET /:submissionId/cards/:cardNumber/image/:side', () => {
+    const realFetch = global.fetch;
+
+    afterEach(() => {
+      global.fetch = realFetch;
+    });
+
+    it('should read the image through a signed URL', async () => {
+      mockPool.query.mockResolvedValueOnce({ rows: [testCard] });
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        arrayBuffer: async () => Buffer.from('image'),
+      });
+
+      const res = await request(app).get(`/${submissionId}/cards/1/image/front`);
+
+      expect(res.status).toBe(200);
+      expect(global.fetch.mock.calls[0][0]).toBe(signedCard.front_image_url);
+      expect(res.body.data).toBe(`data:image/jpeg;base64,${Buffer.from('image').toString('base64')}`);
+    });
+  });
+
   describe('PUT /:submissionId/cards/:cardNumber', () => {
+    it('should return signed URLs', async () => {
+      mockPool.query
+        .mockResolvedValueOnce({ rows: [{ id: cardId }] })
+        .mockResolvedValueOnce({ rows: [testCard] });
+
+      const res = await request(app).put(`/${submissionId}/cards/1`).send({});
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual(signedCard);
+    });
+
     it('should return 404 for non-existent card', async () => {
       mockPool.query.mockResolvedValueOnce({ rows: [] });
 

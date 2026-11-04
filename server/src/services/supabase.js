@@ -10,13 +10,14 @@ if (!supabaseUrl || !supabaseKey) {
 const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
 const BUCKET_NAME = 'tfg-submissions';
+const SIGNED_URL_TTL_SECONDS = 60 * 60;
 
 async function ensureBucket() {
   if (!supabase) return false;
   try {
     const { data, error } = await supabase.storage.getBucket(BUCKET_NAME);
     if (error && error.statusCode === 404) {
-      const { error: createError } = await supabase.storage.createBucket(BUCKET_NAME, { public: true });
+      const { error: createError } = await supabase.storage.createBucket(BUCKET_NAME, { public: false });
       if (createError) {
         console.error('Failed to create storage bucket:', createError);
         return false;
@@ -32,6 +33,12 @@ async function ensureBucket() {
   }
 }
 
+function imagePath(submissionId, cardNumber, side) {
+  return `${submissionId}/card-${cardNumber}/${side}.jpg`;
+}
+
+// Returns the URL stored on the card row. It records where the image is but
+// can't be opened in a private bucket: readers need a signed URL.
 async function uploadImage(fileBuffer, fileName, submissionId, cardNumber, side) {
   if (!supabase) {
     console.warn('Supabase not configured');
@@ -41,7 +48,7 @@ async function uploadImage(fileBuffer, fileName, submissionId, cardNumber, side)
     const bucketReady = await ensureBucket();
     if (!bucketReady) throw new Error('Storage bucket not available');
 
-    const filePath = `${submissionId}/card-${cardNumber}/${side}.jpg`;
+    const filePath = imagePath(submissionId, cardNumber, side);
     console.log(`Uploading ${side} image: ${filePath} (${fileBuffer.length} bytes)`);
     const { data, error } = await supabase.storage.from(BUCKET_NAME).upload(filePath, fileBuffer, { upsert: true });
 
@@ -115,17 +122,51 @@ async function deleteSubmissionImages(submissionId) {
 async function getPresignedUrl(submissionId, cardNumber, side) {
   if (!supabase) return null;
   try {
-    const filePath = `${submissionId}/card-${cardNumber}/${side}.jpg`;
-    const { data, error } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filePath);
+    const { data, error } = await supabase.storage
+      .from(BUCKET_NAME)
+      .createSignedUrl(imagePath(submissionId, cardNumber, side), SIGNED_URL_TTL_SECONDS);
     if (error) {
-      console.error('Failed to get public URL:', error);
+      console.error('Failed to sign image URL:', error);
       return null;
     }
-    return data.publicUrl;
+    return data.signedUrl;
   } catch (err) {
-    console.error('Error getting public URL:', err);
+    console.error('Error signing image URL:', err);
     return null;
   }
+}
+
+// Swaps the stored image URLs on card rows for signed ones, using one storage
+// request however many cards there are. An image that can't be signed comes
+// back as null, so a storage outage doesn't fail the card list: the app also
+// uses that list to pick the next card number.
+async function signCardImageUrls(submissionId, cards) {
+  const signedUrls = new Map();
+  const paths = cards.flatMap((card) => [
+    ...(card.front_image_url ? [imagePath(submissionId, card.card_number, 'front')] : []),
+    ...(card.back_image_url ? [imagePath(submissionId, card.card_number, 'back')] : []),
+  ]);
+
+  if (supabase && paths.length > 0) {
+    try {
+      const { data, error } = await supabase.storage
+        .from(BUCKET_NAME)
+        .createSignedUrls(paths, SIGNED_URL_TTL_SECONDS);
+      if (error) throw error;
+      for (const { path, signedUrl } of data) signedUrls.set(path, signedUrl);
+    } catch (err) {
+      console.error(`Failed to sign image URLs for submission ${submissionId}:`, err);
+    }
+  }
+
+  const signedUrl = (card, side) =>
+    signedUrls.get(imagePath(submissionId, card.card_number, side)) || null;
+
+  return cards.map((card) => ({
+    ...card,
+    front_image_url: signedUrl(card, 'front'),
+    back_image_url: signedUrl(card, 'back'),
+  }));
 }
 
 module.exports = {
@@ -133,5 +174,6 @@ module.exports = {
   deleteImage,
   deleteSubmissionImages,
   getPresignedUrl,
+  signCardImageUrls,
   ensureBucket,
 };
