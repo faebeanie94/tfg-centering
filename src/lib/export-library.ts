@@ -190,6 +190,11 @@ const CSV_HEADER = [
   'tb_qualify',
   'worst_axis',
   'oc_eligible',
+  'layout',
+  'layout_tb_target',
+  'layout_lr_target',
+  'adj_top_pct',
+  'adj_left_pct',
 ];
 
 function csvRowForSide(
@@ -220,6 +225,11 @@ function csvRowForSide(
     grade.tbQualify.toFixed(3),
     grade.worstAxis,
     grade.ocEligible,
+    snapshot.layout?.label ?? 'Bordered (50/50)',
+    snapshot.layout?.tbTarget ?? 50,
+    snapshot.layout?.lrTarget ?? 50,
+    (snapshot.layout?.corrected.topBottom.top ?? topBottom.top).toFixed(1),
+    (snapshot.layout?.corrected.leftRight.left ?? leftRight.left).toFixed(1),
   ]);
 }
 
@@ -233,6 +243,7 @@ function manifestSide(snapshot: SideSnapshot, imagePath: string) {
     inner: snapshot.inner,
     result: snapshot.result,
     grade: snapshot.grade,
+    layout: snapshot.layout,
   };
 }
 

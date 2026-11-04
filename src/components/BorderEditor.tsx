@@ -20,6 +20,15 @@ import type { CardFormat } from '../lib/card-sizes';
 import { formatCardSizeMm } from '../lib/card-sizes';
 import type { AutoCropSkipReason, InnerSideConfidence } from '../lib/auto-crop';
 import type { SubmissionFolder } from '../lib/folder-submission';
+import {
+  BORDERED_PROFILE,
+  allLayoutProfiles,
+  bordersForGrading,
+  correctSplits,
+  findLayoutProfile,
+  isCorrectingProfile,
+  newCustomProfileId,
+} from '../lib/layout-profiles';
 
 interface BorderEditorProps {
   imageSrc: string;
@@ -121,6 +130,7 @@ export function BorderEditor({
   const [showMenu, setShowMenu] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
   const [savingToLibrary, setSavingToLibrary] = useState(false);
+  const [newLayoutName, setNewLayoutName] = useState<string | null>(null);
   const dragStartRef = useRef<{ x: number; y: number; rect: Rect } | null>(null);
   const captureRef = useRef<{ el: HTMLElement; id: number } | null>(null);
   const patternId = useMemo(() => `stripe-${side}-${Math.random().toString(36).slice(2)}`, [side, imageSrc]);
@@ -155,10 +165,25 @@ export function BorderEditor({
     return computeCentering(outer, inner, cardFormat.widthMm, cardFormat.heightMm);
   }, [outer, inner, cardFormat.widthMm, cardFormat.heightMm]);
 
+  // Borderless correction applies to the front only — card backs are bordered.
+  const layoutProfile = useMemo(
+    () =>
+      side === 'front'
+        ? findLayoutProfile(settings.layoutProfileId, settings.customLayoutProfiles)
+        : BORDERED_PROFILE,
+    [side, settings.layoutProfileId, settings.customLayoutProfiles],
+  );
+  const correcting = isCorrectingProfile(layoutProfile);
+
+  const corrected = useMemo(() => {
+    if (!result || !correcting) return null;
+    return correctSplits(result, layoutProfile);
+  }, [result, correcting, layoutProfile]);
+
   const tfgGrade = useMemo(() => {
     if (!result) return null;
-    return getTfgGrade(result.bordersPx, side);
-  }, [result, side]);
+    return getTfgGrade(bordersForGrading(result, layoutProfile), side);
+  }, [result, layoutProfile, side]);
 
   const buildSnapshot = useCallback((): SideSnapshot | null => {
     if (!outer || !inner || !result || !tfgGrade) return null;
@@ -171,8 +196,36 @@ export function BorderEditor({
       savedAt: Date.now(),
       name: cardName.trim() || undefined,
       cardFormatId: cardFormat.id,
+      layout: corrected
+        ? {
+            profileId: layoutProfile.id,
+            label: layoutProfile.label,
+            tbTarget: layoutProfile.tbTarget,
+            lrTarget: layoutProfile.lrTarget,
+            corrected,
+          }
+        : undefined,
     };
-  }, [imageSrc, outer, inner, result, tfgGrade, cardName, cardFormat.id]);
+  }, [imageSrc, outer, inner, result, tfgGrade, cardName, cardFormat.id, corrected, layoutProfile]);
+
+  /** Save the current raw yellow-box split as a new borderless target (e.g. from a Scryfall image). */
+  function saveCurrentAsLayout() {
+    if (!result || newLayoutName === null) return;
+    const label = newLayoutName.trim();
+    if (!label) return;
+    const profile = {
+      id: newCustomProfileId(),
+      label,
+      tbTarget: Math.round(result.topBottom.top * 10) / 10,
+      lrTarget: Math.round(result.leftRight.left * 10) / 10,
+      source: `Set from ${cardName.trim() || 'reference image'} on ${new Date().toLocaleDateString()}`,
+    };
+    onSettingsChange({
+      customLayoutProfiles: [...settings.customLayoutProfiles, profile],
+      layoutProfileId: profile.id,
+    });
+    setNewLayoutName(null);
+  }
 
   function resetLines() {
     if (!imageSize) return;
@@ -530,20 +583,93 @@ export function BorderEditor({
         </div>
         <div className="grade-banner-metrics">
           <div className="metric">
-            <span className="metric-label">T | B</span>
+            <span className="metric-label">T | B{corrected && ' (adj)'}</span>
             <span className="metric-value">
-              {formatPct(result.topBottom.top)} | {formatPct(result.topBottom.bottom)}
+              {formatPct((corrected ?? result).topBottom.top)} | {formatPct((corrected ?? result).topBottom.bottom)}
             </span>
           </div>
           <div className="metric">
-            <span className="metric-label">L | R</span>
+            <span className="metric-label">L | R{corrected && ' (adj)'}</span>
             <span className="metric-value">
-              {formatPct(result.leftRight.left)} | {formatPct(result.leftRight.right)}
+              {formatPct((corrected ?? result).leftRight.left)} | {formatPct((corrected ?? result).leftRight.right)}
             </span>
           </div>
         </div>
         <div className="grade-banner-score">{formatGrade(tfgGrade.grade)}</div>
       </div>
+
+      {side === 'front' && (
+        <div className={`layout-bar ${correcting ? 'layout-bar-active' : ''}`}>
+          <div className="layout-bar-row">
+            <label className="layout-bar-label" htmlFor="layout-profile-select">
+              Layout
+            </label>
+            <select
+              id="layout-profile-select"
+              className="layout-bar-select"
+              value={layoutProfile.id}
+              onChange={(e) => onSettingsChange({ layoutProfileId: e.target.value })}
+            >
+              {allLayoutProfiles(settings.customLayoutProfiles).map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+            {newLayoutName === null && (
+              <button
+                type="button"
+                className="btn btn-secondary btn-small"
+                title="Use this image's yellow-box split as a borderless target"
+                onClick={() => setNewLayoutName(cardName.trim())}
+              >
+                Set target
+              </button>
+            )}
+          </div>
+          {newLayoutName !== null && (
+            <div className="layout-bar-row">
+              <input
+                className="layout-bar-input"
+                type="text"
+                placeholder="Layout name, e.g. MTG MSH Classic Comic"
+                value={newLayoutName}
+                autoFocus
+                onChange={(e) => setNewLayoutName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') saveCurrentAsLayout();
+                  if (e.key === 'Escape') setNewLayoutName(null);
+                }}
+              />
+              <button
+                type="button"
+                className="btn btn-primary btn-small"
+                disabled={!newLayoutName.trim()}
+                onClick={saveCurrentAsLayout}
+              >
+                Save {formatPct(result.topBottom.top)} / {formatPct(result.leftRight.left)}
+              </button>
+              <button type="button" className="btn btn-secondary btn-small" onClick={() => setNewLayoutName(null)}>
+                Cancel
+              </button>
+            </div>
+          )}
+          {correcting && (
+            <p className="layout-bar-note">
+              Borderless: graded against target T {layoutProfile.tbTarget.toFixed(1)}% · L{' '}
+              {layoutProfile.lrTarget.toFixed(1)}%. Raw T|B {formatPct(result.topBottom.top)} | L|R{' '}
+              {formatPct(result.leftRight.left)}.
+              {layoutProfile.hint && <span className="layout-bar-hint"> {layoutProfile.hint}</span>}
+            </p>
+          )}
+          {newLayoutName !== null && (
+            <p className="layout-bar-note">
+              Place the yellow box on the layout's reference points on a perfectly cut copy (or the
+              Scryfall image), then save. The current raw split becomes the target.
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="mm-readout" aria-label="Border measurements in millimetres">
         {mmReadings.map((reading) => (

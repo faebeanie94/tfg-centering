@@ -7,6 +7,12 @@ import {
   isCardFormatSetting,
   type CardFormatSetting,
 } from '../lib/card-sizes';
+import {
+  BORDERED_PROFILE_ID,
+  findLayoutProfile,
+  sanitizeCustomProfiles,
+  type LayoutProfile,
+} from '../lib/layout-profiles';
 
 export interface AppSettings {
   handleColor: string;
@@ -30,6 +36,10 @@ export interface AppSettings {
   /** Used when cardFormat is `custom`. */
   customWidthMm: number;
   customHeightMm: number;
+  /** Front-side layout profile (borderless correction). `bordered` = normal 50/50. */
+  layoutProfileId: string;
+  /** User-created borderless layout targets. */
+  customLayoutProfiles: LayoutProfile[];
 }
 
 const STORAGE_KEY = 'tfg-centering-settings';
@@ -56,6 +66,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   cardFormat: DEFAULT_CARD_FORMAT_SETTING,
   customWidthMm: DEFAULT_CUSTOM_WIDTH_MM,
   customHeightMm: DEFAULT_CUSTOM_HEIGHT_MM,
+  layoutProfileId: BORDERED_PROFILE_ID,
+  customLayoutProfiles: [],
 };
 
 function loadSettings(): AppSettings {
@@ -84,6 +96,9 @@ function loadSettings(): AppSettings {
     if (!isCardFormatSetting(parsed.cardFormat)) parsed.cardFormat = DEFAULT_CARD_FORMAT_SETTING;
     parsed.customWidthMm = clampCardMm(Number(parsed.customWidthMm));
     parsed.customHeightMm = clampCardMm(Number(parsed.customHeightMm));
+    parsed.customLayoutProfiles = sanitizeCustomProfiles(parsed.customLayoutProfiles);
+    if (typeof parsed.layoutProfileId !== 'string') parsed.layoutProfileId = BORDERED_PROFILE_ID;
+    parsed.layoutProfileId = findLayoutProfile(parsed.layoutProfileId, parsed.customLayoutProfiles).id;
     return parsed;
   } catch {
     return DEFAULT_SETTINGS;
@@ -102,7 +117,8 @@ export function useAppSettings() {
   }, []);
 
   const resetSettings = useCallback(() => {
-    setSettings(DEFAULT_SETTINGS);
+    // Keep saved borderless layout targets — they are reference data, not preferences.
+    setSettings((prev) => ({ ...DEFAULT_SETTINGS, customLayoutProfiles: prev.customLayoutProfiles }));
   }, []);
 
   return { settings, updateSettings, resetSettings };

@@ -1,5 +1,6 @@
 import type { Rect, CenteringResult } from './centering';
 import type { TfgCenteringGrade, CardSide } from './tfg-standards';
+import type { SnapshotLayout } from './layout-profiles';
 
 export interface SideSnapshot {
   imageSrc: string;
@@ -10,6 +11,8 @@ export interface SideSnapshot {
   savedAt: number;
   name?: string;
   cardFormatId?: string;
+  /** Present when a borderless layout correction was applied to the grade. */
+  layout?: SnapshotLayout;
 }
 
 export interface GradingSession {

@@ -4,6 +4,13 @@ import { DEFAULT_SETTINGS, SCAN_OBSTRUCTION_OPTIONS } from '../hooks/useAppSetti
 import { getAppBuildLabel, refreshAppToLatest } from '../lib/app-update';
 import { CardSizeFields } from './CardSizeFields';
 import type { SubmissionFolder } from '../lib/folder-submission';
+import {
+  BUILT_IN_PROFILES,
+  BORDERED_PROFILE_ID,
+  isValidTarget,
+  newCustomProfileId,
+  type LayoutProfile,
+} from '../lib/layout-profiles';
 
 interface SettingsPanelProps {
   open: boolean;
@@ -57,6 +64,108 @@ function ColorField({
         ))}
       </div>
     </div>
+  );
+}
+
+function LayoutProfilesSection({
+  settings,
+  onChange,
+}: {
+  settings: AppSettings;
+  onChange: (patch: Partial<AppSettings>) => void;
+}) {
+  const custom = settings.customLayoutProfiles;
+
+  function update(id: string, patch: Partial<LayoutProfile>) {
+    onChange({ customLayoutProfiles: custom.map((p) => (p.id === id ? { ...p, ...patch } : p)) });
+  }
+
+  function remove(id: string) {
+    onChange({
+      customLayoutProfiles: custom.filter((p) => p.id !== id),
+      layoutProfileId: settings.layoutProfileId === id ? BORDERED_PROFILE_ID : settings.layoutProfileId,
+    });
+  }
+
+  function add() {
+    onChange({
+      customLayoutProfiles: [
+        ...custom,
+        { id: newCustomProfileId(), label: 'New borderless layout', tbTarget: 50, lrTarget: 50 },
+      ],
+    });
+  }
+
+  function targetInput(p: LayoutProfile, key: 'tbTarget' | 'lrTarget') {
+    return (
+      <input
+        type="number"
+        inputMode="decimal"
+        step="0.1"
+        min="1"
+        max="99"
+        defaultValue={p[key]}
+        aria-label={key === 'tbTarget' ? `${p.label} top target %` : `${p.label} left target %`}
+        onBlur={(e) => {
+          const n = parseFloat(e.target.value);
+          if (isValidTarget(n)) update(p.id, { [key]: Math.round(n * 10) / 10 });
+          else e.target.value = String(p[key]);
+        }}
+      />
+    );
+  }
+
+  return (
+    <section className="settings-section">
+      <h3>Borderless layouts</h3>
+      <p className="settings-hint" style={{ marginTop: 0, marginBottom: 12 }}>
+        Targets are the top % and left % a perfectly cut copy reads when the yellow box is on the
+        layout's reference points. The front grade uses 50 + (measured − target), so your normal
+        thresholds still apply. Pick the layout in the Border Editor; the back is always 50/50.
+      </p>
+      <div className="layout-profile-list">
+        <div className="layout-profile-item">
+          <span className="layout-profile-head">Layout</span>
+          <span className="layout-profile-head">Top %</span>
+          <span className="layout-profile-head">Left %</span>
+          <span />
+        </div>
+        {BUILT_IN_PROFILES.filter((p) => p.id !== BORDERED_PROFILE_ID).map((p) => (
+          <div key={p.id} className="layout-profile-item" title={p.source}>
+            <span className="settings-field-label">{p.label}</span>
+            <span>{p.tbTarget.toFixed(1)}</span>
+            <span>{p.lrTarget.toFixed(1)}</span>
+            <span className="layout-profile-head">built-in</span>
+          </div>
+        ))}
+        {custom.map((p) => (
+          <div key={p.id} className="layout-profile-item" title={p.source}>
+            <input
+              type="text"
+              defaultValue={p.label}
+              aria-label="Layout name"
+              onBlur={(e) => {
+                const label = e.target.value.trim();
+                if (label) update(p.id, { label });
+                else e.target.value = p.label;
+              }}
+            />
+            {targetInput(p, 'tbTarget')}
+            {targetInput(p, 'lrTarget')}
+            <button type="button" className="btn btn-secondary btn-small" onClick={() => remove(p.id)}>
+              Delete
+            </button>
+          </div>
+        ))}
+      </div>
+      <button type="button" className="btn btn-secondary btn-block" onClick={add}>
+        Add layout
+      </button>
+      <p className="settings-hint">
+        Quickest way to add one: load a Scryfall image or a perfectly cut copy, place the yellow box on
+        the reference points, and tap “Set target” in the Border Editor.
+      </p>
+    </section>
   );
 }
 
@@ -130,6 +239,8 @@ export function SettingsPanel({ open, settings, onChange, onClose }: SettingsPan
             onChange={(patch) => onChange(patch)}
           />
         </section>
+
+        <LayoutProfilesSection settings={settings} onChange={onChange} />
 
         <section className="settings-section">
           <h3>Scanner</h3>
@@ -205,7 +316,7 @@ export function SettingsPanel({ open, settings, onChange, onClose }: SettingsPan
         </section>
 
         <div className="settings-actions">
-          <button type="button" className="btn btn-secondary" onClick={() => onChange(DEFAULT_SETTINGS)}>
+          <button type="button" className="btn btn-secondary" onClick={() => onChange({ ...DEFAULT_SETTINGS, customLayoutProfiles: settings.customLayoutProfiles })}>
             Reset to defaults
           </button>
           <button type="button" className="btn btn-primary" onClick={onClose}>

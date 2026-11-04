@@ -3408,3 +3408,86 @@ body.editor-mode #root {
   flex-wrap: wrap;
 }
 
+
+/* Borderless layout profile bar (Border Editor, front only) */
+.layout-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+}
+
+.layout-bar-active {
+  outline: 1px solid rgba(73, 163, 225, 0.6);
+  outline-offset: -1px;
+}
+
+.layout-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.layout-bar-label {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.layout-bar-select,
+.layout-bar-input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--surface-2);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 0.85rem;
+}
+
+.layout-bar-note {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.layout-bar-hint {
+  color: #49a3e1;
+}
+
+.layout-profile-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.layout-profile-item {
+  display: grid;
+  grid-template-columns: 1fr 72px 72px auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.layout-profile-item input {
+  min-width: 0;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--surface-2);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.85rem;
+}
+
+.layout-profile-head {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
