@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { CardSide } from '../lib/tfg-standards';
+import * as api from '../lib/api-client';
 import { saveCleanImage, shareCleanImage, saveAllCleanImages } from '../lib/export-image';
 
 interface CardMenuProps {
@@ -93,7 +94,7 @@ export function CardMenu({
     setExporting(true);
     setMessage(null);
     try {
-      const response = await fetch(`/api/submissions/${submissionId}/export`);
+      const response = await api.apiFetch(`/api/submissions/${submissionId}/export`);
       if (!response.ok) throw new Error('Export failed');
 
       const blob = await response.blob();

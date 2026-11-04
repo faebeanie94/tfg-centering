@@ -9,9 +9,10 @@ jest.mock('../../server', () => ({
   pool: mockPool,
 }));
 
-jest.mock('../../services/s3', () => ({
-  uploadImage: jest.fn().mockResolvedValue('https://s3.example.com/image.jpg'),
-  deleteImage: jest.fn().mockResolvedValue(undefined),
+jest.mock('../../services/supabase', () => ({
+  uploadImage: jest.fn().mockResolvedValue('https://storage.example.com/image.jpg'),
+  deleteImage: jest.fn().mockResolvedValue(true),
+  getPresignedUrl: jest.fn(async (submissionId, cardNumber, side) => `https://s3.example.com/${side}.jpg`),
 }));
 
 jest.mock('../../services/localStorage', () => ({
@@ -135,7 +136,9 @@ describe('Cards API', () => {
 
   describe('DELETE /:submissionId/cards/:cardNumber', () => {
     it('should delete card', async () => {
-      mockPool.query.mockResolvedValueOnce({ rows: [testCard] });
+      mockPool.query
+        .mockResolvedValueOnce({ rows: [testCard] })
+        .mockResolvedValueOnce({ rowCount: 1 });
 
       const res = await request(app).delete(`/${submissionId}/cards/1`);
 

@@ -1,10 +1,10 @@
 require('dotenv').config();
 const express = require('express');
-const cors = require('cors');
 const fileUpload = require('express-fileupload');
 const path = require('path');
 const { Pool } = require('pg');
 const { errorHandler } = require('./middleware/errorHandler');
+const { authGate } = require('./middleware/auth');
 const { initializeDatabase } = require('./services/db');
 
 const app = express();
@@ -28,7 +28,14 @@ initializeDatabase(pool).catch(err => {
 // Export pool early to avoid circular dependency issues
 module.exports = { app, pool };
 
-app.use(cors());
+if (!process.env.TEAM_PASSWORD) {
+  console.warn('TEAM_PASSWORD is not set - every /api request will be rejected');
+}
+
+// The frontend is served from this same origin, so the API sends no CORS
+// headers and browsers block cross-origin reads.
+app.use('/api', authGate);
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(fileUpload({ limits: { fileSize: 50 * 1024 * 1024 } }));
@@ -76,17 +83,19 @@ app.use((req, res, next) => {
 // Error handler (must be last)
 app.use(errorHandler);
 
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on 0.0.0.0:${PORT}`);
-});
+if (require.main === module) {
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on 0.0.0.0:${PORT}`);
+  });
 
-process.on('SIGTERM', () => {
-  console.log('SIGTERM signal received: closing HTTP server');
-  server.close(() => {
-    console.log('HTTP server closed');
-    pool.end(() => {
-      console.log('Pool ended');
-      process.exit(0);
+  process.on('SIGTERM', () => {
+    console.log('SIGTERM signal received: closing HTTP server');
+    server.close(() => {
+      console.log('HTTP server closed');
+      pool.end(() => {
+        console.log('Pool ended');
+        process.exit(0);
+      });
     });
   });
-});
+}

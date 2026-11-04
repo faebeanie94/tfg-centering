@@ -583,7 +583,10 @@ export function ImageCapture({
                   type="button"
                   className="btn btn-secondary btn-small"
                   onClick={() => {
-                    window.location.href = `/api/submissions/${submissionFolder.submissionId}/export`;
+                    api.exportSubmissionZip(submissionFolder.submissionId).catch((err) => {
+                      console.error('Failed to export submission:', err);
+                      setError('Could not export this submission. Please try again.');
+                    });
                   }}
                 >
                   Export ZIP

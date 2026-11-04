@@ -1,5 +1,6 @@
 import { createRoot } from 'react-dom/client';
 import App from './App';
+import { LoginPrompt } from './components/LoginPrompt';
 import './index.css';
 
 // Unregister any existing service workers to prevent unwanted auto-refreshes
@@ -15,4 +16,9 @@ if ('serviceWorker' in navigator) {
     });
 }
 
-createRoot(document.getElementById('root')!).render(<App />);
+createRoot(document.getElementById('root')!).render(
+  <>
+    <App />
+    <LoginPrompt />
+  </>,
+);
