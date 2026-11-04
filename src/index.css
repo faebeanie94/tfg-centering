@@ -172,8 +172,9 @@ h6 {
   }
 
   .btn-secondary:hover {
-    background: var(--light);
-    color: #000;
+    background: var(--tfg-bravo);
+    border-color: var(--tfg-bravo);
+    color: white;
   }
 }
 
@@ -2329,7 +2330,7 @@ body.editor-mode #root {
 }
 
 .library-tab.is-active {
-  background: var(--tfg-bravo);
+  background: var(--tfg-alpha);
   color: white;
 }
 
