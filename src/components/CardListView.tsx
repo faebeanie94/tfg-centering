@@ -151,7 +151,7 @@ export function CardListView({ submission, onClose, onCardDeleted }: CardListVie
     setExporting(true);
     setMessage(null);
     try {
-      const response = await fetch(`/api/submissions/${submission.submissionId}/export`);
+      const response = await api.apiFetch(`/api/submissions/${submission.submissionId}/export`);
       if (!response.ok) throw new Error('Export failed');
 
       const blob = await response.blob();

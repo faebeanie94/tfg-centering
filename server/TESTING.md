@@ -24,6 +24,8 @@ npm run test:watch
 Tests are organized by module:
 
 ### API Tests (`src/__tests__/api/`)
+- **auth.test.js** - Sign-in and `/api` protection, run against the real app with the database mocked
+
 - **submissions.test.js** - Submission CRUD endpoints
   - POST / - Create submission
   - GET / - List submissions
