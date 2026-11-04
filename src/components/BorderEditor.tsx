@@ -46,7 +46,8 @@ interface BorderEditorProps {
   autoCropInfo?: { confidence: number; reason: AutoCropSkipReason } | null;
   onDismissAutoCropInfo?: () => void;
   onNameChange: (name: string) => void;
-  onSave: (snapshot: SideSnapshot) => void;
+  /** Rejects with a message for the user if the side was not stored. */
+  onSave: (snapshot: SideSnapshot) => Promise<void>;
   onSideChange: (side: CardSide) => void;
   onCaptureSide: (side: CardSide) => void;
   onCrop: () => void;
@@ -127,6 +128,8 @@ export function BorderEditor({
   const [showStandards, setShowStandards] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [savingToLibrary, setSavingToLibrary] = useState(false);
   const [newLayoutName, setNewLayoutName] = useState<string | null>(null);
   const dragStartRef = useRef<{ x: number; y: number; rect: Rect } | null>(null);
@@ -233,17 +236,25 @@ export function BorderEditor({
     setInner(defaultInnerRect(o));
   }
 
-  async function handleSave() {
+  /** Resolves true only if this call stored the side. */
+  async function handleSave(): Promise<boolean> {
     const snap = buildSnapshot();
-    if (!snap || savingRef.current) return;
+    if (!snap || savingRef.current) return false;
     savingRef.current = true;
+    setSaving(true);
+    setSaveError(null);
     try {
       await onSave(snap);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Not saved. Try again.');
+      return false;
     } finally {
       savingRef.current = false;
+      setSaving(false);
     }
     setSavedFlash(true);
     setTimeout(() => setSavedFlash(false), 1500);
+    return true;
   }
 
   function handleSideSwitch(target: CardSide) {
@@ -502,7 +513,8 @@ export function BorderEditor({
   ).map((r) => ({ ...r, estimated: innerSideConfidence ? innerSideConfidence[r.key] === 0 : false }));
 
   return (
-    <div className="editor editor-shell">
+    // Inert while saving: leaving mid-save would let it land on the next card.
+    <div className="editor editor-shell" inert={saving}>
       <div className="editor-toolbar">
         <button type="button" className="btn btn-secondary btn-small" onClick={onReset}>
           ← New
@@ -537,6 +549,7 @@ export function BorderEditor({
       </div>
 
       {libraryMessage && <div className="library-toast">{libraryMessage}</div>}
+      {saveError && <div className="save-error" role="alert">{saveError}</div>}
 
       {submissionFolder && (
         <div className="submission-banner">
@@ -771,14 +784,14 @@ export function BorderEditor({
             <button type="button" className="btn btn-secondary" onClick={() => onCaptureSide(side)}>
               Retake
             </button>
-            <button type="button" className="btn btn-secondary" onClick={async () => { await handleSave(); onCaptureSide(otherSide); }}>
-              Capture {otherSide}
+            <button type="button" className="btn btn-secondary" onClick={async () => { if (await handleSave()) onCaptureSide(otherSide); }}>
+              {saving ? 'Saving…' : `Capture ${otherSide}`}
             </button>
           </>
         ) : (
           <>
             <button type="button" className={`btn btn-primary ${savedFlash ? 'btn-saved' : ''}`} onClick={handleSave}>
-              {savedFlash ? 'Saved ✓' : 'Save Card'}
+              {saving ? 'Saving…' : savedFlash ? 'Saved ✓' : 'Save Card'}
             </button>
             <button type="button" className="btn btn-secondary" onClick={onNextCard}>
               Next Card

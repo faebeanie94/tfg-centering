@@ -31,6 +31,7 @@ import { computeCentering } from './lib/centering';
 import { exportCleanImage } from './lib/export-image';
 import { getTfgGrade } from './lib/tfg-standards';
 import { startSubmission, saveToSubmissionFolder, startNewCard, type SubmissionFolder } from './lib/folder-submission';
+import { libraryErrorMessage } from './lib/saved-cards';
 import { listSubmissionHandles, restoreSubmissionHandle, deleteSubmissionHandle } from './lib/submission-persistence';
 import * as api from './lib/api-client';
 
@@ -223,23 +224,20 @@ export default function App() {
     setPhase('editor');
   }, [autoCropOptions]);
 
+  /** Rejects with a message for the user if the side was not stored. */
   const handleSaveSide = useCallback(
     async (snapshot: SideSnapshot) => {
-      setSession((prev) => ({ ...prev, [currentSide]: snapshot }));
-      if (snapshot.name) {
-        setCardNames((prev) => ({ ...prev, [currentSide]: snapshot.name! }));
-      }
-
       // Check if editing a library entry from a submission and sync back
       const cardNameMatch = cardNames[currentSide]?.match(/^(.+)\/(\d+)$/);
       const isSubmissionCard = cardNameMatch && submissionFolder && cardNameMatch[1] === submissionFolder.name;
 
       // Auto-save clean image to submission folder if active
       if (submissionFolder && snapshot.imageSrc) {
+        let updatedFolder: SubmissionFolder;
         try {
           const cleanDataUrl = await exportCleanImage(snapshot.imageSrc);
 
-          let updatedFolder = { ...submissionFolder };
+          updatedFolder = { ...submissionFolder };
           if (isSubmissionCard) {
             // Editing an existing submission card - update it in place
             const cardNum = parseInt(cardNameMatch![2], 10);
@@ -248,59 +246,63 @@ export default function App() {
 
           updatedFolder = await saveToSubmissionFolder(updatedFolder, cleanDataUrl, currentSide);
           setSubmissionFolder(updatedFolder);
-
-          // Sync grades to backend API if this is an API submission
-          if (submissionFolder.type === 'api' && snapshot.grade) {
-            try {
-              const cardNum = isSubmissionCard
-                ? parseInt(cardNameMatch![2], 10)
-                : updatedFolder.lastCardNumberUsed ?? updatedFolder.nextCardNumber;
-
-              const gradeLabel = snapshot.grade.label;
-              const centeringMeasurements = snapshot.result?.bordersMm ? {
-                [currentSide === 'front' ? 'frontLeftMm' : 'backLeftMm']: snapshot.result.bordersMm.left,
-                [currentSide === 'front' ? 'frontRightMm' : 'backRightMm']: snapshot.result.bordersMm.right,
-                [currentSide === 'front' ? 'frontTopMm' : 'backTopMm']: snapshot.result.bordersMm.top,
-                [currentSide === 'front' ? 'frontBottomMm' : 'backBottomMm']: snapshot.result.bordersMm.bottom,
-              } : {};
-
-              const metadata = currentSide === 'front'
-                ? { frontGrade: gradeLabel, ...centeringMeasurements }
-                : { backGrade: gradeLabel, ...centeringMeasurements };
-
-              await api.updateCard(submissionFolder.submissionId, cardNum, metadata);
-              console.log(`Synced ${currentSide} grade (${gradeLabel}) and centering measurements to API for card ${cardNum}`);
-            } catch (err) {
-              console.error('Failed to sync grade to API:', err);
-              setLibraryMessage('Failed to sync grade to API');
-              window.setTimeout(() => setLibraryMessage(null), 3000);
-            }
-          }
-
-          // Auto-save to library when BOTH sides are complete, using submission name + card number
-          // Skip auto-save if re-editing existing card (card already in library)
-          const updatedSession = { ...session, [currentSide]: snapshot };
-          if (updatedSession.front && updatedSession.back && !isSubmissionCard) {
-            try {
-              const cardNum = updatedFolder.lastCardNumberUsed ?? updatedFolder.nextCardNumber;
-              const libraryLabel = `${submissionFolder.name}/${cardNum}`;
-              const key = `${submissionFolder.type === 'api' ? submissionFolder.submissionId : submissionFolder.name}/${cardNum}`;
-              const existingId = autoSavedCardRef.current?.key === key ? autoSavedCardRef.current.id : undefined;
-              console.log('Auto-saving to library:', libraryLabel);
-              const record = await saveToLibrary(updatedSession, libraryLabel, existingId);
-              autoSavedCardRef.current = { key, id: record.id };
-              console.log('Auto-save to library succeeded:', libraryLabel);
-            } catch (err) {
-              console.error('Failed to auto-save to library:', err);
-              setLibraryMessage('Failed to auto-save to library');
-              window.setTimeout(() => setLibraryMessage(null), 3000);
-            }
-          }
         } catch (err) {
           console.error('Failed to save to submission folder:', err);
-          setLibraryMessage('Failed to save card to submission');
-          window.setTimeout(() => setLibraryMessage(null), 3000);
+          throw new Error('Not saved to the submission. Check your connection and try again.');
         }
+
+        // Sync grades to backend API if this is an API submission
+        if (submissionFolder.type === 'api' && snapshot.grade) {
+          try {
+            const cardNum = isSubmissionCard
+              ? parseInt(cardNameMatch![2], 10)
+              : updatedFolder.lastCardNumberUsed ?? updatedFolder.nextCardNumber;
+
+            const gradeLabel = snapshot.grade.label;
+            const centeringMeasurements = snapshot.result?.bordersMm ? {
+              [currentSide === 'front' ? 'frontLeftMm' : 'backLeftMm']: snapshot.result.bordersMm.left,
+              [currentSide === 'front' ? 'frontRightMm' : 'backRightMm']: snapshot.result.bordersMm.right,
+              [currentSide === 'front' ? 'frontTopMm' : 'backTopMm']: snapshot.result.bordersMm.top,
+              [currentSide === 'front' ? 'frontBottomMm' : 'backBottomMm']: snapshot.result.bordersMm.bottom,
+            } : {};
+
+            const metadata = currentSide === 'front'
+              ? { frontGrade: gradeLabel, ...centeringMeasurements }
+              : { backGrade: gradeLabel, ...centeringMeasurements };
+
+            await api.updateCard(submissionFolder.submissionId, cardNum, metadata);
+            console.log(`Synced ${currentSide} grade (${gradeLabel}) and centering measurements to API for card ${cardNum}`);
+          } catch (err) {
+            console.error('Failed to sync grade to API:', err);
+            throw new Error('The image saved, but its grade did not. Try again.');
+          }
+        }
+
+        // Auto-save to library when BOTH sides are complete, using submission name + card number
+        // Skip auto-save if re-editing existing card (card already in library)
+        const updatedSession = { ...session, [currentSide]: snapshot };
+        if (updatedSession.front && updatedSession.back && !isSubmissionCard) {
+          try {
+            const cardNum = updatedFolder.lastCardNumberUsed ?? updatedFolder.nextCardNumber;
+            const libraryLabel = `${submissionFolder.name}/${cardNum}`;
+            const key = `${submissionFolder.type === 'api' ? submissionFolder.submissionId : submissionFolder.name}/${cardNum}`;
+            const existingId = autoSavedCardRef.current?.key === key ? autoSavedCardRef.current.id : undefined;
+            console.log('Auto-saving to library:', libraryLabel);
+            const record = await saveToLibrary(updatedSession, libraryLabel, existingId);
+            autoSavedCardRef.current = { key, id: record.id };
+            console.log('Auto-save to library succeeded:', libraryLabel);
+          } catch (err) {
+            console.error('Failed to auto-save to library:', err);
+            throw new Error(libraryErrorMessage(err));
+          }
+        }
+      }
+
+      // Only now does the side count as saved: a failed save leaves the session
+      // as it was, so the other side can't pair with something that isn't stored.
+      setSession((prev) => ({ ...prev, [currentSide]: snapshot }));
+      if (snapshot.name) {
+        setCardNames((prev) => ({ ...prev, [currentSide]: snapshot.name! }));
       }
     },
     [currentSide, submissionFolder, session, cardNames, saveToLibrary],
@@ -463,8 +465,15 @@ export default function App() {
   }, [submissionFolder]);
 
   const handleEndSubmission = useCallback(() => {
+    if (
+      submissionFolder?.type === 'zip' &&
+      submissionFolder.images.size > 0 &&
+      !window.confirm(`End "${submissionFolder.name}"? Any images you haven't downloaded will be lost.`)
+    ) {
+      return;
+    }
     setSubmissionFolder(null);
-  }, []);
+  }, [submissionFolder]);
 
   const handleRetakeSubmission = useCallback(() => {
     handleCaptureSide(currentSide);

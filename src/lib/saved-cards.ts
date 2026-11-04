@@ -39,6 +39,13 @@ export function defaultCardLabel(session: GradingSession): string {
   return `Card ${new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`;
 }
 
+/** What to tell the user when a library save fails. */
+export function libraryErrorMessage(err: unknown): string {
+  return (err as Error | null)?.name === 'QuotaExceededError'
+    ? 'Not saved to the library: device storage is full. Free up space and try again.'
+    : 'Not saved to the library. Try again.';
+}
+
 export async function listSavedCards(): Promise<SavedCardRecord[]> {
   const db = await openDb();
   try {
@@ -91,7 +98,8 @@ export async function saveCardToLibrary(
       }
     };
 
-    tx.onerror = () => {
+    // A commit failure such as running out of quota only fires abort, not error.
+    tx.onerror = tx.onabort = () => {
       if (!completed) {
         completed = true;
         db.close();
@@ -149,7 +157,8 @@ export async function updateSavedCardLabel(id: string, label: string): Promise<v
       }
     };
 
-    tx.onerror = () => {
+    // A commit failure such as running out of quota only fires abort, not error.
+    tx.onerror = tx.onabort = () => {
       if (!completed) {
         completed = true;
         db.close();
@@ -182,7 +191,8 @@ export async function deleteSavedCard(id: string): Promise<void> {
       }
     };
 
-    tx.onerror = () => {
+    // A commit failure such as running out of quota only fires abort, not error.
+    tx.onerror = tx.onabort = () => {
       if (!completed) {
         completed = true;
         db.close();

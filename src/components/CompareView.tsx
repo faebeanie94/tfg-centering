@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { formatPct } from '../lib/centering';
 import type { GradingSession } from '../lib/session';
 import { formatGrade, limitingGrade } from '../lib/session';
+import { libraryErrorMessage } from '../lib/saved-cards';
 import type { CardSide } from '../lib/tfg-standards';
 import { CompareExportMenu } from './CardMenu';
 
@@ -96,6 +97,7 @@ export function CompareView({
 }: CompareViewProps) {
   const [showExport, setShowExport] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const limit = limitingGrade(session);
 
   const exportImages = useMemo(() => {
@@ -130,7 +132,10 @@ export function CompareView({
               disabled={saving}
               onClick={() => {
                 setSaving(true);
-                void onSaveToLibrary().finally(() => setSaving(false));
+                setSaveError(null);
+                onSaveToLibrary()
+                  .catch((err) => setSaveError(libraryErrorMessage(err)))
+                  .finally(() => setSaving(false));
               }}
             >
               {saving ? 'Saving…' : 'Save to library'}
@@ -145,6 +150,7 @@ export function CompareView({
       </div>
 
       {libraryMessage && <div className="library-toast">{libraryMessage}</div>}
+      {saveError && <div className="save-error" role="alert">{saveError}</div>}
 
       <div className="compare-grid">
         <SideCard label="Front" snapshot={session.front} onEdit={() => onEdit('front')} />
