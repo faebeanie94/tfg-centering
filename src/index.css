@@ -1742,9 +1742,8 @@ body.editor-mode #root {
   flex: 1;
 }
 
-/* Darker than .btn-grade so the "Saved" flash still registers */
 .btn-saved {
-  background: var(--tfg-grade-darker) !important;
+  background: var(--success) !important;
 }
 
 /* Settings */
