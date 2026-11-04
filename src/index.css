@@ -2221,6 +2221,17 @@ body.editor-mode #root {
   margin: 0 12px;
 }
 
+.save-error {
+  margin: 0 12px;
+  padding: 10px 14px;
+  background: rgba(var(--tfg-error-rgb), 0.15);
+  border: 1px solid var(--danger);
+  color: var(--tfg-error-light);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
 .submission-banner {
   display: flex;
   flex-wrap: wrap;
