@@ -61,6 +61,8 @@ interface BorderEditorProps {
   /** Layout for this card. Backs are always bordered. */
   frontLayout: LayoutProfile;
   onFrontLayoutChange: (profile: LayoutProfile) => void;
+  /** Layout of the previous card, offered as a one-tap shortcut on a new front. */
+  lastCardLayoutId?: string | null;
   /** Called before a detour that comes back here, so the boxes survive the remount. */
   onKeepDraft: (draft: EditorDraft) => void;
   /** Auto-crop applied but wasn't fully confident — dismissible "worth checking" note. */
@@ -116,6 +118,7 @@ export function BorderEditor({
   initialHandEdited = false,
   frontLayout,
   onFrontLayoutChange,
+  lastCardLayoutId = null,
   onKeepDraft,
   autoCropInfo = null,
   onDismissAutoCropInfo,
@@ -552,6 +555,11 @@ export function BorderEditor({
   const layoutOptions = allLayoutProfiles(settings.customLayoutProfiles);
   // A reopened card can use a custom layout that has since been deleted.
   if (!layoutOptions.some((p) => p.id === layoutProfile.id)) layoutOptions.push(layoutProfile);
+  // Looked up live, so a layout deleted or retargeted in Settings isn't reused as it was.
+  const lastCardLayout =
+    !session.front && lastCardLayoutId !== layoutProfile.id
+      ? layoutOptions.find((p) => p.id === lastCardLayoutId)
+      : undefined;
 
   function renderEdgeHandles(rect: Rect, rectType: 'outer' | 'inner', color: string) {
     const edges: Array<'left' | 'right' | 'top' | 'bottom'> = ['left', 'right', 'top', 'bottom'];
@@ -714,6 +722,17 @@ export function BorderEditor({
               </button>
             )}
           </div>
+          {lastCardLayout && (
+            <div className="layout-bar-row">
+              <button
+                type="button"
+                className="btn btn-secondary btn-small"
+                onClick={() => onFrontLayoutChange(lastCardLayout)}
+              >
+                Same as last card: {lastCardLayout.label}
+              </button>
+            </div>
+          )}
           {newLayoutName !== null && (
             <div className="layout-bar-row">
               <input

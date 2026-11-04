@@ -58,6 +58,10 @@ export default function App() {
   const [editorRects, setEditorRects] = useState<EditorDraft>({});
   /** Layout of the card in hand. It belongs to the card, so each new card starts bordered. */
   const [frontLayout, setFrontLayout] = useState<LayoutProfile>(BORDERED_PROFILE);
+  /** Layout the previous card's front was saved with, offered as a shortcut on the next card. */
+  const [lastCardLayoutId, setLastCardLayoutId] = useState<string | null>(null);
+  /** Layout this card's front was saved with, if it has been saved. */
+  const savedFrontLayoutIdRef = useRef<string | null>(null);
   const [cardNames, setCardNames] = useState<{ front: string; back: string }>({ front: '', back: '' });
   const [showSettings, setShowSettings] = useState(false);
   const [returnPhaseAfterEdit, setReturnPhaseAfterEdit] = useState<Phase>('editor');
@@ -87,6 +91,12 @@ export default function App() {
   useEffect(() => {
     setFrontLayout((prev) => settings.customLayoutProfiles.find((p) => p.id === prev.id) ?? prev);
   }, [settings.customLayoutProfiles]);
+
+  /** Call when moving to another card. A front that was never saved doesn't count. */
+  const rememberCardLayout = useCallback(() => {
+    if (savedFrontLayoutIdRef.current) setLastCardLayoutId(savedFrontLayoutIdRef.current);
+    savedFrontLayoutIdRef.current = null;
+  }, []);
 
   const activeCardFormat = useMemo(() => {
     const fromSettings = selectionFromSettings(settings);
@@ -238,6 +248,9 @@ export default function App() {
   const handleSaveSide = useCallback(
     async (snapshot: SideSnapshot) => {
       setSession((prev) => ({ ...prev, [currentSide]: snapshot }));
+      if (currentSide === 'front') {
+        savedFrontLayoutIdRef.current = snapshot.layout?.profileId ?? BORDERED_PROFILE.id;
+      }
       if (snapshot.name) {
         setCardNames((prev) => ({ ...prev, [currentSide]: snapshot.name! }));
       }
@@ -361,7 +374,10 @@ export default function App() {
       setSubmissionFolder((prev) => prev && startNewCard(prev));
     }
     setCardNames((prev) => ({ ...prev, [side]: '' }));
-    if (side === 'front') setFrontLayout(BORDERED_PROFILE);
+    if (side === 'front') {
+      setFrontLayout(BORDERED_PROFILE);
+      savedFrontLayoutIdRef.current = null;
+    }
     setCurrentSide(side);
     setRawImage(null);
     setWorkingImage(null);
@@ -386,6 +402,7 @@ export default function App() {
   }, []);
 
   const handleReset = useCallback(() => {
+    rememberCardLayout();
     setSession(emptySession());
     setSubmissionFolder((prev) => prev && startNewCard(prev));
     setRawImage(null);
@@ -398,7 +415,7 @@ export default function App() {
     setPendingHint(undefined);
     setAutoCropInfo(null);
     setPhase('capture');
-  }, []);
+  }, [rememberCardLayout]);
 
   const handleStartSubmission = useCallback(async () => {
     try {
@@ -487,13 +504,14 @@ export default function App() {
 
   const handleNextCard = useCallback(() => {
     // Reset session and go back to capture for next card
+    rememberCardLayout();
     setSession(emptySession());
     setCardNames({ front: '', back: '' });
     setFrontLayout(BORDERED_PROFILE);
     setCurrentSide('front');
     setPhase('capture');
     setSubmissionFolder((prev) => prev && startNewCard(prev));
-  }, []);
+  }, [rememberCardLayout]);
 
   const handleCaptureSideChange = useCallback((side: CardSide) => {
     setCurrentSide(side);
@@ -588,6 +606,7 @@ export default function App() {
               setSession(nextSession);
               setCardNames({ front: cardName, back: cardName });
               // The backend doesn't store the layout, so re-edits start bordered.
+              rememberCardLayout();
               setFrontLayout(BORDERED_PROFILE);
               setEditorRects({});
               setSubmissionFolder({
@@ -725,6 +744,7 @@ export default function App() {
           initialHandEdited={editorRects.handEdited}
           frontLayout={frontLayout}
           onFrontLayoutChange={setFrontLayout}
+          lastCardLayoutId={lastCardLayoutId}
           onKeepDraft={setEditorRects}
           autoCropInfo={autoCropInfo}
           onDismissAutoCropInfo={() => setAutoCropInfo(null)}
