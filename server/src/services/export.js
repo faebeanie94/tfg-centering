@@ -5,14 +5,27 @@ const { pool } = require('../server');
 const { getSubmissionPath } = require('./localStorage');
 const { getPresignedUrl } = require('./supabase');
 
-// Create ZIP of submission
-const createSubmissionZip = async (submissionId, outputStream) => {
-  console.log(`📦 Starting export for submission: ${submissionId}`);
-  const archive = archiver('zip', { zlib: { level: 9 } });
+const folderNameFor = (name) => (name || 'submission').replace(/[^a-z0-9]/gi, '_').toLowerCase();
 
-  archive.pipe(outputStream);
+/** Share (%) of the first border: top of top+bottom, left of left+right. Blank when unmeasured. */
+const sharePct = (a, b) => {
+  const x = parseFloat(a);
+  const y = parseFloat(b);
+  if (!Number.isFinite(x) || !Number.isFinite(y) || x + y <= 0) return '';
+  return ((x / (x + y)) * 100).toFixed(1);
+};
 
-  try {
+const csvCell = (value) => {
+  const text = value === null || value === undefined ? '' : String(value);
+  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+};
+
+/**
+ * Add one submission (summary JSON, card images + metadata, grades.csv) to an
+ * open archive under `folderName/`. Returns the submission and its card rows.
+ */
+const appendSubmission = async (archive, submissionId, folderNameOverride) => {
+  {
     // Get submission from DB
     const submissionResult = await pool.query(
       'SELECT * FROM submissions WHERE id = $1',
@@ -26,7 +39,7 @@ const createSubmissionZip = async (submissionId, outputStream) => {
     const submission = submissionResult.rows[0];
     console.log(`📦 Found submission: "${submission.name}"`);
     const submissionDir = getSubmissionPath(submissionId);
-    const folderName = submission.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    const folderName = folderNameOverride || folderNameFor(submission.name);
 
     // Get all cards
     const cardsResult = await pool.query(
@@ -187,7 +200,7 @@ const createSubmissionZip = async (submissionId, outputStream) => {
     }
 
     // Add grades and measurements CSV
-    const gradesLines = ['Card Number,Front Grade,Back Grade,Overall Grade,Front Left (mm),Front Right (mm),Front Top (mm),Front Bottom (mm),Back Left (mm),Back Right (mm),Back Top (mm),Back Bottom (mm)'];
+    const gradesLines = ['Card Number,Front Grade,Back Grade,Overall Grade,Front Left (mm),Front Right (mm),Front Top (mm),Front Bottom (mm),Back Left (mm),Back Right (mm),Back Top (mm),Back Bottom (mm),Front Top (%),Front Left (%)'];
     for (const card of cardsResult.rows) {
       const frontGrade = card.front_grade || '—';
       const backGrade = card.back_grade || '—';
@@ -213,17 +226,103 @@ const createSubmissionZip = async (submissionId, outputStream) => {
       const backRight = card.back_right_mm ?? '—';
       const backTop = card.back_top_mm ?? '—';
       const backBottom = card.back_bottom_mm ?? '—';
-      gradesLines.push(`${card.card_number},${frontGrade},${backGrade},${overallGrade},${frontLeft},${frontRight},${frontTop},${frontBottom},${backLeft},${backRight},${backTop},${backBottom}`);
+      card.overall_grade = overallGrade;
+      gradesLines.push(`${card.card_number},${frontGrade},${backGrade},${overallGrade},${frontLeft},${frontRight},${frontTop},${frontBottom},${backLeft},${backRight},${backTop},${backBottom},${sharePct(card.front_top_mm, card.front_bottom_mm)},${sharePct(card.front_left_mm, card.front_right_mm)}`);
     }
     archive.append(gradesLines.join('\n') + '\n', {
       name: `${folderName}/grades.csv`,
     });
     console.log(`📦 Added grades CSV with ${gradesLines.length - 1} cards`);
 
-    // Finalize archive
-    console.log(`📦 Finalizing archive with ${cardsResult.rows.length} cards`);
+    return { submission, folderName, cards: cardsResult.rows };
+  }
+};
+
+// Create ZIP of submission
+const createSubmissionZip = async (submissionId, outputStream) => {
+  console.log(`📦 Starting export for submission: ${submissionId}`);
+  const archive = archiver('zip', { zlib: { level: 9 } });
+  archive.pipe(outputStream);
+
+  try {
+    const { cards } = await appendSubmission(archive, submissionId);
+    console.log(`📦 Finalizing archive with ${cards.length} cards`);
     await archive.finalize();
     console.log(`📦 Export complete`);
+  } catch (err) {
+    archive.destroy();
+    throw err;
+  }
+};
+
+const LIBRARY_CSV_HEADER = [
+  'Submission', 'Submission Completed', 'Card Number', 'Folder',
+  'Front Grade', 'Back Grade', 'Overall Grade',
+  'Front Left (mm)', 'Front Right (mm)', 'Front Top (mm)', 'Front Bottom (mm)',
+  'Back Left (mm)', 'Back Right (mm)', 'Back Top (mm)', 'Back Bottom (mm)',
+  'Front Top (%)', 'Front Left (%)', 'Notes',
+];
+
+/**
+ * Every given submission in one ZIP, each in its own folder exactly as a
+ * single export, plus library.csv at the top with one row per card across all
+ * of them. Missing submissions are skipped and listed in library.json.
+ */
+const createLibraryZip = async (submissionIds, outputStream) => {
+  console.log(`📦 Starting library export for ${submissionIds.length} submissions`);
+  const archive = archiver('zip', { zlib: { level: 9 } });
+  archive.pipe(outputStream);
+
+  try {
+    const lines = [LIBRARY_CSV_HEADER.join(',')];
+    const usedFolders = new Set();
+    const included = [];
+    const skipped = [];
+
+    for (const id of submissionIds) {
+      const found = await pool.query('SELECT name FROM submissions WHERE id = $1', [id]);
+      if (found.rows.length === 0) {
+        skipped.push(id);
+        continue;
+      }
+
+      // Two submissions can share a name; keep their folders apart.
+      const base = folderNameFor(found.rows[0].name);
+      let folder = base;
+      for (let n = 2; usedFolders.has(folder); n++) folder = `${base}_${n}`;
+      usedFolders.add(folder);
+
+      const { submission, cards } = await appendSubmission(archive, id, folder);
+      included.push({ id, name: submission.name, folder, cardCount: cards.length });
+
+      for (const card of cards) {
+        lines.push([
+          submission.name,
+          submission.completed_at ? 'yes' : 'no',
+          card.card_number,
+          `${folder}/card-${card.card_number}`,
+          card.front_grade || '',
+          card.back_grade || '',
+          card.overall_grade && card.overall_grade !== '—' ? card.overall_grade : '',
+          card.front_left_mm ?? '', card.front_right_mm ?? '', card.front_top_mm ?? '', card.front_bottom_mm ?? '',
+          card.back_left_mm ?? '', card.back_right_mm ?? '', card.back_top_mm ?? '', card.back_bottom_mm ?? '',
+          sharePct(card.front_top_mm, card.front_bottom_mm),
+          sharePct(card.front_left_mm, card.front_right_mm),
+          card.notes || '',
+        ].map(csvCell).join(','));
+      }
+    }
+
+    archive.append(lines.join('\n') + '\n', { name: 'library.csv' });
+    archive.append(JSON.stringify({
+      exportedAt: new Date().toISOString(),
+      submissions: included,
+      cardCount: lines.length - 1,
+      skippedSubmissionIds: skipped,
+    }, null, 2), { name: 'library.json' });
+
+    console.log(`📦 Finalizing library archive: ${included.length} submissions, ${lines.length - 1} cards`);
+    await archive.finalize();
   } catch (err) {
     archive.destroy();
     throw err;
@@ -250,5 +349,7 @@ const estimateZipSize = async (submissionId) => {
 
 module.exports = {
   createSubmissionZip,
+  createLibraryZip,
+  sharePct,
   estimateZipSize,
 };

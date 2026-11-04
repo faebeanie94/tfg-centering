@@ -1,10 +1,33 @@
 const express = require('express');
 const { pool } = require('../server');
-const { createSubmissionZip, estimateZipSize } = require('../services/export');
+const { createSubmissionZip, createLibraryZip, estimateZipSize } = require('../services/export');
 const { validateUUID } = require('../middleware/validation');
 const { asyncHandler } = require('../middleware/errorHandler');
 
 const router = express.Router();
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const MAX_LIBRARY_SUBMISSIONS = 500;
+
+/** Several submissions in one ZIP: body { ids: [uuid, ...] }. */
+router.post('/export-all', asyncHandler(async (req, res) => {
+  const ids = Array.isArray(req.body?.ids) ? [...new Set(req.body.ids)] : null;
+  if (!ids || ids.length === 0) {
+    return res.status(400).json({ error: 'ids must be a non-empty array of submission ids' });
+  }
+  if (ids.length > MAX_LIBRARY_SUBMISSIONS) {
+    return res.status(400).json({ error: `at most ${MAX_LIBRARY_SUBMISSIONS} submissions per export` });
+  }
+  if (!ids.every((id) => typeof id === 'string' && UUID_RE.test(id))) {
+    return res.status(400).json({ error: 'every id must be a valid UUID' });
+  }
+
+  const stamp = new Date().toISOString().slice(0, 10);
+  res.setHeader('Content-Type', 'application/zip');
+  res.setHeader('Content-Disposition', `attachment; filename="tfg_library_${stamp}.zip"`);
+
+  await createLibraryZip(ids, res);
+}));
 
 router.get('/:id/export', validateUUID('id'), asyncHandler(async (req, res) => {
   const { id } = req.params;
