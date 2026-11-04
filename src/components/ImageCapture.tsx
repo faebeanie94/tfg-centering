@@ -499,7 +499,7 @@ export function ImageCapture({
   return (
     <div className="capture capture-idle">
       <div className="capture-top-bar">
-        <span className="capture-side-badge">{side === 'front' ? 'Front' : 'Back'} side</span>
+        <img className="capture-logo" src="/tfg-logo.png" alt="TFG" />
         <div className="capture-top-actions">
           {side === 'front' && hasSavedSides ? (
             <>
@@ -538,7 +538,7 @@ export function ImageCapture({
       </div>
 
       <div className="capture-hero capture-hero-compact">
-        <div className="capture-logo">TFG</div>
+        <span className="capture-side-badge">{side === 'front' ? 'Front' : 'Back'} side</span>
         <h1>Tree Frog Grading</h1>
         <p>Capture the {side} of your card</p>
       </div>

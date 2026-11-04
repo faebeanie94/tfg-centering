@@ -33,23 +33,60 @@
     var(--tfg-alpha-dark) 100%
   );
 
-  --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  /* What tfg.cards renders: Bootstrap's system stack for body text, Poppins for headings.
+     tfg-app declares Inter, but its rule targets .body, which no page uses. */
+  --font-primary: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', 'Noto Sans',
+    'Liberation Sans', Arial, sans-serif;
   --font-heading: 'Poppins', sans-serif;
 
-  /* Dark theme surfaces from tfg.cards Bootstrap [data-bs-theme=dark] */
-  --bg: #212529;
-  --surface: #343a40;
-  --surface-2: #495057;
-  --text: #dee2e6;
-  --text-muted: rgba(222, 226, 230, 0.75);
-  --border: #495057;
+  --font-mono: SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+
+  /* Dark theme surfaces from tfg-app bootstrap.css (5.3.8) [data-bs-theme=dark] */
+  color-scheme: dark;
+  --bg: #212529; /* --bs-body-bg */
+  --surface: #343a40; /* --bs-secondary-bg */
+  --surface-2: #495057; /* --bs-gray-700 */
+  --surface-sunken: #2b3035; /* --bs-tertiary-bg */
+  --text: #dee2e6; /* --bs-body-color */
+  --text-strong: #fff; /* --bs-emphasis-color */
+  --text-muted: rgba(222, 226, 230, 0.75); /* --bs-secondary-color */
+  --border: #495057; /* --bs-border-color */
+  --border-translucent: rgba(255, 255, 255, 0.15); /* --bs-border-color-translucent */
+  --light: #f8f9fa; /* --bs-light */
+  --card-border: #e9ecef; /* tfg-app .feature-card */
   --primary: var(--tfg-alpha);
   --primary-hover: var(--tfg-alpha-dark);
+  --gradient-highlight: linear-gradient(135deg, var(--tfg-alpha), var(--tfg-bravo)); /* .btn-highlight */
+  --gradient-highlight-hover: linear-gradient(135deg, var(--tfg-bravo), var(--tfg-alpha));
   --success: var(--tfg-grade);
   --warning: var(--tfg-error);
   --danger: var(--tfg-error);
   --accent: var(--tfg-grade);
-  --radius: 12px;
+
+  /* Tints of the brand colours, for alerts and subtle backgrounds */
+  --tfg-bravo-rgb: 73, 163, 225;
+  --tfg-alpha-rgb: 203, 54, 135;
+  --tfg-grade-rgb: 120, 194, 133;
+  --tfg-error-rgb: 231, 125, 49;
+
+  /* Radii from Bootstrap: --bs-border-radius-{sm,,lg,xl,pill} */
+  --radius-sm: 0.25rem;
+  --radius: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 1rem;
+  --radius-pill: 50rem;
+
+  /* Shadows from tfg-app custom.css .btn-alpha and Bootstrap */
+  --shadow-btn: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
+  --shadow-btn-hover: 0 10px 15px -3px rgba(37, 99, 235, 0.3);
+  --shadow-card: 0 4px 6px rgba(0, 0, 0, 0.05); /* .feature-card */
+  --shadow-dialog: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  --focus-ring: 0 0 0 0.25rem rgba(var(--tfg-alpha-rgb), 0.25);
+
+  /* Aliases used by older rules */
+  --bg-primary: var(--surface);
+  --text-primary: var(--text);
+  --border-color: var(--border);
 }
 
 html {
@@ -72,6 +109,8 @@ h4,
 h5,
 h6 {
   font-family: var(--font-heading);
+  font-weight: 600;
+  line-height: 1.2;
 }
 
 #root {
@@ -86,48 +125,69 @@ h6 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 0.5rem;
   border: none;
   border-radius: var(--radius);
+  font-family: var(--font-primary);
   font-size: 1rem;
   font-weight: 600;
+  line-height: 1.5;
   cursor: pointer;
-  padding: 12px 24px;
-  transition: background 0.15s, transform 0.1s;
+  padding: 0.75rem 1.5rem;
+  transition: background 0.15s ease-in-out, box-shadow 0.15s ease-in-out, transform 0.15s ease-in-out;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
+}
+
+.btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .btn:active {
   transform: scale(0.97);
 }
 
+/* Matches tfg-app .btn-highlight, the site's main call to action */
 .btn-primary {
-  background: var(--primary);
+  background: var(--gradient-highlight);
   color: white;
+  box-shadow: var(--shadow-btn);
 }
 
-.btn-primary:hover {
-  background: var(--primary-hover);
-}
-
+/* Matches Bootstrap .btn-outline-light, the site's secondary action */
 .btn-secondary {
-  background: var(--surface-2);
-  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--light);
+  color: var(--light);
+  font-weight: 400;
 }
 
-.btn-secondary:hover {
-  background: #5c636a;
+/* Hover only where a pointer can hover, so touches don't leave it stuck on */
+@media (hover: hover) {
+  .btn-primary:hover {
+    background: var(--gradient-highlight-hover);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-btn-hover);
+  }
+
+  .btn-secondary:hover {
+    background: var(--light);
+    color: #000;
+  }
 }
 
+/* Matches Bootstrap .btn-lg with the .btn-highlight padding */
 .btn-large {
   width: 100%;
-  padding: 16px 24px;
-  font-size: 1.1rem;
+  padding: 0.75rem 2rem;
+  border-radius: var(--radius-lg);
+  font-size: 1.25rem;
 }
 
+/* Bootstrap default .btn sizing */
 .btn-small {
-  padding: 8px 16px;
+  padding: 0.375rem 0.75rem;
   font-size: 0.875rem;
 }
 
@@ -144,18 +204,13 @@ h6 {
   padding-top: 24px;
 }
 
+/* Home screen follows the site layout: navbar, full-bleed hero, then content */
 .capture-idle {
-  min-height: calc(100dvh - 32px);
-  justify-content: center;
+  min-height: calc(100dvh - 16px);
+  margin-top: -16px;
+  justify-content: flex-start;
   gap: 20px;
   padding-top: 0;
-}
-
-.capture-hero-compact .capture-logo {
-  width: 52px;
-  height: 52px;
-  font-size: 1rem;
-  margin-bottom: 8px;
 }
 
 .capture-hero-compact h1 {
@@ -164,7 +219,8 @@ h6 {
 }
 
 .capture-hero-compact p {
-  font-size: 0.9rem;
+  font-size: 1rem;
+  margin: 0;
 }
 
 /* Full-screen scanner */
@@ -414,34 +470,42 @@ body.scanner-mode #root {
   cursor: not-allowed;
 }
 
+/* Both span the window while their content stays on the #root column */
+.capture-top-bar,
 .capture-hero {
-  text-align: center;
+  margin-inline: calc(50% - 50vw);
+  padding-inline: max(1rem, calc(50vw - 304px));
 }
 
-.capture-logo {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 64px;
-  height: 64px;
-  border-radius: 16px;
-  background: var(--bg-gradient-bravo-to-alpha);
+/* Matches tfg-app .jumbotron-custom */
+.capture-hero {
+  background: var(--bg-gradient-bravo-dark-to-alpha-dark);
   color: white;
-  font-family: var(--font-heading);
-  font-weight: 700;
-  font-size: 1.25rem;
-  margin-bottom: 12px;
+  padding-block: 3rem 2rem;
+  overflow: hidden;
 }
 
+/* Same white wordmark and height as the tfg-app .navbar-brand */
+.capture-logo {
+  display: block;
+  height: 40px;
+  width: auto;
+}
+
+/* Matches tfg-app .display-3 and .lead */
 .capture-hero h1 {
-  font-size: 1.75rem;
+  font-size: 2rem;
   font-weight: 700;
-  margin-bottom: 8px;
+  line-height: 1.1;
+  color: white;
+  margin-bottom: 1rem;
 }
 
 .capture-hero p {
-  color: var(--text-muted);
-  font-size: 0.95rem;
+  color: white;
+  opacity: 0.9;
+  font-size: 1.1rem;
+  font-weight: 300;
 }
 
 .capture-actions {
@@ -452,9 +516,9 @@ body.scanner-mode #root {
 
 .saved-submissions {
   padding: 12px;
-  background: rgba(74, 144, 226, 0.08);
+  background: rgba(var(--tfg-bravo-rgb), 0.08);
   border-radius: var(--radius);
-  border: 1px solid rgba(74, 144, 226, 0.2);
+  border: 1px solid rgba(var(--tfg-bravo-rgb), 0.2);
 }
 
 .saved-submissions-label {
@@ -491,17 +555,17 @@ body.scanner-mode #root {
 }
 
 .error-banner {
-  background: rgba(231, 125, 49, 0.15);
+  background: rgba(var(--tfg-error-rgb), 0.15);
   border: 1px solid var(--danger);
   color: var(--tfg-error-light);
-  padding: 12px 16px;
+  padding: 1rem;
   border-radius: var(--radius);
   font-size: 0.9rem;
 }
 
 .submission-status {
-  background: rgba(74, 144, 226, 0.1);
-  border: 1px solid var(--primary);
+  background: rgba(var(--tfg-bravo-rgb), 0.1);
+  border: 1px solid rgba(var(--tfg-bravo-rgb), 0.5);
   border-radius: var(--radius);
   padding: 12px 16px;
   display: flex;
@@ -874,10 +938,11 @@ body.editor-mode #root {
   font-size: 0.7rem;
 }
 
+/* Pill toggles match tfg-app .nav-pills */
 .side-toggle {
   display: flex;
   background: var(--surface);
-  border-radius: 20px;
+  border-radius: var(--radius);
   padding: 3px;
   flex: 1;
 }
@@ -888,15 +953,15 @@ body.editor-mode #root {
   background: transparent;
   color: var(--text-muted);
   padding: 8px 12px;
-  border-radius: 18px;
+  border-radius: var(--radius);
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
 }
 
 .side-btn.active {
-  background: var(--surface-2);
-  color: var(--text);
+  background: var(--tfg-bravo);
+  color: white;
 }
 
 .grade-banner {
@@ -1042,7 +1107,7 @@ body.editor-mode #root {
 }
 
 .mm-readout-est-mark {
-  color: #e77d31;
+  color: var(--tfg-error);
   margin-left: 2px;
 }
 
@@ -1057,7 +1122,7 @@ body.editor-mode #root {
 }
 
 .mm-scale-hint-est {
-  color: #e77d31;
+  color: var(--tfg-error);
 }
 
 .card-size-custom-row {
@@ -1427,19 +1492,30 @@ body.editor-mode #root {
 }
 
 /* Capture top bar */
+/* Matches tfg-app .navbar-custom */
 .capture-top-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
+  gap: 0.5rem;
+  padding-block: max(0.5rem, env(safe-area-inset-top)) 0.5rem;
+  margin-bottom: -20px; /* the hero sits directly under the navbar */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: relative;
+  z-index: 1;
 }
 
+/* Matches tfg-app .hero-badge, without the pulse */
 .capture-side-badge {
-  font-size: 0.85rem;
+  display: inline-flex;
+  font-size: 0.875rem;
   font-weight: 600;
-  color: var(--text-muted);
-  background: var(--surface);
-  padding: 6px 12px;
-  border-radius: 20px;
+  color: white;
+  background: var(--tfg-grade-dark);
+  padding: 0.5rem 1rem;
+  border-radius: 50px;
+  margin-bottom: 1.5rem;
 }
 
 .capture-top-actions {
@@ -1602,8 +1678,8 @@ body.editor-mode #root {
 }
 
 .perspective-corner-tab.active {
-  background: var(--surface-2);
-  border-color: #6c757d;
+  background: var(--tfg-bravo);
+  border-color: var(--tfg-bravo);
   color: #fff;
 }
 
@@ -1842,15 +1918,15 @@ body.editor-mode #root {
 
 .backfill-message {
   padding: 12px;
-  background: #d4edda;
-  color: #155724;
+  background: rgba(var(--tfg-grade-rgb), 0.15);
+  color: var(--tfg-grade-light);
   border-radius: var(--radius);
   font-size: 0.9rem;
 }
 
 .backfill-message-error {
-  background: #f8d7da;
-  color: #721c24;
+  background: rgba(var(--tfg-error-rgb), 0.15);
+  color: var(--tfg-error-light);
 }
 
 .backfill-results {
@@ -1881,11 +1957,11 @@ body.editor-mode #root {
 }
 
 .backfill-result-item.success {
-  border-left: 3px solid #28a745;
+  border-left: 3px solid var(--tfg-grade);
 }
 
 .backfill-result-item.error {
-  border-left: 3px solid #dc3545;
+  border-left: 3px solid var(--tfg-error);
 }
 
 .result-icon {
@@ -2139,9 +2215,9 @@ body.editor-mode #root {
   gap: 4px;
   margin: 0;
   padding: 4px 8px;
-  background: rgba(74, 144, 226, 0.1);
-  border: 1px solid var(--primary);
-  border-radius: 4px;
+  background: rgba(var(--tfg-bravo-rgb), 0.1);
+  border: 1px solid rgba(var(--tfg-bravo-rgb), 0.5);
+  border-radius: var(--radius-sm);
   font-size: 0.7rem;
   color: var(--text-primary);
 }
@@ -2190,7 +2266,7 @@ body.editor-mode #root {
   background: none;
   border: none;
   padding: 0;
-  color: #e77d31;
+  color: var(--tfg-error);
   font-size: inherit;
   font-weight: 600;
   text-decoration: underline;
@@ -2234,8 +2310,8 @@ body.editor-mode #root {
   display: flex;
   gap: 4px;
   padding: 3px;
-  background: rgba(222, 226, 230, 0.08);
-  border-radius: 10px;
+  background: var(--surface);
+  border-radius: var(--radius);
   margin-bottom: 16px;
 }
 
@@ -2248,13 +2324,13 @@ body.editor-mode #root {
   font-size: 0.85rem;
   font-weight: 600;
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   cursor: pointer;
 }
 
 .library-tab.is-active {
-  background: rgba(222, 226, 230, 0.16);
-  color: var(--text);
+  background: var(--tfg-bravo);
+  color: white;
 }
 
 .library-tab-count {
@@ -2915,7 +2991,7 @@ body.editor-mode #root {
 
 .card-list-measurement-values {
   color: var(--text);
-  font-family: 'Monaco', 'Courier New', monospace;
+  font-family: var(--font-mono);
   font-size: 0.75rem;
 }
 
@@ -3013,7 +3089,7 @@ body.editor-mode #root {
 .submissions-select:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(203, 54, 135, 0.1);
+  box-shadow: var(--focus-ring);
 }
 
 .library-item-title-input {
@@ -3030,7 +3106,7 @@ body.editor-mode #root {
 .library-item-title-input:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(203, 54, 135, 0.1);
+  box-shadow: var(--focus-ring);
 }
 
 .gallery-view {
@@ -3097,9 +3173,10 @@ body.editor-mode #root {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex: 1;
+  flex: 1 1 100%;
   color: inherit;
   font-size: inherit;
+  text-align: left;
 }
 
 .gallery-submission-toggle:hover h3 {
@@ -3270,7 +3347,7 @@ body.editor-mode #root {
 
 .gallery-measurement-values {
   color: var(--text);
-  font-family: 'Monaco', 'Courier New', monospace;
+  font-family: var(--font-mono);
   font-size: 0.75rem;
 }
 
@@ -3382,7 +3459,7 @@ body.editor-mode #root {
 .form-group textarea:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+  box-shadow: var(--focus-ring);
 }
 
 .modal-footer {
@@ -3394,10 +3471,10 @@ body.editor-mode #root {
 }
 
 .error-message {
-  background-color: rgba(239, 68, 68, 0.1);
-  color: var(--danger);
+  background-color: rgba(var(--tfg-error-rgb), 0.15);
+  color: var(--tfg-error-light);
   padding: 8px 12px;
-  border-radius: 4px;
+  border-radius: var(--radius);
   font-size: 0.9rem;
   margin-bottom: 16px;
 }
@@ -3459,7 +3536,7 @@ body.editor-mode #root {
 }
 
 .layout-bar-hint {
-  color: #49a3e1;
+  color: var(--tfg-bravo);
 }
 
 .layout-profile-list {
@@ -3490,4 +3567,166 @@ body.editor-mode #root {
   font-size: 0.7rem;
   color: var(--text-muted);
   text-transform: uppercase;
+}
+
+/* tfg-app component layer: rules shared across screens, kept last so they win.
+   Cards, form controls, tables and modals follow Bootstrap 5.3 as themed by tfg-app. */
+
+/* Content cards match tfg-app .feature-card */
+.results,
+.compare-card,
+.compare-summary,
+.capture-tips,
+.library-card-item,
+.card-list-item,
+.gallery-submission {
+  background: var(--bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
+}
+
+/* Panels inside those cards step up to the surface colour */
+.result-card,
+.compare-mm-cell {
+  background: var(--surface);
+}
+
+/* Dense tool panels stay quieter, so a bright outline doesn't compete with the card image */
+.grade-banner,
+.mm-readout,
+.layout-bar,
+.toggle-row,
+.library-item,
+.gallery-card {
+  border: 1px solid var(--border-translucent);
+  border-radius: var(--radius);
+}
+
+.gallery-card:hover {
+  border-color: var(--primary);
+}
+
+/* Form controls (.form-control, .form-select) */
+.settings-select,
+.color-text,
+.name-edit-input,
+.submissions-select,
+.library-item-title-input,
+.library-card-title-input,
+.submission-rename-dialog input,
+.layout-bar-select,
+.layout-bar-input,
+.layout-profile-item input,
+.form-group input,
+.form-group textarea {
+  padding: 0.375rem 0.75rem;
+  background-color: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--font-primary);
+  font-size: 1rem;
+  line-height: 1.5;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.color-text {
+  font-family: var(--font-mono);
+}
+
+.settings-select:focus,
+.color-text:focus,
+.name-edit-input:focus,
+.library-card-title-input:focus,
+.submission-rename-dialog input:focus,
+.layout-bar-select:focus,
+.layout-bar-input:focus,
+.layout-profile-item input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: var(--focus-ring);
+}
+
+/* Compact variants where the editor has little vertical room */
+.layout-bar-select,
+.layout-bar-input,
+.layout-profile-item input {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+}
+
+/* Modals and sheets (.modal-content) */
+.modal,
+.action-sheet {
+  background: var(--bg);
+  border: 1px solid var(--border-translucent);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.modal-dialog,
+.submission-rename-dialog {
+  background: var(--bg);
+  border: 1px solid var(--border-translucent);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-dialog);
+}
+
+.modal-backdrop,
+.modal-overlay,
+.submission-rename-overlay {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.action-sheet-cancel {
+  background: transparent;
+  border: 1px solid var(--light);
+  color: var(--light);
+  font-weight: 400;
+  border-radius: var(--radius-lg);
+}
+
+/* Tables (.table) */
+.grade-table th,
+.grade-table td {
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Badges (.badge) */
+.grade-badge,
+.condition-badge,
+.submission-mode,
+.submission-mode-badge,
+.backfill-side-badge {
+  border-radius: var(--radius);
+}
+
+/* Grade figures match tfg-app .stat-number */
+.grade-banner-score,
+.compare-grade,
+.result-ratio {
+  font-family: var(--font-heading);
+  font-weight: 700;
+}
+
+/* Hover states */
+.btn-danger:hover {
+  background: var(--tfg-error-dark);
+}
+
+/* Modals sit on the page background, so inset panels step up to the surface */
+.standards-note {
+  background: var(--surface);
+}
+
+/* The full-bleed home sections must not cause sideways scrolling.
+   Scoped to the home screen so it can't hide overflow on other screens. */
+body:has(.capture-idle) {
+  overflow-x: clip;
+}
+
+/* Keeps every action reachable now outline buttons are wider */
+.gallery-submission-header {
+  flex-wrap: wrap;
 }
