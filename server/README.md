@@ -86,4 +86,4 @@ npm start
 ## Notes
 - Local folders mirror S3 for offline access
 - All `/api` routes need a session from `POST /api/auth/login`, which checks the shared `TEAM_PASSWORD`. `/health` and the frontend stay public
-- Images stored in S3, metadata in PostgreSQL
+- Images stored in a private Supabase bucket, metadata in PostgreSQL. The API returns signed image URLs that last an hour, and the URLs stored on card rows can't be opened
