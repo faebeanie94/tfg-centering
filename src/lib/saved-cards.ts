@@ -53,13 +53,14 @@ export async function listSavedCards(): Promise<SavedCardRecord[]> {
 export async function saveCardToLibrary(
   session: GradingSession,
   label?: string,
+  existingId?: string,
 ): Promise<SavedCardRecord> {
   if (!sessionHasAny(session)) {
     throw new Error('Nothing to save');
   }
 
   // Generate ID with fallback for older browsers
-  const id = crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const id = existingId ?? (crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
 
   const record: SavedCardRecord = {
     id,

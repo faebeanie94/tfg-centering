@@ -26,8 +26,8 @@ export function useSavedCards() {
   }, [refresh]);
 
   const save = useCallback(
-    async (session: GradingSession, label?: string) => {
-      const record = await saveCardToLibrary(session, label);
+    async (session: GradingSession, label?: string, existingId?: string) => {
+      const record = await saveCardToLibrary(session, label, existingId);
       setCards((prev) => [record, ...prev.filter((c) => c.id !== record.id)]);
       return record;
     },

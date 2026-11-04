@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, useEffect } from 'react';
+import { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import type { CardSide } from './lib/tfg-standards';
 import { useAppSettings } from './hooks/useAppSettings';
 import { emptySession, sessionHasAny, type GradingSession, type SideSnapshot } from './lib/session';
@@ -27,8 +27,10 @@ import {
   resolveCardFormat,
   type CardSizeSelection,
 } from './lib/card-sizes';
+import { computeCentering } from './lib/centering';
 import { exportCleanImage } from './lib/export-image';
-import { startSubmission, saveToSubmissionFolder, deleteCardFromSubmission, type SubmissionFolder } from './lib/folder-submission';
+import { getTfgGrade } from './lib/tfg-standards';
+import { startSubmission, saveToSubmissionFolder, startNewCard, type SubmissionFolder } from './lib/folder-submission';
 import { listSubmissionHandles, restoreSubmissionHandle, deleteSubmissionHandle } from './lib/submission-persistence';
 import * as api from './lib/api-client';
 
@@ -74,6 +76,8 @@ export default function App() {
   const [pendingHint, setPendingHint] = useState<CaptureDetectHint | undefined>(undefined);
   const [submissionFolder, setSubmissionFolder] = useState<SubmissionFolder | null>(null);
   const [savedSubmissions, setSavedSubmissions] = useState<Array<{ id: string; name: string; timestamp: number }>>([]);
+  /** Library record the current submission card auto-saved to, so re-saves update it. */
+  const autoSavedCardRef = useRef<{ key: string; id: string } | null>(null);
 
   // Load saved submissions on mount
   useEffect(() => {
@@ -227,7 +231,7 @@ export default function App() {
       }
 
       // Check if editing a library entry from a submission and sync back
-      const cardNameMatch = cardNames[currentSide]?.match(/^([^/]+)\/(\d+)$/);
+      const cardNameMatch = cardNames[currentSide]?.match(/^(.+)\/(\d+)$/);
       const isSubmissionCard = cardNameMatch && submissionFolder && cardNameMatch[1] === submissionFolder.name;
 
       // Auto-save clean image to submission folder if active
@@ -280,8 +284,11 @@ export default function App() {
             try {
               const cardNum = updatedFolder.lastCardNumberUsed ?? updatedFolder.nextCardNumber;
               const libraryLabel = `${submissionFolder.name}/${cardNum}`;
+              const key = `${submissionFolder.type === 'api' ? submissionFolder.submissionId : submissionFolder.name}/${cardNum}`;
+              const existingId = autoSavedCardRef.current?.key === key ? autoSavedCardRef.current.id : undefined;
               console.log('Auto-saving to library:', libraryLabel);
-              await saveToLibrary(updatedSession, libraryLabel);
+              const record = await saveToLibrary(updatedSession, libraryLabel, existingId);
+              autoSavedCardRef.current = { key, id: record.id };
               console.log('Auto-save to library succeeded:', libraryLabel);
             } catch (err) {
               console.error('Failed to auto-save to library:', err);
@@ -336,6 +343,10 @@ export default function App() {
 
   const handleDeleteSide = useCallback((side: CardSide) => {
     setSession((prev) => ({ ...prev, [side]: null }));
+    // Nothing left of this card here, so a new photo must not reuse its number.
+    if (session[side === 'front' ? 'back' : 'front'] === null) {
+      setSubmissionFolder((prev) => prev && startNewCard(prev));
+    }
     setCardNames((prev) => ({ ...prev, [side]: '' }));
     setCurrentSide(side);
     setRawImage(null);
@@ -344,34 +355,7 @@ export default function App() {
     setSessionCardSize(null);
     setAutoCropInfo(null);
     setPhase('capture');
-  }, []);
-
-  const handleRetake = useCallback(
-    async (side: CardSide) => {
-      // Delete the current card from submission before retaking
-      if (submissionFolder) {
-        // Determine which card to delete: use lastCardNumberUsed if available
-        const cardToDelete = submissionFolder.currentEdit?.cardNumber || submissionFolder.lastCardNumberUsed;
-
-        if (cardToDelete) {
-          try {
-            await deleteCardFromSubmission(submissionFolder, cardToDelete);
-            console.log(`Deleted card ${cardToDelete} before retake`);
-            // Reset submission state after deletion so next save treats it as a new card
-            setSubmissionFolder({ ...submissionFolder, lastCardNumberUsed: null, lastSideSaved: null });
-          } catch (err) {
-            console.error('Failed to delete card:', err);
-            setLibraryMessage('Failed to delete card');
-            window.setTimeout(() => setLibraryMessage(null), 3000);
-            return; // Don't proceed with retake if delete fails
-          }
-        }
-      }
-      // Then go back to capture
-      handleCaptureSide(side);
-    },
-    [submissionFolder, handleCaptureSide],
-  );
+  }, [session]);
 
   const handlePerspectiveFix = useCallback(() => {
     if (!workingImage) return;
@@ -389,6 +373,7 @@ export default function App() {
 
   const handleReset = useCallback(() => {
     setSession(emptySession());
+    setSubmissionFolder((prev) => prev && startNewCard(prev));
     setRawImage(null);
     setWorkingImage(null);
     setEditorRects({});
@@ -482,11 +467,8 @@ export default function App() {
   }, []);
 
   const handleRetakeSubmission = useCallback(() => {
-    if (submissionFolder) {
-      setSubmissionFolder({ ...submissionFolder, lastSideSaved: null });
-    }
     handleCaptureSide(currentSide);
-  }, [submissionFolder, currentSide, handleCaptureSide]);
+  }, [currentSide, handleCaptureSide]);
 
   const handleNextCard = useCallback(() => {
     // Reset session and go back to capture for next card
@@ -494,11 +476,8 @@ export default function App() {
     setCardNames({ front: '', back: '' });
     setCurrentSide('front');
     setPhase('capture');
-    // Reset submission folder state for fresh card
-    if (submissionFolder) {
-      setSubmissionFolder({ ...submissionFolder, lastSideSaved: null, lastCardNumberUsed: null });
-    }
-  }, [submissionFolder]);
+    setSubmissionFolder((prev) => prev && startNewCard(prev));
+  }, []);
 
   const handleCaptureSideChange = useCallback((side: CardSide) => {
     setCurrentSide(side);
@@ -519,6 +498,14 @@ export default function App() {
             }
 
             try {
+              if (
+                submissionFolder?.type === 'zip' &&
+                submissionFolder.images.size > 0 &&
+                !window.confirm(`Editing this card ends "${submissionFolder.name}". Any images you haven't downloaded will be lost.`)
+              ) {
+                return;
+              }
+
               const url = `/api/submissions/${submissionId}/cards/${card.card_number}/image/${side}`;
               console.log('Fetching image from:', url);
               const res = await fetch(url);
@@ -532,12 +519,20 @@ export default function App() {
                 return;
               }
 
+              const sameSubmission = submissionFolder?.type === 'api' && submissionFolder.submissionId === submissionId;
+              const submissionName = sameSubmission
+                ? submissionFolder.name
+                : (await api.getSubmission(submissionId)).name;
+
               console.log('Setting workingImage, size:', data.data.length);
               setRawImage(data.data);
               setWorkingImage(data.data);
               setCurrentSide(side as CardSide);
+              setAutoCropInfo(null);
 
-              // For re-edits, prefill the other side if it exists
+              // For re-edits, prefill the other side if it exists. Its rects and
+              // grade are a fresh detection: the backend doesn't store the rects.
+              const nextSession = emptySession();
               const otherSide = side === 'front' ? 'back' : 'front';
               const otherImageUrl = otherSide === 'front' ? card.front_image_url : card.back_image_url;
               if (otherImageUrl) {
@@ -547,15 +542,17 @@ export default function App() {
                   if (otherRes.ok) {
                     const otherData = await otherRes.json();
                     if (otherData.data) {
-                      const otherSnapshot: SideSnapshot = {
+                      const { outer, inner } = await seedEditorRectsFromImage(otherData.data, autoCropOptions);
+                      const result = computeCentering(outer, inner, activeCardFormat.widthMm, activeCardFormat.heightMm);
+                      nextSession[otherSide] = {
                         imageSrc: otherData.data,
-                        outer: { x: 0, y: 0, width: 0, height: 0 },
-                        inner: { x: 0, y: 0, width: 0, height: 0 },
-                        result: { bordersPx: { left: 0, right: 0, top: 0, bottom: 0 }, bordersMm: { left: 0, right: 0, top: 0, bottom: 0 }, leftRight: { left: 0, right: 0 }, topBottom: { top: 0, bottom: 0 }, pxPerMm: 0 },
-                        grade: { grade: 0, label: '', ratioLabel: '', lrQualify: 0, tbQualify: 0, worstQualify: 0, worstAxis: 'left-right', ocEligible: false },
+                        outer,
+                        inner,
+                        result,
+                        grade: getTfgGrade(result.bordersPx, otherSide),
                         savedAt: Date.now(),
+                        cardFormatId: activeCardFormat.id,
                       };
-                      setSession(prev => ({ ...prev, [otherSide]: otherSnapshot }));
                     }
                   }
                 } catch (err) {
@@ -563,16 +560,18 @@ export default function App() {
                 }
               }
 
-              setCardNames({ front: `temp/${card.card_number}`, back: `temp/${card.card_number}` });
+              const cardName = `${submissionName}/${card.card_number}`;
+              setSession(nextSession);
+              setCardNames({ front: cardName, back: cardName });
               setEditorRects({});
               setSubmissionFolder({
                 type: 'api',
                 submissionId,
-                name: 'temp',
-                nextCardNumber: card.card_number + 1,
+                name: submissionName,
+                nextCardNumber: sameSubmission ? submissionFolder.nextCardNumber : card.card_number + 1,
                 currentEdit: { cardNumber: card.card_number, side: side as 'front' | 'back' },
                 lastSideSaved: null,
-                lastCardNumberUsed: null,
+                lastCardNumberUsed: card.card_number,
               });
               console.log('About to change phase to crop');
               setPhase('crop');
@@ -703,7 +702,6 @@ export default function App() {
           onSave={handleSaveSide}
           onSideChange={handleSideChange}
           onCaptureSide={handleCaptureSide}
-          onRetake={handleRetake}
           onCrop={handleCrop}
           onPerspectiveFix={handlePerspectiveFix}
           onDelete={() => handleDeleteSide(currentSide)}
