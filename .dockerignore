@@ -10,6 +10,5 @@ dist
 server/node_modules
 server/dist
 .idea
-.cursor
 .claude
 coverage

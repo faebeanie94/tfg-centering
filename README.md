@@ -54,14 +54,13 @@ npm run preview
 Day-to-day work uses **GitHub only**:
 
 - Repo: https://github.com/faebeanie94/tfg-centering
-- Remote name in this clone: `github` (`git push -u github HEAD`)
-- Ignore the GitLab `origin` remote unless you explicitly need it
+- Remote name in this clone: `origin` (`git push -u origin HEAD`)
 
 ```bash
-git fetch github
-git checkout -b cursor/my-change
+git fetch origin
+git checkout -b feature/my-change
 # …work…
-git push -u github HEAD
+git push -u origin HEAD
 gh pr create --repo faebeanie94/tfg-centering
 ```
 
