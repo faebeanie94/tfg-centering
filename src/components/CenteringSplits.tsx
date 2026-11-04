@@ -17,7 +17,11 @@ function formatSplit(a: number | null, b: number | null): string {
   return `${pct.toFixed(1)}/${(100 - pct).toFixed(1)}`;
 }
 
-/** T/B and L/R percentage splits, with the axis that sets the grade in bold. */
+/**
+ * Raw T/B and L/R percentage splits, with the raw worst axis in bold. The
+ * backend keeps only border widths, so a borderless card's adjusted grade can
+ * differ from these.
+ */
 export function CenteringSplits({ top, bottom, left, right }: { top: MmValue; bottom: MmValue; left: MmValue; right: MmValue }) {
   const t = toNumber(top);
   const b = toNumber(bottom);
@@ -32,8 +36,8 @@ export function CenteringSplits({ top, bottom, left, right }: { top: MmValue; bo
   const lr = formatSplit(l, r);
 
   return (
-    <span className="card-list-measurement-values">
-      {worstAxis === 'top-bottom' ? <strong>T/B: {tb}</strong> : <>T/B: {tb}</>}
+    <span className="card-list-measurement-values" title="Measured split. A borderless card's grade is adjusted for its layout, so it can differ.">
+      Raw {worstAxis === 'top-bottom' ? <strong>T/B: {tb}</strong> : <>T/B: {tb}</>}
       {' | '}
       {worstAxis === 'left-right' ? <strong>L/R: {lr}</strong> : <>L/R: {lr}</>}
     </span>

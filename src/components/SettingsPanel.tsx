@@ -83,7 +83,6 @@ function LayoutProfilesSection({
   function remove(id: string) {
     onChange({
       customLayoutProfiles: custom.filter((p) => p.id !== id),
-      layoutProfileId: settings.layoutProfileId === id ? BORDERED_PROFILE_ID : settings.layoutProfileId,
     });
   }
 
