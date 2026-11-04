@@ -49,7 +49,6 @@ interface BorderEditorProps {
   onSave: (snapshot: SideSnapshot) => void;
   onSideChange: (side: CardSide) => void;
   onCaptureSide: (side: CardSide) => void;
-  onRetake?: (side: CardSide) => Promise<void>;
   onCrop: () => void;
   onPerspectiveFix: () => void;
   onDelete: () => void;
@@ -98,7 +97,6 @@ export function BorderEditor({
   onSave,
   onSideChange,
   onCaptureSide,
-  onRetake,
   onCrop,
   onPerspectiveFix,
   onDelete,
@@ -133,6 +131,7 @@ export function BorderEditor({
   const [newLayoutName, setNewLayoutName] = useState<string | null>(null);
   const dragStartRef = useRef<{ x: number; y: number; rect: Rect } | null>(null);
   const captureRef = useRef<{ el: HTMLElement; id: number } | null>(null);
+  const savingRef = useRef(false);
   const patternId = useMemo(() => `stripe-${side}-${Math.random().toString(36).slice(2)}`, [side, imageSrc]);
 
   useEffect(() => {
@@ -236,8 +235,13 @@ export function BorderEditor({
 
   async function handleSave() {
     const snap = buildSnapshot();
-    if (!snap) return;
-    await onSave(snap);
+    if (!snap || savingRef.current) return;
+    savingRef.current = true;
+    try {
+      await onSave(snap);
+    } finally {
+      savingRef.current = false;
+    }
     setSavedFlash(true);
     setTimeout(() => setSavedFlash(false), 1500);
   }
@@ -764,7 +768,7 @@ export function BorderEditor({
         </button>
         {!otherSaved ? (
           <>
-            <button type="button" className="btn btn-secondary" onClick={async () => { onRetake ? await onRetake(side) : onCaptureSide(side); }}>
+            <button type="button" className="btn btn-secondary" onClick={() => onCaptureSide(side)}>
               Retake
             </button>
             <button type="button" className="btn btn-secondary" onClick={async () => { await handleSave(); onCaptureSide(otherSide); }}>

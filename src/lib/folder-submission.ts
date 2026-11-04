@@ -96,26 +96,12 @@ export async function saveToSubmissionFolder(
   dataUrl: string,
   side: 'front' | 'back',
 ): Promise<SubmissionFolder> {
-  console.log(`saveToSubmissionFolder: side=${side}, lastSideSaved=${submission.lastSideSaved}, currentEdit=${submission.currentEdit?.cardNumber}, lastCardNumberUsed=${submission.lastCardNumberUsed}`);
-  let cardNumber: number;
-
-  if (submission.currentEdit && submission.currentEdit.side === side) {
-    // Re-editing the same side of the same card
-    console.log('Re-editing same side');
-    cardNumber = submission.currentEdit.cardNumber;
-  } else if (submission.lastSideSaved === null) {
-    // First side of a new pair - find lowest available number (handles deleted cards)
-    console.log('New pair - finding lowest available number');
-    cardNumber = await findLowestAvailableCardNumber(submission);
-  } else if (submission.lastSideSaved !== side) {
-    // Opposite side of current pair - use same card number as first side
-    console.log('Opposite side of pair');
-    cardNumber = submission.lastCardNumberUsed || submission.nextCardNumber;
-  } else {
-    // Same side again - this shouldn't happen in normal flow, but handle it
-    console.log('Same side again - incrementing');
-    cardNumber = submission.nextCardNumber + 1;
-  }
+  // lastCardNumberUsed is the card in progress, so re-saves and the other side
+  // stay on it. It is only cleared by startNewCard().
+  const cardNumber =
+    submission.currentEdit?.cardNumber ??
+    submission.lastCardNumberUsed ??
+    (await findLowestAvailableCardNumber(submission));
   console.log(`Using card number: ${cardNumber}`);
 
   let blob: Blob;
@@ -135,25 +121,26 @@ export async function saveToSubmissionFolder(
     submission.images.set(`${cardNumber}-${side}.jpg`, blob);
   }
 
-  // Create updated submission with new state
-  let nextCardNumber = submission.nextCardNumber;
-  let lastCardNumberUsed: number | null = cardNumber;
-  let lastSideSaved: 'front' | 'back' | null = side;
-
-  // Only increment when we save back after front (completes the pair)
-  if (side === 'back' && submission.lastSideSaved === 'front') {
-    nextCardNumber = Math.max(submission.nextCardNumber, cardNumber + 1);
-    // Keep lastCardNumberUsed so retake can delete the current card
-    // Only reset lastSideSaved to indicate we're not in the middle of a pair
-    lastSideSaved = null;
-  }
+  // Saving the opposite side completes the pair, so the banner can move on.
+  const pairComplete = submission.lastSideSaved != null && submission.lastSideSaved !== side;
 
   return {
     ...submission,
-    nextCardNumber,
-    lastCardNumberUsed,
-    lastSideSaved,
+    nextCardNumber: pairComplete ? Math.max(submission.nextCardNumber, cardNumber + 1) : submission.nextCardNumber,
+    lastCardNumberUsed: cardNumber,
+    lastSideSaved: side,
     currentEdit: null,
+  };
+}
+
+/** Finish the card in progress, so the next save takes a new card number. */
+export function startNewCard<T extends SubmissionFolder>(submission: T): T {
+  return {
+    ...submission,
+    nextCardNumber: Math.max(submission.nextCardNumber, (submission.lastCardNumberUsed ?? 0) + 1),
+    currentEdit: null,
+    lastSideSaved: null,
+    lastCardNumberUsed: null,
   };
 }
 
@@ -185,13 +172,10 @@ export async function downloadSubmissionZip(submission: ZipSubmission): Promise<
  */
 export async function listSubmissionCards(submission: SubmissionFolder): Promise<number[]> {
   if (submission.type === 'api') {
-    try {
-      const cards = await api.listCards(submission.submissionId);
-      return cards.map((c) => c.card_number).sort((a, b) => a - b);
-    } catch (err) {
-      console.error('Failed to list submission cards:', err);
-      return [];
-    }
+    // Let failures through: treating them as "no cards" would reuse card 1 and
+    // overwrite it.
+    const cards = await api.listCards(submission.submissionId);
+    return cards.map((c) => c.card_number).sort((a, b) => a - b);
   }
 
   // For ZIP submissions, extract card numbers from actual files
@@ -203,29 +187,6 @@ export async function listSubmissionCards(submission: SubmissionFolder): Promise
     }
   }
   return Array.from(cardNumbers).sort((a, b) => a - b);
-}
-
-/**
- * Delete a card from the submission.
- */
-export async function deleteCardFromSubmission(
-  submission: SubmissionFolder,
-  cardNumber: number,
-): Promise<void> {
-  if (submission.type === 'api') {
-    try {
-      await api.deleteCard(submission.submissionId, cardNumber);
-      console.log(`Deleted card ${cardNumber} from API submission`);
-    } catch (err) {
-      console.error('Failed to delete card from API:', err);
-      throw err;
-    }
-  } else {
-    // For ZIP submissions, delete both front and back images if they exist
-    submission.images.delete(`${cardNumber}-front.jpg`);
-    submission.images.delete(`${cardNumber}-back.jpg`);
-    console.log(`Deleted card ${cardNumber} from ZIP submission`);
-  }
 }
 
 /**
