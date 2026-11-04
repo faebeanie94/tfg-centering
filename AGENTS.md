@@ -6,7 +6,7 @@ This repo is a single, frontend-only PWA: **Card Centering Grader — Tree Frog 
 
 ### Git remotes
 
-Use **GitHub only** (`github` → `https://github.com/faebeanie94/tfg-centering.git`). Do not push to or open PRs against the GitLab `origin` remote unless the user asks. See `.cursor/rules/github-workflow.mdc`.
+Use **GitHub only** (`https://github.com/faebeanie94/tfg-centering`). Remote names differ between checkouts, so run `git remote -v` and use the one that points at that URL: in local checkouts it is `origin`, with no separate `github` remote. Do not push to or open PRs against a GitLab remote unless the user asks. See `.cursor/rules/github-workflow.mdc`.
 
 ### Services / commands
 
