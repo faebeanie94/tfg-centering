@@ -161,6 +161,21 @@ function LayoutProfilesSection({
       <button type="button" className="btn btn-secondary btn-block" onClick={add}>
         Add layout
       </button>
+      <label className="settings-field" style={{ marginTop: 16 }}>
+        <span className="settings-field-label">Card lookup service URL</span>
+        <input
+          className="settings-select"
+          type="url"
+          inputMode="url"
+          placeholder="https://lookup.tfg.cards"
+          defaultValue={settings.cardLookupUrl}
+          onBlur={(e) => onChange({ cardLookupUrl: e.target.value.trim().replace(/\/+$/, '') })}
+        />
+      </label>
+      <p className="settings-hint" style={{ marginTop: 0 }}>
+        With a URL set, the Border Editor can look a card up by game, set and number and pick its
+        layout automatically. Leave empty to hide the lookup.
+      </p>
       <p className="settings-hint">
         Quickest way to add one: load a Scryfall image or a perfectly cut copy, place the yellow box on
         the reference points, and tap “Set target” in the Border Editor.
@@ -316,7 +331,13 @@ export function SettingsPanel({ open, settings, onChange, onClose }: SettingsPan
         </section>
 
         <div className="settings-actions">
-          <button type="button" className="btn btn-secondary" onClick={() => onChange({ ...DEFAULT_SETTINGS, customLayoutProfiles: settings.customLayoutProfiles })}>
+          <button type="button" className="btn btn-secondary" onClick={() =>
+              onChange({
+                ...DEFAULT_SETTINGS,
+                customLayoutProfiles: settings.customLayoutProfiles,
+                cardLookupUrl: settings.cardLookupUrl,
+              })
+            }>
             Reset to defaults
           </button>
           <button type="button" className="btn btn-primary" onClick={onClose}>

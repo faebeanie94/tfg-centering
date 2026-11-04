@@ -21,6 +21,13 @@ import { formatCardSizeMm } from '../lib/card-sizes';
 import type { AutoCropSkipReason, InnerSideConfidence } from '../lib/auto-crop';
 import type { SubmissionFolder } from '../lib/folder-submission';
 import {
+  LOOKUP_GAMES,
+  LookupError,
+  profileForLookup,
+  resolveCentering,
+  type LookupResult,
+} from '../lib/card-lookup';
+import {
   BORDERED_PROFILE,
   allLayoutProfiles,
   bordersForGrading,
@@ -131,6 +138,12 @@ export function BorderEditor({
   const [savedFlash, setSavedFlash] = useState(false);
   const [savingToLibrary, setSavingToLibrary] = useState(false);
   const [newLayoutName, setNewLayoutName] = useState<string | null>(null);
+  const [lookupSet, setLookupSet] = useState('');
+  const [lookupNumber, setLookupNumber] = useState('');
+  const [lookupBusy, setLookupBusy] = useState(false);
+  const [lookupOutcome, setLookupOutcome] = useState<
+    { kind: 'ok' | 'warn' | 'error'; text: string; imageUrl?: string | null } | null
+  >(null);
   const dragStartRef = useRef<{ x: number; y: number; rect: Rect } | null>(null);
   const captureRef = useRef<{ el: HTMLElement; id: number } | null>(null);
   const patternId = useMemo(() => `stripe-${side}-${Math.random().toString(36).slice(2)}`, [side, imageSrc]);
@@ -207,6 +220,61 @@ export function BorderEditor({
         : undefined,
     };
   }, [imageSrc, outer, inner, result, tfgGrade, cardName, cardFormat.id, corrected, layoutProfile]);
+
+  /** Ask tfg-card-lookup which layout this card uses, and select it. */
+  async function runLookup() {
+    if (!settings.cardLookupUrl || !lookupNumber.trim() || lookupBusy) return;
+    setLookupBusy(true);
+    setLookupOutcome(null);
+    try {
+      const answer: LookupResult = await resolveCentering(settings.cardLookupUrl, {
+        game: settings.lookupGame,
+        set: lookupSet,
+        number: lookupNumber,
+      });
+      if (answer.status !== 'resolved') {
+        const names = answer.candidates.slice(0, 4).map((c) => `${c.name} (${c.set.toUpperCase()} ${c.number})`);
+        setLookupOutcome({
+          kind: 'warn',
+          text:
+            answer.status === 'candidates'
+              ? `Several cards match: ${names.join(', ')}. Add the set and number.`
+              : 'No card found. Check the game, set and number.',
+        });
+        return;
+      }
+
+      const cardLabel = `${answer.card.name} (${answer.card.set.toUpperCase()} ${answer.card.number})`;
+      if (answer.needsLayout) {
+        onSettingsChange({ layoutProfileId: BORDERED_PROFILE.id });
+        setLookupOutcome({
+          kind: 'warn',
+          text: `${cardLabel} is borderless and has no layout yet. Load the official image, place the yellow box on its reference points and tap Set target.`,
+          imageUrl: answer.measuring.imageUrl,
+        });
+        return;
+      }
+
+      const { profileId, addProfile } = profileForLookup(answer.layout, settings.customLayoutProfiles);
+      onSettingsChange({
+        layoutProfileId: profileId,
+        ...(addProfile ? { customLayoutProfiles: [...settings.customLayoutProfiles, addProfile] } : {}),
+      });
+      setLookupOutcome({
+        kind: 'ok',
+        text: answer.matched
+          ? `${cardLabel} → ${answer.layout.label}${addProfile ? ' (added to your layouts)' : ''}.`
+          : `${cardLabel} → bordered (50/50).`,
+      });
+    } catch (error) {
+      setLookupOutcome({
+        kind: 'error',
+        text: error instanceof LookupError ? error.message : 'Card lookup failed.',
+      });
+    } finally {
+      setLookupBusy(false);
+    }
+  }
 
   /** Save the current raw yellow-box split as a new borderless target (e.g. from a Scryfall image). */
   function saveCurrentAsLayout() {
@@ -627,6 +695,60 @@ export function BorderEditor({
               </button>
             )}
           </div>
+          {settings.cardLookupUrl && newLayoutName === null && (
+            <form
+              className="layout-bar-row"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void runLookup();
+              }}
+            >
+              <select
+                className="layout-bar-select layout-lookup-game"
+                aria-label="Game"
+                value={settings.lookupGame}
+                onChange={(e) => onSettingsChange({ lookupGame: e.target.value })}
+              >
+                {LOOKUP_GAMES.map((g) => (
+                  <option key={g.code} value={g.code}>
+                    {g.label}
+                  </option>
+                ))}
+              </select>
+              <input
+                className="layout-bar-input layout-lookup-set"
+                type="text"
+                placeholder="Set"
+                aria-label="Set"
+                value={lookupSet}
+                onChange={(e) => setLookupSet(e.target.value)}
+              />
+              <input
+                className="layout-bar-input layout-lookup-number"
+                type="text"
+                placeholder={LOOKUP_GAMES.find((g) => g.code === settings.lookupGame)?.numberHint ?? 'Number'}
+                aria-label="Card number"
+                value={lookupNumber}
+                onChange={(e) => setLookupNumber(e.target.value)}
+              />
+              <button type="submit" className="btn btn-secondary btn-small" disabled={lookupBusy || !lookupNumber.trim()}>
+                {lookupBusy ? '…' : 'Look up'}
+              </button>
+            </form>
+          )}
+          {lookupOutcome && (
+            <p className={`layout-bar-note layout-lookup-${lookupOutcome.kind}`}>
+              {lookupOutcome.text}
+              {lookupOutcome.imageUrl && (
+                <>
+                  {' '}
+                  <a href={lookupOutcome.imageUrl} target="_blank" rel="noopener noreferrer">
+                    Official image
+                  </a>
+                </>
+              )}
+            </p>
+          )}
           {newLayoutName !== null && (
             <div className="layout-bar-row">
               <input
