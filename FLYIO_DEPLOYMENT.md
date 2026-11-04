@@ -71,6 +71,7 @@ flyctl info -a tfg-centering
 
 **Secret (via flyctl secrets):**
 - `SUPABASE_SERVICE_KEY` - For server-side operations
+- `TEAM_PASSWORD` - Shared team password for signing in. Without it every `/api` request is rejected. Changing it signs everyone out
 
 ## Update Existing Deployment
 

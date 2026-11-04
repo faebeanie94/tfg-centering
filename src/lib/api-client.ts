@@ -9,13 +9,67 @@ export class ApiError extends Error {
   }
 }
 
+// A 401 opens the login prompt and waits for it, so the request that hit it can
+// carry on once the user has signed in. Concurrent 401s share one prompt.
+let loginResult: Promise<boolean> | null = null;
+let finishLogin: ((signedIn: boolean) => void) | null = null;
+const loginListeners = new Set<() => void>();
+
+function setLoginPrompt(result: Promise<boolean> | null) {
+  loginResult = result;
+  loginListeners.forEach((listener) => listener());
+}
+
+function requestLogin(): Promise<boolean> {
+  if (!loginResult) {
+    setLoginPrompt(new Promise((resolve) => { finishLogin = resolve; }));
+  }
+  return loginResult!;
+}
+
+export function subscribeToLoginPrompt(listener: () => void): () => void {
+  loginListeners.add(listener);
+  return () => loginListeners.delete(listener);
+}
+
+export function isLoginPromptOpen(): boolean {
+  return loginResult !== null;
+}
+
+export function closeLoginPrompt(signedIn: boolean): void {
+  finishLogin?.(signedIn);
+  finishLogin = null;
+  setLoginPrompt(null);
+}
+
+export async function login(password: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password }),
+  });
+  if (res.ok) return;
+
+  const errorData = await res.json().catch(() => null);
+  throw new ApiError(errorData?.error || `Sign-in failed with status ${res.status}`, res.status, errorData);
+}
+
+/** `fetch` for /api URLs: asks the user to sign in if the session is missing or expired. */
+export async function apiFetch(url: string, options?: RequestInit): Promise<Response> {
+  const res = await fetch(url, options);
+  if (res.status !== 401 || !url.startsWith(API_BASE)) return res;
+
+  const signedIn = await requestLogin();
+  return signedIn ? fetch(url, options) : res;
+}
+
 async function fetchWithRetry(
   url: string,
   options?: RequestInit,
   retries = 0
 ): Promise<Response> {
   try {
-    const res = await fetch(url, options);
+    const res = await apiFetch(url, options);
 
     if (res.ok) return res;
 
@@ -198,9 +252,10 @@ export async function exportSubmissionZip(submissionId: string): Promise<void> {
 
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
+  const fileName = res.headers.get('content-disposition')?.split('filename="')[1]?.split('"')[0];
   const link = document.createElement('a');
   link.href = url;
-  link.download = `submission-${submissionId}.zip`;
+  link.download = fileName || `submission-${submissionId}.zip`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);

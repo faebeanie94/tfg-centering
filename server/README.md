@@ -85,5 +85,5 @@ npm start
 
 ## Notes
 - Local folders mirror S3 for offline access
-- Single-user (no authentication)
+- All `/api` routes need a session from `POST /api/auth/login`, which checks the shared `TEAM_PASSWORD`. `/health` and the frontend stay public
 - Images stored in S3, metadata in PostgreSQL

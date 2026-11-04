@@ -8,8 +8,8 @@ jest.mock('../../server', () => ({
   pool: mockPool,
 }));
 
-jest.mock('../../services/s3', () => ({
-  deleteSubmissionImages: jest.fn().mockResolvedValue(undefined),
+jest.mock('../../services/supabase', () => ({
+  deleteSubmissionImages: jest.fn().mockResolvedValue(true),
 }));
 
 jest.mock('../../services/localStorage', () => ({
@@ -19,6 +19,8 @@ jest.mock('../../services/localStorage', () => ({
 
 // NOW import after mocks are defined
 const submissionsRouter = require('../../api/submissions');
+const { deleteSubmissionImages } = require('../../services/supabase');
+const { deleteSubmissionFolder } = require('../../services/localStorage');
 const { uuidv4 } = require('../setup');
 
 // Create test app
@@ -202,14 +204,29 @@ describe('Submissions API', () => {
   });
 
   describe('DELETE /:id', () => {
-    it('should delete submission', async () => {
-      mockPool.query.mockResolvedValueOnce({ rows: [testSubmission] });
+    it('should delete submission and its stored images', async () => {
+      mockPool.query
+        .mockResolvedValueOnce({ rows: [{ id: testId }] })
+        .mockResolvedValueOnce({ rows: [testSubmission] });
 
       const res = await request(app).delete(`/${testId}`);
 
       expect(res.status).toBe(200);
       expect(res.body.message).toBe('Submission deleted');
       expect(res.body.id).toBe(testId);
+      expect(deleteSubmissionImages).toHaveBeenCalledWith(testId);
+      expect(deleteSubmissionFolder).toHaveBeenCalledWith(testId);
+    });
+
+    it('should keep the submission when its images cannot be deleted', async () => {
+      mockPool.query.mockResolvedValueOnce({ rows: [{ id: testId }] });
+      deleteSubmissionImages.mockResolvedValueOnce(false);
+
+      const res = await request(app).delete(`/${testId}`);
+
+      expect(res.status).toBe(502);
+      expect(mockPool.query).toHaveBeenCalledTimes(1);
+      expect(deleteSubmissionFolder).not.toHaveBeenCalled();
     });
 
     it('should return 404 for non-existent submission', async () => {
@@ -219,6 +236,7 @@ describe('Submissions API', () => {
 
       expect(res.status).toBe(404);
       expect(res.body.error).toBe('Submission not found');
+      expect(deleteSubmissionImages).not.toHaveBeenCalled();
     });
   });
 });

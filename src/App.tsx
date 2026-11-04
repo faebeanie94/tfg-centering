@@ -521,7 +521,7 @@ export default function App() {
             try {
               const url = `/api/submissions/${submissionId}/cards/${card.card_number}/image/${side}`;
               console.log('Fetching image from:', url);
-              const res = await fetch(url);
+              const res = await api.apiFetch(url);
               console.log('Response status:', res.status);
               if (!res.ok) throw new Error(`Request failed with status ${res.status}`);
 
@@ -543,7 +543,7 @@ export default function App() {
               if (otherImageUrl) {
                 try {
                   const otherUrl = `/api/submissions/${submissionId}/cards/${card.card_number}/image/${otherSide}`;
-                  const otherRes = await fetch(otherUrl);
+                  const otherRes = await api.apiFetch(otherUrl);
                   if (otherRes.ok) {
                     const otherData = await otherRes.json();
                     if (otherData.data) {

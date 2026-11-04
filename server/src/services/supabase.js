@@ -77,6 +77,41 @@ async function deleteImage(imageUrl) {
   }
 }
 
+// Storage has no recursive list. Folders come back with a null id.
+async function listFiles(prefix) {
+  const pageSize = 1000;
+  const files = [];
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase.storage
+      .from(BUCKET_NAME)
+      .list(prefix, { limit: pageSize, offset });
+    if (error) throw error;
+
+    for (const entry of data) {
+      const path = `${prefix}/${entry.name}`;
+      if (entry.id) files.push(path);
+      else files.push(...(await listFiles(path)));
+    }
+    if (data.length < pageSize) return files;
+  }
+}
+
+// Returns false if anything may be left behind. Safe to call again after that.
+async function deleteSubmissionImages(submissionId) {
+  if (!supabase) return true;
+  try {
+    const files = await listFiles(submissionId);
+    for (let i = 0; i < files.length; i += 1000) {
+      const { error } = await supabase.storage.from(BUCKET_NAME).remove(files.slice(i, i + 1000));
+      if (error) throw error;
+    }
+    return true;
+  } catch (err) {
+    console.error(`Failed to delete images for submission ${submissionId}:`, err);
+    return false;
+  }
+}
+
 async function getPresignedUrl(submissionId, cardNumber, side) {
   if (!supabase) return null;
   try {
@@ -96,6 +131,7 @@ async function getPresignedUrl(submissionId, cardNumber, side) {
 module.exports = {
   uploadImage,
   deleteImage,
+  deleteSubmissionImages,
   getPresignedUrl,
   ensureBucket,
 };

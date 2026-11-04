@@ -1,6 +1,7 @@
 const express = require('express');
 const { pool } = require('../server');
 const { saveSubmissionMetadata, deleteSubmissionFolder } = require('../services/localStorage');
+const { deleteSubmissionImages } = require('../services/supabase');
 const { validateSubmissionName, validateUUID } = require('../middleware/validation');
 const { asyncHandler } = require('../middleware/errorHandler');
 
@@ -75,6 +76,19 @@ router.put('/:id/completed', validateUUID('id'), asyncHandler(async (req, res) =
 
 router.delete('/:id', validateUUID('id'), asyncHandler(async (req, res) => {
   const { id } = req.params;
+
+  const existing = await pool.query('SELECT id FROM submissions WHERE id = $1', [id]);
+
+  if (existing.rows.length === 0) {
+    return res.status(404).json({ error: 'Submission not found' });
+  }
+
+  // Images go first: once the row is gone nothing tracks them, and they'd stay
+  // reachable in the public bucket. A failed delete can simply be retried.
+  const imagesDeleted = await deleteSubmissionImages(id);
+  if (!imagesDeleted) {
+    return res.status(502).json({ error: 'Could not delete the submission images. Please try again.' });
+  }
 
   const result = await pool.query('DELETE FROM submissions WHERE id = $1 RETURNING *', [id]);
 
