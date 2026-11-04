@@ -3491,3 +3491,32 @@ body.editor-mode #root {
   color: var(--text-muted);
   text-transform: uppercase;
 }
+
+/* Card lookup row in the layout bar */
+.layout-lookup-game {
+  flex: 0 1 7.5rem;
+}
+
+.layout-lookup-set {
+  flex: 0 1 5rem;
+}
+
+.layout-lookup-number {
+  flex: 1 1 6rem;
+}
+
+.layout-lookup-ok {
+  color: #78c285;
+}
+
+.layout-lookup-warn {
+  color: #e77d31;
+}
+
+.layout-lookup-error {
+  color: #e05252;
+}
+
+.layout-bar-note a {
+  color: #49a3e1;
+}

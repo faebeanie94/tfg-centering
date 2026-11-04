@@ -40,6 +40,10 @@ export interface AppSettings {
   layoutProfileId: string;
   /** User-created borderless layout targets. */
   customLayoutProfiles: LayoutProfile[];
+  /** tfg-card-lookup base URL; empty hides the card lookup row. */
+  cardLookupUrl: string;
+  /** Last game picked in the card lookup row. */
+  lookupGame: string;
 }
 
 const STORAGE_KEY = 'tfg-centering-settings';
@@ -68,6 +72,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   customHeightMm: DEFAULT_CUSTOM_HEIGHT_MM,
   layoutProfileId: BORDERED_PROFILE_ID,
   customLayoutProfiles: [],
+  cardLookupUrl: (import.meta.env.VITE_CARD_LOOKUP_URL as string | undefined) ?? '',
+  lookupGame: 'pokemon',
 };
 
 function loadSettings(): AppSettings {
@@ -99,6 +105,8 @@ function loadSettings(): AppSettings {
     parsed.customLayoutProfiles = sanitizeCustomProfiles(parsed.customLayoutProfiles);
     if (typeof parsed.layoutProfileId !== 'string') parsed.layoutProfileId = BORDERED_PROFILE_ID;
     parsed.layoutProfileId = findLayoutProfile(parsed.layoutProfileId, parsed.customLayoutProfiles).id;
+    if (typeof parsed.cardLookupUrl !== 'string') parsed.cardLookupUrl = DEFAULT_SETTINGS.cardLookupUrl;
+    if (typeof parsed.lookupGame !== 'string') parsed.lookupGame = DEFAULT_SETTINGS.lookupGame;
     return parsed;
   } catch {
     return DEFAULT_SETTINGS;
@@ -118,7 +126,11 @@ export function useAppSettings() {
 
   const resetSettings = useCallback(() => {
     // Keep saved borderless layout targets — they are reference data, not preferences.
-    setSettings((prev) => ({ ...DEFAULT_SETTINGS, customLayoutProfiles: prev.customLayoutProfiles }));
+    setSettings((prev) => ({
+      ...DEFAULT_SETTINGS,
+      customLayoutProfiles: prev.customLayoutProfiles,
+      cardLookupUrl: prev.cardLookupUrl,
+    }));
   }, []);
 
   return { settings, updateSettings, resetSettings };
